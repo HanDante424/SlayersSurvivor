@@ -230,7 +230,7 @@ public class GameManager : MonoBehaviour
         GUI.Label(new Rect(W - 160, 18, 150, 30), $"처치 {Kills}", UIStyles.Label);
 
         // 체력 바 (플레이어 아래)
-        var sp = Camera.main.WorldToScreenPoint(p.transform.position + Vector3.down * 0.65f);
+        var sp = Camera.main.WorldToScreenPoint(p.transform.position + Vector3.down * p.HealthBarOffset);
         UIStyles.Bar(new Rect(sp.x - 30, H - sp.y, 60, 7), p.hp / p.maxHp, new Color(0.9f, 0.25f, 0.25f));
 
         // 보유 무기

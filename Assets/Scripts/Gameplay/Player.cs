@@ -19,17 +19,38 @@ public class Player : MonoBehaviour
     public readonly List<Weapon> weapons = new List<Weapon>();
     public Vector2 Facing { get; private set; } = Vector2.right;
 
+    /// <summary>체력 바를 그릴 위치 (플레이어 기준 아래쪽 거리)</summary>
+    public float HealthBarOffset { get; private set; } = 0.65f;
+
     float invuln;
     SpriteRenderer sr;
     Color baseColor;
+    SpriteSheetAnimator anim;
 
     void Awake()
     {
         I = this;
         hp = maxHp;
-        sr = SpriteFactory.AddRenderer(gameObject, "Player", SpriteFactory.Shape.Circle, new Color(0.35f, 0.75f, 1f), 10);
+
+        // Resources/Sprites/Player_Run.png 가 있으면 4방향 달리기 애니메이션 사용
+        sr = gameObject.AddComponent<SpriteRenderer>();
+        sr.sortingOrder = 10;
+        anim = gameObject.AddComponent<SpriteSheetAnimator>();
+        const float cell = 1.9f, pivotY = 0.4f;
+        if (anim.Load("Player_Run", 4, 8, cell, pivotY))
+        {
+            transform.localScale = Vector3.one;
+            HealthBarOffset = cell * (pivotY - 0.06f) + 0.15f; // 발 바로 아래
+        }
+        else
+        {
+            Destroy(anim);
+            anim = null;
+            sr.sprite = SpriteFactory.Get("Player", SpriteFactory.Shape.Circle);
+            sr.color = new Color(0.35f, 0.75f, 1f);
+            transform.localScale = Vector3.one * 0.9f;
+        }
         baseColor = sr.color;
-        transform.localScale = Vector3.one * 0.9f;
     }
 
     void Update()
@@ -40,14 +61,16 @@ public class Player : MonoBehaviour
         if (input.sqrMagnitude > 1f) input.Normalize();
         if (input.sqrMagnitude > 0.01f) Facing = input.normalized;
         transform.position += (Vector3)(input * moveSpeed * Time.deltaTime);
-        if (Mathf.Abs(input.x) > 0.01f) sr.flipX = input.x < 0;
+        if (anim != null) anim.SetMove(input);
+        else if (Mathf.Abs(input.x) > 0.01f) sr.flipX = input.x < 0;
 
         if (regen > 0) hp = Mathf.Min(maxHp, hp + regen * Time.deltaTime);
 
         if (invuln > 0)
         {
             invuln -= Time.deltaTime;
-            sr.color = Mathf.Repeat(invuln * 20f, 1f) > 0.5f ? Color.white : baseColor;
+            // 피격 시 깜빡임 (실제 스프라이트는 흰색이라 투명도로 표현)
+            sr.color = Mathf.Repeat(invuln * 20f, 1f) > 0.5f ? new Color(1f, 0.55f, 0.55f, 0.45f) : baseColor;
             if (invuln <= 0) sr.color = baseColor;
         }
 
