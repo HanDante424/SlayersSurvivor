@@ -211,86 +211,65 @@ public class GameManager : MonoBehaviour
     public void GameOver() => SetState(GameState.GameOver);
     void Victory() => SetState(GameState.Victory);
 
-    void Restart()
-    {
-        Time.timeScale = 1f;
-        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-    }
+    void Restart() => SceneLoader.Load(SceneManager.GetActiveScene().name);
+    void ToTitle() => SceneLoader.Load(SceneLoader.Title);
 
-    // ---------- UI (IMGUI: 추가 패키지 없이 동작하는 임시 UI) ----------
-    GUIStyle label, big, button, small;
-    Font font;
-    Texture2D white;
-
-    void InitStyles()
-    {
-        if (label != null) return;
-        font = Font.CreateDynamicFontFromOSFont(new[] { "Malgun Gothic", "맑은 고딕", "Arial" }, 20);
-        white = Texture2D.whiteTexture;
-        label = new GUIStyle(GUI.skin.label) { font = font, fontSize = 20, normal = { textColor = Color.white } };
-        small = new GUIStyle(label) { fontSize = 16, wordWrap = true, normal = { textColor = new Color(0.85f, 0.85f, 0.85f) } };
-        big = new GUIStyle(label) { fontSize = 44, alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold };
-        button = new GUIStyle(GUI.skin.button) { font = font, fontSize = 20, alignment = TextAnchor.UpperLeft, padding = new RectOffset(16, 16, 14, 14), wordWrap = true, richText = true };
-    }
-
-    void Bar(Rect r, float t, Color fill)
-    {
-        GUI.color = new Color(0, 0, 0, 0.6f); GUI.DrawTexture(r, white);
-        GUI.color = fill; GUI.DrawTexture(new Rect(r.x, r.y, r.width * Mathf.Clamp01(t), r.height), white);
-        GUI.color = Color.white;
-    }
-
+    // ---------- UI (IMGUI 임시 UI, 스타일은 UIStyles 공용) ----------
     void OnGUI()
     {
-        InitStyles();
+        UIStyles.Init();
         float W = Screen.width, H = Screen.height;
         var p = Player.I;
         if (p == null) return;
 
         // 상단 경험치 바
-        Bar(new Rect(0, 0, W, 14), (float)Xp / XpToNext, new Color(0.3f, 0.7f, 1f));
-        GUI.Label(new Rect(12, 18, 300, 30), $"Lv.{Level}", label);
+        UIStyles.Bar(new Rect(0, 0, W, 14), (float)Xp / XpToNext, new Color(0.3f, 0.7f, 1f));
+        GUI.Label(new Rect(12, 18, 300, 30), $"Lv.{Level}", UIStyles.Label);
         var ts = TimeSpan.FromSeconds(Elapsed);
-        GUI.Label(new Rect(W / 2 - 40, 18, 120, 30), $"{ts.Minutes:00}:{ts.Seconds:00}", label);
-        GUI.Label(new Rect(W - 160, 18, 150, 30), $"처치 {Kills}", label);
+        GUI.Label(new Rect(W / 2 - 40, 18, 120, 30), $"{ts.Minutes:00}:{ts.Seconds:00}", UIStyles.Label);
+        GUI.Label(new Rect(W - 160, 18, 150, 30), $"처치 {Kills}", UIStyles.Label);
 
         // 체력 바 (플레이어 아래)
         var sp = Camera.main.WorldToScreenPoint(p.transform.position + Vector3.down * 0.65f);
-        Bar(new Rect(sp.x - 30, H - sp.y, 60, 7), p.hp / p.maxHp, new Color(0.9f, 0.25f, 0.25f));
+        UIStyles.Bar(new Rect(sp.x - 30, H - sp.y, 60, 7), p.hp / p.maxHp, new Color(0.9f, 0.25f, 0.25f));
 
         // 보유 무기
         float y = 52;
         foreach (var w in p.weapons)
         {
-            GUI.Label(new Rect(12, y, 300, 26), $"{w.DisplayName}  Lv.{w.level}", small);
+            GUI.Label(new Rect(12, y, 300, 26), $"{w.DisplayName}  Lv.{w.level}", UIStyles.Small);
             y += 22;
         }
 
+        float mbw = 260, mbh = 56;
+        float mbx = (W - mbw) / 2;
+
         if (State == GameState.LevelUp)
         {
-            GUI.color = new Color(0, 0, 0, 0.65f); GUI.DrawTexture(new Rect(0, 0, W, H), white); GUI.color = Color.white;
-            GUI.Label(new Rect(0, H * 0.15f, W, 60), "레벨 업!", big);
+            UIStyles.Overlay(UIStyles.Dim);
+            GUI.Label(new Rect(0, H * 0.15f, W, 60), "레벨 업!", UIStyles.Big);
             float bw = Mathf.Min(520, W - 40), bh = 86;
             float bx = (W - bw) / 2, by = H * 0.3f;
             for (int i = 0; i < choices.Count; i++)
             {
                 var c = choices[i];
-                if (GUI.Button(new Rect(bx, by + i * (bh + 14), bw, bh), $"[{i + 1}] {c.title}\n<size=16>{c.desc}</size>", button)) Pick(i);
+                if (GUI.Button(new Rect(bx, by + i * (bh + 14), bw, bh), $"[{i + 1}] {c.title}\n<size=16>{c.desc}</size>", UIStyles.Button)) Pick(i);
             }
         }
         else if (State == GameState.Paused)
         {
-            GUI.color = new Color(0, 0, 0, 0.5f); GUI.DrawTexture(new Rect(0, 0, W, H), white); GUI.color = Color.white;
-            GUI.Label(new Rect(0, H * 0.4f, W, 60), "일시정지", big);
-            GUI.Label(new Rect(0, H * 0.4f + 60, W, 30), "ESC 계속하기", new GUIStyle(label) { alignment = TextAnchor.MiddleCenter });
+            UIStyles.Overlay(new Color(0, 0, 0, 0.5f));
+            GUI.Label(new Rect(0, H * 0.3f, W, 60), "일시정지", UIStyles.Big);
+            if (GUI.Button(new Rect(mbx, H * 0.3f + 90, mbw, mbh), "계속하기 (ESC)", UIStyles.MenuButton)) SetState(GameState.Playing);
+            if (GUI.Button(new Rect(mbx, H * 0.3f + 90 + mbh + 14, mbw, mbh), "타이틀로", UIStyles.MenuButton)) ToTitle();
         }
         else if (State == GameState.GameOver || State == GameState.Victory)
         {
-            GUI.color = new Color(0, 0, 0, 0.7f); GUI.DrawTexture(new Rect(0, 0, W, H), white); GUI.color = Color.white;
-            GUI.Label(new Rect(0, H * 0.3f, W, 60), State == GameState.Victory ? "생존 성공!" : "게임 오버", big);
-            var center = new GUIStyle(label) { alignment = TextAnchor.MiddleCenter };
-            GUI.Label(new Rect(0, H * 0.3f + 80, W, 30), $"생존 시간 {ts.Minutes:00}:{ts.Seconds:00}   레벨 {Level}   처치 {Kills}", center);
-            if (GUI.Button(new Rect(W / 2 - 110, H * 0.3f + 140, 220, 56), "다시 하기 (R)", new GUIStyle(button) { alignment = TextAnchor.MiddleCenter })) Restart();
+            UIStyles.Overlay(new Color(0, 0, 0, 0.7f));
+            GUI.Label(new Rect(0, H * 0.3f, W, 60), State == GameState.Victory ? "생존 성공!" : "게임 오버", UIStyles.Big);
+            GUI.Label(new Rect(0, H * 0.3f + 80, W, 30), $"생존 시간 {ts.Minutes:00}:{ts.Seconds:00}   레벨 {Level}   처치 {Kills}", UIStyles.Center);
+            if (GUI.Button(new Rect(mbx, H * 0.3f + 140, mbw, mbh), "다시 하기 (R)", UIStyles.MenuButton)) Restart();
+            if (GUI.Button(new Rect(mbx, H * 0.3f + 140 + mbh + 14, mbw, mbh), "타이틀로", UIStyles.MenuButton)) ToTitle();
         }
     }
 }
