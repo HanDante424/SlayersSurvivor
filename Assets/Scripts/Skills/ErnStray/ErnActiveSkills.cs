@@ -18,8 +18,8 @@ public class TripleSlash : ActiveSkill
     const int Hits = 3;
 
     const float FxFps = 20f;            // [임시] 10프레임 → 0.5초 (3타 전체를 한 시트로)
-    const float FxWidth = 1.8f;         // [임시] 한 칸 가로 = 범위 x 이 값
-    const float FxForward = 0.45f;      // [임시] 이펙트 중심 = 플레이어 앞 범위 x 이 값
+    const float FxWidth = 3f;         // [임시] 한 칸 가로 = 범위 x 이 값
+    const float FxForward = 1.2f;      // [임시] 이펙트 중심 = 플레이어 앞 범위 x 이 값
 
     static SkillHitbox Hit => T.tripleSlash;
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
@@ -191,6 +191,7 @@ public class FireStream : Skill
     public override string Badge => stacks.ToString();
     public override float CooldownFraction =>
         stacks >= MaxStacks ? 0f : stacks > 0 ? 0f : Mathf.Clamp01(recharge / Mathf.Max(0.01f, StackCooldown));
+    public override float CooldownRemaining => stacks > 0 ? 0f : Mathf.Max(0f, recharge);
     /// <summary>다음 스택 회복 진행도 (HUD)</summary>
     public float RechargeFraction => stacks >= MaxStacks ? 0f : Mathf.Clamp01(recharge / Mathf.Max(0.01f, StackCooldown));
 
@@ -204,6 +205,7 @@ public class FireStream : Skill
 
     public override bool TryActivate()
     {
+        if (CheatDisabled) return false;   // 치트: 스킬별 사용 금지
         if (stacks <= 0 || P.IsBusy) return false;
         if (stacks == MaxStacks) recharge = StackCooldown;
         stacks--;
@@ -241,6 +243,7 @@ public class BlazingStorm : Skill
 
     public override bool TryActivate()
     {
+        if (CheatDisabled) return false;   // 치트: 스킬별 사용 금지
         if (running || P.IsBusy || !GameManager.I.UltimateReady) return false;
         GameManager.I.ConsumeUltimateGauge();
         StartCoroutine(Run());

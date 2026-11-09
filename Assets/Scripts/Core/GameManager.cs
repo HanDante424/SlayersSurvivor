@@ -12,6 +12,9 @@ public class GameManager : MonoBehaviour
 
     [Header("진행")]
     public float surviveTime = 600f;      // 10분 생존 시 승리
+
+    /// <summary>[임시] 게임 카메라 시야 (화면 세로 절반, 유닛). 기존 7 → 1.5배</summary>
+    public const float ViewSize = 10.5f;
     public GameState State { get; private set; } = GameState.Playing;
     public float Elapsed { get; private set; }
     public int Kills { get; private set; }
@@ -45,7 +48,7 @@ public class GameManager : MonoBehaviour
             cam = cgo.AddComponent<Camera>();
         }
         cam.orthographic = true;
-        cam.orthographicSize = 7f;
+        cam.orthographicSize = ViewSize;
         cam.backgroundColor = new Color(0.08f, 0.1f, 0.09f);
         cam.clearFlags = CameraClearFlags.SolidColor;
         if (cam.GetComponent<CameraFollow>() == null) cam.gameObject.AddComponent<CameraFollow>();
@@ -84,7 +87,7 @@ public class GameManager : MonoBehaviour
         Elapsed += Time.deltaTime;
         if (Elapsed >= surviveTime) { Victory(); return; }
 
-        Spawning();
+        if (!DebugCheats.NoSpawn) Spawning();   // 치트 F8: 적 생성 중지
         Enemy.Separate();
     }
 
@@ -119,13 +122,19 @@ public class GameManager : MonoBehaviour
         return EnemyKind.Bat;
     }
 
-    Vector2 SpawnPos()
+    /// <summary>화면 밖 거리: 플레이어(화면 중앙)에서 화면 모서리 + 1.5 유닛. 적 생성·재배치 기준</summary>
+    public static float OffscreenRadius
     {
-        var cam = Camera.main;
-        float h = cam.orthographicSize, w = h * cam.aspect;
-        float dist = Mathf.Sqrt(w * w + h * h) + 1.5f;
-        return (Vector2)Player.I.transform.position + Random.insideUnitCircle.normalized * dist;
+        get
+        {
+            var cam = Camera.main;
+            if (cam == null) return 16f;
+            float h = cam.orthographicSize, w = h * cam.aspect;
+            return Mathf.Sqrt(w * w + h * h) + 1.5f;
+        }
     }
+
+    Vector2 SpawnPos() => (Vector2)Player.I.transform.position + Random.insideUnitCircle.normalized * OffscreenRadius;
 
     // ---------- 경험치 / 레벨업 ----------
     public void OnEnemyKilled(Enemy e)
@@ -382,6 +391,14 @@ public class GameManager : MonoBehaviour
     static GUIStyle subtitleStyle;
     static GUIStyle SubtitleStyle => subtitleStyle ??= new GUIStyle(UIStyles.Center) { richText = true };
 
+    // 스킬 슬롯 색: 사용 가능 = 밝은 회색 / 사용 불가 = 어두운 회색, 쿨타임 동안 아래에서 회색이 차오름
+    static readonly Color SlotReady = new Color(0.78f, 0.78f, 0.78f, 0.95f);
+    static readonly Color SlotReadyText = new Color(0.08f, 0.08f, 0.08f, 1f);
+    static readonly Color SlotLocked = new Color(0.16f, 0.16f, 0.16f, 0.92f);
+    static readonly Color SlotFill = new Color(0.45f, 0.45f, 0.45f, 0.95f);
+    static GUIStyle slotTime;
+    static GUIStyle SlotTime => slotTime ??= new GUIStyle(UIStyles.Label) { fontSize = 22, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter };
+
     void DrawSkillBar(Player p, float W, float H)
     {
         var T = Tuning.Skills;
@@ -402,28 +419,47 @@ public class GameManager : MonoBehaviour
             else { s = p.FirstOfKind(SkillKind.Ultimate); key = T.ultimateKey.ToString(); }
 
             var r = new Rect(x0 + i * (size + gap), yy, size, size);
-            GUI.color = new Color(0, 0, 0, s != null ? 0.7f : 0.35f);
-            GUI.DrawTexture(r, UIStyles.White);
+            Color text = Color.white;
 
-            if (s != null)
+            if (s == null)
             {
-                // 쿨타임: 위에서부터 어둡게 덮음
-                float cd = s.CooldownFraction;
-                if (cd > 0)
+                // 빈 칸
+                GUI.color = new Color(0, 0, 0, 0.35f);
+                GUI.DrawTexture(r, UIStyles.White);
+                text = new Color(1, 1, 1, 0.4f);
+            }
+            else
+            {
+                float cd = s.CooldownFraction;               // 1 = 방금 사용, 0 = 사용 가능
+                bool ready = cd <= 0f && !(s.Entry.kind != SkillKind.Ultimate && p.IsBusy) && !s.CheatDisabled;
+                if (ready)
                 {
-                    GUI.color = new Color(0, 0, 0, 0.6f);
-                    GUI.DrawTexture(new Rect(r.x, r.y, r.width, r.height * cd), UIStyles.White);
+                    // 사용 가능: 밝은 회색
+                    GUI.color = SlotReady;
+                    GUI.DrawTexture(r, UIStyles.White);
+                    text = SlotReadyText;
                 }
                 else
                 {
-                    GUI.color = new Color(1f, 0.55f, 0.15f, 0.9f);
-                    GUI.DrawTexture(new Rect(r.x, r.yMax - 3, r.width, 3), UIStyles.White);
+                    // 사용 불가: 어두운 회색 + 아래에서부터 회색이 차오름 (다 차면 사용 가능)
+                    GUI.color = SlotLocked;
+                    GUI.DrawTexture(r, UIStyles.White);
+                    float filled = r.height * Mathf.Clamp01(1f - cd);
+                    GUI.color = SlotFill;
+                    GUI.DrawTexture(new Rect(r.x, r.yMax - filled, r.width, filled), UIStyles.White);
+                    // 남은 시간 (초)
+                    float left = s.CooldownRemaining;
+                    if (left > 0f)
+                    {
+                        GUI.color = Color.white;
+                        GUI.Label(r, left >= 10f ? $"{left:0}" : $"{left:0.0}", SlotTime);
+                    }
                 }
-                GUI.color = Color.white;
+                GUI.color = text;
                 GUI.Label(new Rect(r.x + 2, r.y, r.width - 4, r.height - 2), s.Entry.name, slotName);
                 if (s.Badge != null) GUI.Label(new Rect(r.x, r.y + 2, r.width - 4, 20), s.Badge, slotBadge);
             }
-            GUI.color = s != null ? Color.white : new Color(1, 1, 1, 0.4f);
+            GUI.color = text;
             GUI.Label(new Rect(r.x + 5, r.y + 2, 40, 20), key, slotKey);
             GUI.color = Color.white;
         }

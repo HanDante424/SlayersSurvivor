@@ -103,7 +103,8 @@ public abstract class Skill : MonoBehaviour
         Mathf.FloorToInt(baseDamage * (1f + DamageBonus) * P.damageMul + 1e-4f);   // 1e-4: 10×1.3 같은 부동소수 오차 보정
 
     /// <summary>최종 쿨타임 = 기본 × (1 - min(감소율 합계, 0.9))</summary>
-    protected float CooldownOf(float baseSeconds) => baseSeconds * (1f - CooldownReduction) * P.cooldownMul;
+    protected float CooldownOf(float baseSeconds) =>
+        DebugCheats.NoCooldown ? 0f : baseSeconds * (1f - CooldownReduction) * P.cooldownMul;   // 치트 F6: 쿨타임 0
 
     /// <summary>최종 범위 = 기본 × (1 + 범위 증가율 합계). 정수화 규칙은 미정 → 그대로</summary>
     protected float RangeOf(float baseRange) => baseRange * (1f + RangeBonus) * P.areaMul;
@@ -123,6 +124,10 @@ public abstract class Skill : MonoBehaviour
     // ---------- 수동 / 이동 / 궁극기용 ----------
     /// <summary>HUD 표시용: 0=사용 가능, 1=방금 사용</summary>
     public virtual float CooldownFraction => 0f;
+    /// <summary>HUD 표시용: 남은 쿨타임(초). 시간으로 표시할 수 없는 스킬(궁극기 게이지 등)은 0</summary>
+    public virtual float CooldownRemaining => 0f;
+    /// <summary>치트 패널에서 이 스킬만 사용 금지됨</summary>
+    public bool CheatDisabled => Entry != null && DebugCheats.IsSkillDisabled(Entry.id);
     /// <summary>HUD 표시용 추가 정보 (스택 수 등)</summary>
     public virtual string Badge => null;
     /// <summary>키를 눌렀을 때. 사용했으면 true</summary>
@@ -159,12 +164,17 @@ public abstract class ActiveSkill : Skill
     protected abstract float CooldownSeconds { get; }
 
     public override float CooldownFraction => cdLeft <= 0 ? 0f : Mathf.Clamp01(cdLeft / Mathf.Max(0.01f, CooldownSeconds));
+    public override float CooldownRemaining => Mathf.Max(0f, cdLeft);
 
-    public override void Tick(float dt) { if (cdLeft > 0) cdLeft -= dt; }
+    public override void Tick(float dt)
+    {
+        if (DebugCheats.NoCooldown) cdLeft = 0f;   // 이미 돌고 있던 쿨타임도 즉시 해제
+        if (cdLeft > 0) cdLeft -= dt;
+    }
 
     public override bool TryActivate()
     {
-        if (cdLeft > 0 || P.IsBusy) return false;
+        if (cdLeft > 0 || P.IsBusy || CheatDisabled) return false;
         cdLeft = CooldownSeconds;
         Activate();
         return true;
@@ -181,6 +191,8 @@ public abstract class AutoSkill : Skill
 
     public override void Tick(float dt)
     {
+        if (DebugCheats.NoAutoSkills || CheatDisabled) return; // 치트 F7 / 스킬별 사용 금지
+        if (DebugCheats.NoCooldown && timer > 0f) timer = 0f;   // 치트 F6
         timer -= dt;
         if (timer > 0) return;
         // 발동할 대상이 없으면 쿨타임을 소모하지 않고 다음 프레임에 다시 확인

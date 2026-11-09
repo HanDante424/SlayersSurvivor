@@ -118,7 +118,9 @@ public class Enemy : MonoBehaviour
         if (!stunned && (p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);
 
         // 너무 멀어지면 플레이어 근처로 재배치 (뱀서 방식)
-        if (dist > 22f) transform.position = (Vector2)p.transform.position + Random.insideUnitCircle.normalized * 14f;
+        // 기준은 카메라 시야에 맞춰 자동 (화면 밖 생성 거리 + 6 넘으면 화면 밖 생성 거리로)
+        float far = GameManager.OffscreenRadius;
+        if (dist > far + 6f) transform.position = (Vector2)p.transform.position + Random.insideUnitCircle.normalized * far;
 
         if (flash > 0)
         {

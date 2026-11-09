@@ -45,9 +45,9 @@ MonoBehaviour:
     knockback: 1.5
   tripleSlash:
     shape: 1
-    forward: 3.2
-    back: 0.9
-    width: 2.2
+    forward: 8
+    back: 1.5
+    width: 9
     radius: 2.6
     halfAngle: 75
     near: 0.3
@@ -58,7 +58,7 @@ MonoBehaviour:
     forward: 2.2
     back: 0.9
     width: 1.6
-    radius: 2.6
+    radius: 2
     halfAngle: 180
     near: 0.3
     knockback: 0.3
@@ -67,10 +67,10 @@ MonoBehaviour:
     forward: 2.2
     back: 0.9
     width: 1.6
-    radius: 2.6
+    radius: 4
     halfAngle: 180
     near: 0.3
-    knockback: 1.2
+    knockback: 5
   solarExplosionDelay: 0.45
   autoSlots: 6
   passiveSlots: 6
