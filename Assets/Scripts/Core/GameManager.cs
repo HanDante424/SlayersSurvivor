@@ -163,9 +163,9 @@ public class GameManager : MonoBehaviour
         AddWeaponOption<Lightning>(pool, p);
 
         pool.Add(new Upgrade { title = "체력 강화", desc = "최대 체력 +20, 체력 회복", apply = () => { p.maxHp += 20; p.hp = Mathf.Min(p.maxHp, p.hp + 20); } });
-        pool.Add(new Upgrade { title = "신속", desc = "이동 속도 +8%", apply = () => p.moveSpeed *= 1.08f });
+        pool.Add(new Upgrade { title = "신속", desc = "이동 속도 +8%", apply = () => p.moveSpeedMul *= 1.08f });
         pool.Add(new Upgrade { title = "재생", desc = "초당 체력 회복 +0.5", apply = () => p.regen += 0.5f });
-        pool.Add(new Upgrade { title = "자석", desc = "획득 범위 +30%", apply = () => p.pickupRadius *= 1.3f });
+        pool.Add(new Upgrade { title = "자석", desc = "획득 범위 +30%", apply = () => p.pickupMul *= 1.3f });
         pool.Add(new Upgrade { title = "힘", desc = "모든 피해량 +10%", apply = () => p.damageMul += 0.1f });
         if (p.cooldownMul > 0.5f)
             pool.Add(new Upgrade { title = "가속", desc = "모든 쿨다운 -8%", apply = () => p.cooldownMul *= 0.92f });

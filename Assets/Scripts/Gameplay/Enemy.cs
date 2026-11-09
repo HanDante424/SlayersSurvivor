@@ -15,6 +15,7 @@ public class Enemy : MonoBehaviour
     Color baseColor;
     float flash;
     Vector2 knockback;
+    float baseScale = 1f;
 
     public static Enemy Spawn(EnemyKind kind, Vector2 pos, float hpMul)
     {
@@ -39,8 +40,10 @@ public class Enemy : MonoBehaviour
         }
         maxHp *= hpMul;
         hp = maxHp;
-        radius = scale * 0.5f;
+        baseScale = scale;
+        radius = baseScale * Tuning.Enemy.HitboxRatio(kind);
         transform.localScale = Vector3.one * scale;
+        HitboxView.Attach(transform, HitboxView.EnemyColor, () => radius);
         sr = SpriteFactory.AddRenderer(gameObject, "Enemy_" + k, shape, col, k == EnemyKind.Boss ? 6 : 5);
         baseColor = sr.color;
     }
@@ -61,6 +64,8 @@ public class Enemy : MonoBehaviour
 
     void Update()
     {
+        // 판정 크기는 설정 파일 값으로 매 프레임 갱신 (Play 중 조정 반영)
+        radius = baseScale * Tuning.Enemy.HitboxRatio(kind);
         if (GameManager.I.State != GameState.Playing) return;
         var p = Player.I;
         if (p == null) return;
@@ -75,7 +80,8 @@ public class Enemy : MonoBehaviour
         transform.position = pos;
         sr.flipX = dir.x < 0;
 
-        if (dist < radius + p.radius) p.TakeDamage(damage);
+        float touch = radius + p.radius;
+        if ((p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);
 
         // 너무 멀어지면 플레이어 근처로 재배치 (뱀서 방식)
         if (dist > 22f) transform.position = (Vector2)p.transform.position + Random.insideUnitCircle.normalized * 14f;

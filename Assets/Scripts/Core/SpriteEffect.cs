@@ -42,13 +42,14 @@ public class SpriteEffect : MonoBehaviour
 
     /// <summary>이펙트를 만들어 재생. parent 가 있으면 따라 움직입니다.</summary>
     public static SpriteEffect Spawn(Sprite[] frames, float fps, Transform parent, Vector2 localPos,
-                                     float angleDeg, bool flipX, int sortingOrder)
+                                     float angleDeg, bool flipX, int sortingOrder, float scale = 1f)
     {
         if (frames == null || frames.Length == 0) return null;
         var go = new GameObject("FX_" + frames[0].name);
         go.transform.SetParent(parent, false);
         go.transform.localPosition = localPos;
         go.transform.localRotation = Quaternion.Euler(0, 0, angleDeg);
+        go.transform.localScale = Vector3.one * scale;
 
         var fx = go.AddComponent<SpriteEffect>();
         fx.frames = frames;

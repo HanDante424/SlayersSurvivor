@@ -78,6 +78,12 @@ public class SpriteSheetAnimator : MonoBehaviour
 
     public bool HasClip(string key) => clips.ContainsKey(key);
 
+    /// <summary>클립 재생 속도 변경 (실행 중 조정용)</summary>
+    public void SetClipFps(string key, float fps)
+    {
+        if (clips.TryGetValue(key, out var c)) c.fps = Mathf.Max(0.1f, fps);
+    }
+
     /// <summary>매 프레임 이동 방향을 넘겨주세요. 0 벡터면 정지.</summary>
     public void SetMove(Vector2 dir)
     {

@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7e62d052331942f9ac8e07da32f1ca67, type: 3}
+  m_Name: ErnStrayConfig
+  m_EditorClassIdentifier: 
+  hurtRadius: 0.4
+  hurtOffset: {x: 0, y: 0}
+  pickupRadius: 2
+  moveSpeed: 4.5
+  critChance: 0.5
+  attackFps: 16
+  fxDelay: 0.125
+  fxDistance: 0.7
+  fxOffset: {x: 0, y: 0}
+  fxSize: 2
+  fxCritSize: 2.6
+  fxFps: 32
+  fxCritFps: 36
