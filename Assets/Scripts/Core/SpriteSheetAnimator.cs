@@ -82,12 +82,13 @@ public class SpriteSheetAnimator : MonoBehaviour
     public void SetMove(Vector2 dir)
     {
         moving = dir.sqrMagnitude > 0.01f;
-        if (!moving || oneShot != null) return;   // 동작 재생 중에는 방향 고정
+        if (!moving) return;
+        // 동작 재생 중에도 이동 방향을 따라 돌아봄 (같은 프레임에서 행만 바뀜)
         Facing = ToFacing(dir);
     }
 
     /// <summary>
-    /// 클립을 한 번 재생합니다. 재생 중에는 방향이 고정되고, 끝나면 이동/정지 애니메이션으로 돌아갑니다.
+    /// 클립을 한 번 재생합니다. 재생 중 이동하면 그 방향으로 돌아보고, 끝나면 이동/정지 애니메이션으로 돌아갑니다.
     /// 이미 다른 동작이 재생 중이면 무시하고 false 를 돌려줍니다 (interrupt=true 면 끊고 새로 시작).
     /// </summary>
     /// <param name="dir">바라볼 방향. 0 벡터면 현재 방향 유지</param>
