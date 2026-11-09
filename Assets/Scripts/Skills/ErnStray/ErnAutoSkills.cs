@@ -205,7 +205,8 @@ public class FireSlash : AutoSkill
     void OnEnemyKilled(Enemy e)
     {
         if (!HasSpecial(DeathEcho) || DebugCheats.NoAutoSkills || CheatDisabled) return;
-        // 적 1마리 사망 = 메아리 1회 (Enemy.Die 는 적마다 한 번만). 메아리 참격도 검기를 발사 (연속 공격 생성은 미적용)
+        // 적 1마리 사망 = 메아리 1회 (Enemy.Die 는 적마다 한 번만) → 처치가 있어야만 생성되므로 무한 생성 없음.
+        // 메아리 참격에도 Lv.5 방향 강화 + Lv.10 추가 공격(검기·연속 공격 생성)을 적용해 최대한 많이 발생
         StartCoroutine(EchoAt(e.transform.position));
     }
 
@@ -214,14 +215,43 @@ public class FireSlash : AutoSkill
         // 다음 프레임 이후에 생성 → 연쇄가 한 프레임 안에서 재귀로 쌓이지 않음
         if (T.fireEchoDelay > 0) yield return new WaitForSeconds(T.fireEchoDelay);
         else yield return null;
-        Vector2 d0 = Random.insideUnitCircle.normalized;   // [임시] 3방향의 기준 각도 미정 → 무작위
+        foreach (var d in EchoDirections(at)) Strike(at, d);   // 참격 + 검기 / 연속 공격 생성
+    }
+
+    /// <summary>
+    /// 메아리 3방향(120°)에 Lv.5 특수 강화 적용 [해석]
+    ///  대상 추적: 기준 방향 = 사망 위치에서 가장 가까운 적 (없으면 무작위) → 3방향
+    ///  양방향 공격: 3방향 + 각 정반대 = 6방향
+    ///  난사: 3방향 각각을 무작위 3회로 → 9방향
+    /// </summary>
+    List<Vector2> EchoDirections(Vector2 at)
+    {
+        var list = new List<Vector2>();
+        Vector2 d0 = Random.insideUnitCircle.normalized;   // [임시] 기준 각도 미정 → 무작위
+        if (HasSpecial(Track))
+        {
+            var t = Nearest(at, T.fireTrackRange);
+            if (t != null && ((Vector2)t.transform.position - at).sqrMagnitude > 0.0001f)
+                d0 = ((Vector2)t.transform.position - at).normalized;
+        }
         if (d0.sqrMagnitude < 0.001f) d0 = Vector2.right;
+
         for (int k = 0; k < 3; k++)
         {
             Vector2 d = Rotate(d0, ChainAngle * k);
-            SlashOnce(at, d);
-            if (HasSpecial(Wave)) StartCoroutine(WaveAfter(at, d));   // 검기 → 죽음의 메아리 루트
+            if (HasSpecial(Scatter))
+                for (int i = 0; i < ScatterCount; i++)
+                {
+                    var r = Random.insideUnitCircle.normalized;
+                    list.Add(r.sqrMagnitude < 0.001f ? d : r);
+                }
+            else
+            {
+                list.Add(d);
+                if (HasSpecial(BothWays)) list.Add(-d);
+            }
         }
+        return list;
     }
 
     static Vector2 Rotate(Vector2 v, float deg)
