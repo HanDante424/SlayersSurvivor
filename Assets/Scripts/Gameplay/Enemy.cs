@@ -32,6 +32,12 @@ public class Enemy : MonoBehaviour
         slowLeft = Mathf.Max(slowLeft, seconds);
     }
 
+    /// <summary>넉백 속도가 초당 줄어드는 비율. 밀려나는 총 거리 = 넉백 속도 / 이 값</summary>
+    public const float KnockDecay = 10f;
+
+    /// <summary>밀려날 거리(유닛) → Hit/Push 에 넘길 넉백 속도</summary>
+    public static float KnockSpeed(float distance) => distance * KnockDecay;
+
     /// <summary>피해 없이 밀어내기</summary>
     public void Push(Vector2 dir, float force)
     {
@@ -103,7 +109,7 @@ public class Enemy : MonoBehaviour
 
         float moveSpeed = stunned ? 0f : speed * slowMul;
         pos += (dir * moveSpeed + knockback) * Time.deltaTime;
-        knockback = Vector2.Lerp(knockback, Vector2.zero, 10f * Time.deltaTime);
+        knockback = Vector2.Lerp(knockback, Vector2.zero, KnockDecay * Time.deltaTime);
         transform.position = pos;
         if (!stunned) sr.flipX = dir.x < 0;
 

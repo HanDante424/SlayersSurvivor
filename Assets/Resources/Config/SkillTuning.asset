@@ -30,10 +30,48 @@ MonoBehaviour:
   - 2.5
   - 4.5
   - 7
-  damagePerLevel: 0.1
-  cooldownPerLevel: 0.03
-  cooldownFloor: 0.4
-  rangePerLevel: 0.02
+  upgradeDamage: 0.1
+  upgradeRange: 0.15
+  upgradeCooldown: 0.05
+  cooldownReductionCap: 0.9
+  fireSlash:
+    shape: 1
+    forward: 5
+    back: 1.2
+    width: 3
+    radius: 1.6
+    halfAngle: 70
+    near: 0.3
+    knockback: 1.5
+  tripleSlash:
+    shape: 1
+    forward: 3.2
+    back: 0.9
+    width: 2.2
+    radius: 2.6
+    halfAngle: 75
+    near: 0.3
+    knockback: 0.4
+  tripleSlashInterval: 0.15
+  solarSlash:
+    shape: 0
+    forward: 2.2
+    back: 0.9
+    width: 1.6
+    radius: 2.6
+    halfAngle: 180
+    near: 0.3
+    knockback: 0.3
+  solarExplosion:
+    shape: 0
+    forward: 2.2
+    back: 0.9
+    width: 1.6
+    radius: 2.6
+    halfAngle: 180
+    near: 0.3
+    knockback: 1.2
+  solarExplosionDelay: 0.45
   autoSlots: 6
   passiveSlots: 6
   manualSlots: 3

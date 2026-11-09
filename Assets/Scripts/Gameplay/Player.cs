@@ -81,11 +81,14 @@ public class Player : MonoBehaviour
         return n;
     }
 
-    /// <summary>스킬 획득 또는 강화</summary>
+    /// <summary>
+    /// 스킬 신규 획득 (Lv.1). 이미 보유 중이면 아무것도 하지 않음 —
+    /// 보유 스킬 강화는 레벨업 화면의 기본 강화(Skill.ApplyBasicUpgrade) / 궁극기 강화(Skill.LevelUp) 경유.
+    /// </summary>
     public Skill AddOrLevelSkill(SkillEntry entry)
     {
         var existing = GetSkill(entry.id);
-        if (existing != null) { existing.LevelUp(); return existing; }
+        if (existing != null) return existing;
         var go = new GameObject("Skill_" + entry.id);
         go.transform.SetParent(transform, false);
         var s = (Skill)go.AddComponent(entry.type);

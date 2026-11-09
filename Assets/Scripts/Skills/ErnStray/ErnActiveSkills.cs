@@ -6,38 +6,44 @@ using UnityEngine;
 // 방향은 플레이어가 마지막으로 이동한 방향(Facing) 기준.
 // 기획서에 없는 값은 각 클래스 맨 위 "[임시]" 상수.
 
-/// <summary>M01 트리플 슬래시: 범위 중간 · 피해 높음 · 쿨 중간</summary>
+/// <summary>
+/// M01 트리플 슬래시 (기획 v0.2): 수동 · 쿨타임 8초 · 1회 사용 시 3타 · 타당 피해 8 (총 24) · 바라보는 방향으로만.
+/// 다단히트 → 타마다 floor(8 × (1 + 공격력 증가율 합계)). 판정·간격은 SkillTuning.tripleSlash* 에서 조정.
+/// </summary>
 public class TripleSlash : ActiveSkill
 {
-    const float Interval = 0.15f;       // [임시] 베기 간격
-    const float HalfAngle = 75f;        // [임시]
+    // 기본 수치 (기획 v0.2 확정 — 임의 변경 금지)
+    const float BaseCooldown = 8f;
+    const float DamagePerHit = 8f;
+    const int Hits = 3;
+
     const float FxFps = 20f;            // [임시] 10프레임 → 0.5초 (3타 전체를 한 시트로)
     const float FxWidth = 1.8f;         // [임시] 한 칸 가로 = 범위 x 이 값
     const float FxForward = 0.45f;      // [임시] 이펙트 중심 = 플레이어 앞 범위 x 이 값
 
-    protected override float CooldownSeconds => Cooldown(Tier.Mid);
+    static SkillHitbox Hit => T.tripleSlash;
+    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
 
     protected override void Activate() => StartCoroutine(Run());
 
     IEnumerator Run()
     {
         string[] clips = { Player.SlashH, Player.SlashV, Player.Thrust };
-        float per = Damage(Power.High) / 3f;   // 총 피해 '높음'을 3타로 나눔 [임시 해석]
-        float r0 = Range(Tier.Mid);
+        float r0 = RangeOf(Hit.radius);
         // 트리플 슬래시 시트는 3타를 한 번에 그린 10프레임 → 첫 타에 한 번만 띄움
         var frames = ErnSkillFx.TripleSlash;
         if (frames != null)
             ErnSkillFx.SpawnDirected(frames, FxFps, (Vector2)P.transform.position + P.Facing * (r0 * FxForward),
                                      P.Facing, r0 * FxWidth);
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < Hits; i++)
         {
             Vector2 from = P.transform.position;
             Vector2 dir = P.Facing;
             P.PlayAttack(clips[i], dir, baseFx: frames == null);
-            float r = Range(Tier.Mid);
-            if (frames == null) Fx.Arc(from, dir, r, i == 2 ? Fx.FireBright : Fx.Fire, 0.15f);
-            SkillHits.Sector(from, dir, r, HalfAngle, per, 3f);
-            yield return new WaitForSeconds(Interval);
+            float r = RangeOf(Hit.radius);
+            if (frames == null) Fx.Arc(from, dir, r, i == Hits - 1 ? Fx.FireBright : Fx.Fire, 0.15f);
+            SkillHits.Directed(Hit, from, dir, RangeScale, HitDamage(DamagePerHit));   // 모양은 SkillTuning.tripleSlash
+            if (i < Hits - 1) yield return new WaitForSeconds(T.tripleSlashInterval);
         }
     }
 }

@@ -4,15 +4,28 @@ using UnityEngine;
 /// <summary>스킬 종류 (기획서 2.1)</summary>
 public enum SkillKind { Auto, Manual, Movement, Passive, Ultimate }
 
+/// <summary>기본 강화 3종 (기획 v0.2 4장). 1회 선택 효과는 SkillTuning (공격력 +10% / 범위 +10% / 쿨타임 -5%)</summary>
+public enum BasicUpgrade { Damage, Range, Cooldown }
+
+/// <summary>특수 강화 선택지 1개 (기획 미설계 → 아직 어떤 스킬도 만들지 않음)</summary>
+public class SpecialUpgradeOption
+{
+    public string title, desc;
+}
+
 /// <summary>
 /// 모든 스킬의 공통 기반.
-/// - 스킬 레벨 1~15 (캐릭터 레벨과 별개). Lv.5·10·15는 특수 강화 시점 (효과는 기획 미설계 → 훅만 존재)
-/// - 수치는 등급(Power/Tier)으로만 지정하고, 숫자는 SkillTuning 임시 환산표에서 가져옴
+/// - 스킬 레벨 1~15 (캐릭터 레벨과 별개)
+/// - 일반 스킬 성장 (기획 v0.2): 보유 스킬을 레벨업 후보로 고르면 기본 강화 1개 선택 → 스킬 레벨 +1.
+///   스킬 레벨 5·10·15 에 도달하면 이어서 특수 강화 선택 (효과는 기획 미설계 → 훅만 존재).
+/// - 강화율은 종류별로 합연산. 피해량 = floor(기본 × (1 + 합계)), 쿨타임 감소 합계는 최대 90%.
+/// - 궁극기는 기본 강화 없이 레벨만 오름 (캐릭터 Lv.60 강화, 별도 규칙)
 /// </summary>
 public abstract class Skill : MonoBehaviour
 {
     public const int MaxLevel = 15;
     public static readonly int[] MilestoneLevels = { 5, 10, 15 };
+    static readonly SpecialUpgradeOption[] NoSpecialOptions = new SpecialUpgradeOption[0];
 
     public SkillEntry Entry { get; private set; }
     public int level = 1;
@@ -21,35 +34,87 @@ public abstract class Skill : MonoBehaviour
     protected static SkillTuning T => Tuning.Skills;
 
     public virtual int LevelCap => Entry.kind == SkillKind.Ultimate ? T.ultimateMaxLevel : MaxLevel;
+    /// <summary>일반 스킬 = 기본/특수 강화 대상 (궁극기 제외)</summary>
+    public bool IsGeneral => Entry.kind != SkillKind.Ultimate;
 
     public void Init(SkillEntry entry) => Entry = entry;
 
     public static bool IsMilestone(int lv) => Array.IndexOf(MilestoneLevels, lv) >= 0;
 
+    // ---------- 기본 강화 (합연산) ----------
+    public int DamageUps { get; private set; }
+    public int RangeUps { get; private set; }
+    public int CooldownUps { get; private set; }
+
+    /// <summary>공격력 증가율 합계 (0.3 = +30%)</summary>
+    public float DamageBonus => T.upgradeDamage * DamageUps;
+    /// <summary>범위 증가율 합계</summary>
+    public float RangeBonus => T.upgradeRange * RangeUps;
+    /// <summary>쿨타임 감소율 합계 (최대 cooldownReductionCap = 90%)</summary>
+    public float CooldownReduction => Mathf.Min(T.upgradeCooldown * CooldownUps, T.cooldownReductionCap);
+
+    /// <summary>기본 강화 1개 적용 후 스킬 레벨 +1. 특수 강화는 이 다음에 SpecialPending 으로 확인</summary>
+    public void ApplyBasicUpgrade(BasicUpgrade u)
+    {
+        if (!IsGeneral || level >= LevelCap) return;
+        switch (u)
+        {
+            case BasicUpgrade.Damage: DamageUps++; break;
+            case BasicUpgrade.Range: RangeUps++; break;
+            case BasicUpgrade.Cooldown: CooldownUps++; break;
+        }
+        level++;
+        OnLevelChanged();
+    }
+
+    /// <summary>궁극기 강화 (기본 강화 없이 레벨만)</summary>
     public void LevelUp()
     {
         if (level >= LevelCap) return;
         level++;
-        // 특수 강화 효과는 스킬별 기획 확정 후 OnMilestone 에서 구현
-        if (Entry.kind != SkillKind.Ultimate && IsMilestone(level)) OnMilestone(level);
         OnLevelChanged();
     }
 
-    /// <summary>Lv.5·10·15 특수 강화 (기획 미설계 — 현재 아무 효과 없음)</summary>
-    protected virtual void OnMilestone(int lv) { }
+    // ---------- 특수 강화 (Lv.5·10·15, 스킬 레벨 기준) ----------
+    readonly System.Collections.Generic.HashSet<int> specialTaken = new System.Collections.Generic.HashSet<int>();
+
+    /// <summary>현재 레벨이 특수 강화 레벨인데 아직 고르지 않았으면 true</summary>
+    public bool SpecialPending => IsGeneral && IsMilestone(level) && !specialTaken.Contains(level);
+
+    /// <summary>
+    /// 특수 강화 선택지. 기획 미설계 → 기본은 비어 있음 (선택 화면에는 "미설계" 확인 버튼만 표시).
+    /// 효과가 확정되면 스킬별로 override.
+    /// </summary>
+    public virtual SpecialUpgradeOption[] SpecialOptions(int lv) => NoSpecialOptions;
+
+    /// <param name="option">SpecialOptions 의 인덱스, 선택지가 없으면 -1</param>
+    public void ApplySpecial(int lv, int option)
+    {
+        if (!specialTaken.Add(lv)) return;
+        OnSpecialUpgrade(lv, option);
+    }
+
+    protected virtual void OnSpecialUpgrade(int lv, int option) { }
     protected virtual void OnLevelChanged() { }
 
-    // ---------- 등급 → 숫자 (임시 환산표 + 스킬 레벨 성장) ----------
-    protected float Damage(Power p) =>
-        T.Damage(p) * (1f + T.damagePerLevel * (level - 1)) * P.damageMul;
+    // ---------- 최종 수치 (기본 수치 + 기본 강화 합연산) ----------
+    /// <summary>1타 최종 피해량 = floor(기본 × (1 + 공격력 증가율 합계)). 다단히트는 타마다 이 값</summary>
+    protected int HitDamage(float baseDamage) =>
+        Mathf.FloorToInt(baseDamage * (1f + DamageBonus) * P.damageMul + 1e-4f);   // 1e-4: 10×1.3 같은 부동소수 오차 보정
 
-    protected float Cooldown(Tier t) =>
-        T.Cooldown(t) * Mathf.Max(T.cooldownFloor, 1f - T.cooldownPerLevel * (level - 1)) * P.cooldownMul;
+    /// <summary>최종 쿨타임 = 기본 × (1 - min(감소율 합계, 0.9))</summary>
+    protected float CooldownOf(float baseSeconds) => baseSeconds * (1f - CooldownReduction) * P.cooldownMul;
 
-    protected float Range(Tier t) =>
-        T.Range(t) * (1f + T.rangePerLevel * (level - 1)) * P.areaMul;
+    /// <summary>최종 범위 = 기본 × (1 + 범위 증가율 합계). 정수화 규칙은 미정 → 그대로</summary>
+    protected float RangeOf(float baseRange) => baseRange * (1f + RangeBonus) * P.areaMul;
+    /// <summary>범위 배율 (판정 도형 전체에 곱함)</summary>
+    protected float RangeScale => RangeOf(1f);
 
-    protected float Reach(Tier t) => T.Reach(t) * (1f + T.rangePerLevel * (level - 1));
+    // ---------- 등급 → 숫자 (기본 수치가 아직 없는 스킬용 임시 환산표) ----------
+    protected float Damage(Power p) => T.Damage(p) * (1f + DamageBonus) * P.damageMul;
+    protected float Cooldown(Tier t) => CooldownOf(T.Cooldown(t));
+    protected float Range(Tier t) => RangeOf(T.Range(t));
+    protected float Reach(Tier t) => T.Reach(t) * (1f + RangeBonus);
 
     // ---------- 자동 스킬용 ----------
     /// <summary>매 프레임 (Playing 상태에서만) 호출</summary>
