@@ -200,7 +200,7 @@ public class FireSlash : AutoSkill
 
     // ---------- 죽음의 메아리 (처치 조건 연쇄) ----------
     void OnEnable() => Enemy.Killed += OnEnemyKilled;
-    void OnDisable() => Enemy.Killed -= OnEnemyKilled;
+    protected override void OnDisable() { base.OnDisable(); Enemy.Killed -= OnEnemyKilled; }
 
     void OnEnemyKilled(Enemy e)
     {
@@ -401,8 +401,16 @@ public class SolarSlash : AutoSkill
     protected override bool Fire()
     {
         P.PlayAttack(Player.SlashV);
-        StartCoroutine(Burning ? BurnRoutine() : Sequence(false));
+        StartCoroutine(Burning ? BurnRoutine() : CastWhole());
         return true;
+    }
+
+    /// <summary>쿨타임은 공격이 모두 끝난 뒤부터: 베기 → 폭발(+연속 폭발) → 메아리 → 폭발(+연속 폭발)</summary>
+    IEnumerator CastWhole()
+    {
+        Casting = true;
+        yield return Sequence(false);
+        Casting = false;
     }
 
     /// <summary>일반형: 베기 → 후속 폭발 (연속 폭발이면 +2) → 메아리면 끝난 뒤 1회 재발동 (재발동은 다시 메아리 없음)</summary>

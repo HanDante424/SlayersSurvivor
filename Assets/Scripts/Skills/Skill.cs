@@ -258,6 +258,7 @@ public abstract class AutoSkill : Skill
     public override void Tick(float dt)
     {
         if (DebugCheats.NoAutoSkills || CheatDisabled) return; // 치트 F7 / 스킬별 사용 금지
+        if (Casting) return;                                   // 공격 진행 중 = 쿨타임 대기 (끝나면 그때부터 쿨타임)
         if (DebugCheats.NoCooldown && timer > 0f) timer = 0f;   // 치트 F6
         timer -= dt;
         if (timer > 0) return;
@@ -271,4 +272,9 @@ public abstract class AutoSkill : Skill
 
     /// <summary>쿨타임이 공격 종료 후부터 도는 지속형 공격의 지속시간 (솔라 슬래시 타오름 등). 기본 0 = 발동 즉시 쿨타임</summary>
     protected virtual float CastDuration => 0f;
+
+    /// <summary>true 동안은 쿨타임이 줄지 않음. 길이가 정해지지 않은 연속 공격(솔라 슬래시 메아리·연속 폭발 등)이 끝날 때 false 로</summary>
+    protected bool Casting;
+
+    protected virtual void OnDisable() => Casting = false;   // 코루틴이 끊겨도 영구 정지하지 않게
 }

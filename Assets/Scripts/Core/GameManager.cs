@@ -428,6 +428,104 @@ public class GameManager : MonoBehaviour
     static GUIStyle SkillListStyle => skillListStyle ??= new GUIStyle(UIStyles.Small) { richText = true, wordWrap = false };
     static GUIStyle subtitleStyle;
     static GUIStyle SubtitleStyle => subtitleStyle ??= new GUIStyle(UIStyles.Center) { richText = true };
+    static GUIStyle cardText;
+    static GUIStyle CardText => cardText ??= new GUIStyle(UIStyles.Label)
+        { fontSize = 20, wordWrap = true, richText = true, alignment = TextAnchor.UpperLeft };
+
+    // ---------- 선택 카드 (세로 카드 가로 배치, 내용이 길면 드래그/휠로 스크롤) ----------
+    const float CardDragThreshold = 8f;   // 이만큼 움직이면 클릭이 아니라 드래그
+    float[] cardScroll = new float[4];
+    int cardSerial = -1, dragCard = -1;
+    float dragStartY, dragStartScroll;
+    bool dragMoved;
+
+    void DrawChoiceCards(float W, float H)
+    {
+        int n = choices.Count;
+        if (n == 0) return;
+        if (cardScroll.Length < n) cardScroll = new float[n];
+        if (cardSerial != menuSerial)   // 새 화면이 열리면 스크롤 초기화
+        {
+            cardSerial = menuSerial; dragCard = -1;
+            for (int i = 0; i < cardScroll.Length; i++) cardScroll[i] = 0f;
+        }
+
+        const float gap = 20f, pad = 16f;
+        float cw = Mathf.Min(280f, (W - 40f - gap * (n - 1)) / n);
+        float top = H * 0.27f;
+        float ch = Mathf.Clamp(H * 0.82f - 70f - top, 160f, 420f);   // 아래 스킬 바 위까지
+        float x0 = (W - (cw * n + gap * (n - 1))) / 2f;
+
+        var ev = Event.current;
+        Vector2 mouse = ev.mousePosition;
+
+        for (int i = 0; i < n; i++)
+        {
+            var c = choices[i];
+            var card = new Rect(x0 + i * (cw + gap), top, cw, ch);
+            var view = new Rect(card.x + pad, card.y + pad, cw - pad * 2 - 6, ch - pad * 2);
+            string text = $"<b>[{i + 1}] {c.title}</b>\n\n<size=17>{c.desc}</size>";
+            float contentH = CardText.CalcHeight(new GUIContent(text), view.width);
+            float maxScroll = Mathf.Max(0f, contentH - view.height);
+            bool selectable = c.apply != null;
+            bool over = card.Contains(mouse);
+
+            // 입력: 누르고 움직이면 스크롤, 안 움직이고 떼면 선택
+            switch (ev.type)
+            {
+                case EventType.MouseDown when ev.button == 0 && over:
+                    dragCard = i; dragMoved = false;
+                    dragStartY = mouse.y; dragStartScroll = cardScroll[i];
+                    ev.Use();
+                    break;
+                case EventType.MouseDrag when dragCard == i:
+                    float dy = mouse.y - dragStartY;
+                    if (Mathf.Abs(dy) > CardDragThreshold) dragMoved = true;
+                    if (dragMoved) cardScroll[i] = dragStartScroll - dy;
+                    ev.Use();
+                    break;
+                case EventType.MouseUp when dragCard == i:
+                    bool click = !dragMoved && over && selectable;
+                    dragCard = -1;
+                    ev.Use();
+                    if (click) { Pick(i); return; }
+                    break;
+                case EventType.ScrollWheel when over:
+                    cardScroll[i] += ev.delta.y * 20f;
+                    ev.Use();
+                    break;
+            }
+            cardScroll[i] = Mathf.Clamp(cardScroll[i], 0f, maxScroll);
+
+            if (ev.type != EventType.Repaint) continue;
+
+            // 카드 배경 (선택 불가 = 반투명 회색)
+            GUI.color = selectable ? Color.white : new Color(1f, 1f, 1f, 0.45f);
+            bool pressed = dragCard == i && !dragMoved;
+            UIStyles.Button.Draw(card, GUIContent.none, over && selectable, pressed, false, false);
+
+            // 내용 (카드 안으로 잘라서 그림)
+            GUI.BeginGroup(view);
+            CardText.Draw(new Rect(0, -cardScroll[i], view.width, contentH), new GUIContent(text), false, false, false, false);
+            GUI.EndGroup();
+
+            // 스크롤 표시: 오른쪽 막대 + 아래에 더 있으면 ▼
+            if (maxScroll > 0f)
+            {
+                var track = new Rect(card.xMax - 8, view.y, 3, view.height);
+                GUI.color = new Color(1, 1, 1, 0.12f * GUI.color.a); GUI.DrawTexture(track, UIStyles.White);
+                float th = Mathf.Max(20f, track.height * view.height / contentH);
+                float ty = track.y + (track.height - th) * (cardScroll[i] / maxScroll);
+                GUI.color = new Color(1, 1, 1, 0.5f); GUI.DrawTexture(new Rect(track.x, ty, track.width, th), UIStyles.White);
+                if (cardScroll[i] < maxScroll - 1f)
+                {
+                    GUI.color = UIStyles.Accent;
+                    GUI.Label(new Rect(card.x, card.yMax - 22, card.width, 20), "▼", UIStyles.Center);
+                }
+            }
+            GUI.color = Color.white;
+        }
+    }
 
     // 스킬 슬롯 색: 사용 가능 = 밝은 회색 / 사용 불가 = 어두운 회색, 쿨타임 동안 아래에서 회색이 차오름
     static readonly Color SlotReady = new Color(0.78f, 0.78f, 0.78f, 0.95f);
@@ -559,15 +657,7 @@ public class GameManager : MonoBehaviour
             GUI.Label(new Rect(0, H * 0.15f - 20, W, 60), menuTitle, UIStyles.Big);
             if (!string.IsNullOrEmpty(menuSub))
                 GUI.Label(new Rect(0, H * 0.15f + 36, W, 56), menuSub, SubtitleStyle);
-            float bw = Mathf.Min(520, W - 40), bh = 86;
-            float bx = (W - bw) / 2, by = H * 0.3f;
-            for (int i = 0; i < choices.Count; i++)
-            {
-                var c = choices[i];
-                GUI.enabled = c.apply != null;   // 선택 불가 후보는 회색
-                if (GUI.Button(new Rect(bx, by + i * (bh + 14), bw, bh), $"[{i + 1}] {c.title}\n<size=16>{c.desc}</size>", UIStyles.Button)) Pick(i);
-                GUI.enabled = true;
-            }
+            DrawChoiceCards(W, H);
         }
         else if (State == GameState.Paused)
         {
