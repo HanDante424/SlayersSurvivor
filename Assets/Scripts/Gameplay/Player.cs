@@ -27,18 +27,36 @@ public class Player : MonoBehaviour
     Color baseColor;
     SpriteSheetAnimator anim;
 
+    // 캐릭터 스프라이트 시트: Resources/Sprites/{CharacterId}_{동작}.png
+    const string CharacterId = "ErnStray";
+    public const string SlashH = "SlashH";   // 수평베기
+    public const string SlashV = "SlashV";   // 수직베기
+    public const string Thrust = "Thrust";   // 찌르기
+    static readonly string[] AttackClips = { SlashH, SlashV, Thrust };
+    const float AttackFps = 16f;             // 8프레임 → 0.5초
+
+    /// <summary>
+    /// 공격 모션 재생 (애니메이션만, 판정 없음). dir 이 0이면 현재 바라보는 방향.
+    /// 이전 공격 모션이 끝나기 전에는 무시되고 false 를 돌려줍니다.
+    /// </summary>
+    public bool PlayAttack(string clip, Vector2 dir = default)
+        => anim != null && anim.Play(clip, dir);
+
     void Awake()
     {
         I = this;
         hp = maxHp;
 
-        // Resources/Sprites/Player_Run.png 가 있으면 4방향 달리기 애니메이션 사용
+        // Resources/Sprites/ErnStray_*.png 가 있으면 4방향 스프라이트 애니메이션 사용
         sr = gameObject.AddComponent<SpriteRenderer>();
         sr.sortingOrder = 10;
         anim = gameObject.AddComponent<SpriteSheetAnimator>();
         const float cell = 1.9f, pivotY = 0.4f;
-        if (anim.Load("Player_Run", 4, 8, cell, pivotY))
+        if (anim.LoadClip(SpriteSheetAnimator.Run, CharacterId + "_Run", 4, 8, cell, pivotY, 12f, true))
         {
+            anim.LoadClip(SpriteSheetAnimator.Idle, CharacterId + "_Idle", 4, 8, cell, pivotY, 8f, true);
+            foreach (var key in AttackClips)
+                anim.LoadClip(key, CharacterId + "_" + key, 4, 8, cell, pivotY, AttackFps, false);
             transform.localScale = Vector3.one;
             HealthBarOffset = cell * (pivotY - 0.06f) + 0.15f; // 발 바로 아래
         }
@@ -63,6 +81,13 @@ public class Player : MonoBehaviour
         transform.position += (Vector3)(input * moveSpeed * Time.deltaTime);
         if (anim != null) anim.SetMove(input);
         else if (Mathf.Abs(input.x) > 0.01f) sr.flipX = input.x < 0;
+
+#if UNITY_EDITOR
+        // 애니메이션 확인용 (에디터 전용): J 수평베기 / K 수직베기 / L 찌르기
+        if (Input.GetKeyDown(KeyCode.J)) PlayAttack(SlashH);
+        if (Input.GetKeyDown(KeyCode.K)) PlayAttack(SlashV);
+        if (Input.GetKeyDown(KeyCode.L)) PlayAttack(Thrust);
+#endif
 
         if (regen > 0) hp = Mathf.Min(maxHp, hp + regen * Time.deltaTime);
 
