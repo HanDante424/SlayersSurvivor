@@ -176,7 +176,7 @@ public class Player : MonoBehaviour
 
     public void TakeDamage(float dmg)
     {
-        if (invuln > 0 || GameManager.I.State != GameState.Playing) return;
+        if (DebugCheats.God || invuln > 0 || GameManager.I.State != GameState.Playing) return;
         hp -= dmg;
         invuln = 0.35f;
         CameraFollow.Shake(0.12f, 0.15f);
