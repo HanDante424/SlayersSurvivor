@@ -7,7 +7,8 @@ using UnityEngine;
 ///  F1 판정 표시 / F2 패널 열기 / F3 무적 / F4 원히트킬 / F5 적 체력 무제한
 ///  F6 쿨타임 감소 100% / F7 자동 스킬 사용 금지 / F8 적 생성 중지
 ///  레벨 +1 / +10 (궁극기 획득 Lv.45 확인용), 궁극기 게이지 채우기
-///  오른쪽 열: 스킬별 사용 금지 (레벨업 후보 스킬 + 보유 스킬)
+///  오른쪽 열: 스킬별 사용 금지 (레벨업 후보 스킬 + 보유 스킬) / Lv+1 = 그 스킬의 기본 강화 화면 바로 열기
+///            (Lv.5·10·15 특수 강화 확인용, 캐릭터 레벨은 그대로)
 /// 상태는 static 이라 재시작(R)해도 유지됩니다.
 /// </summary>
 public class DebugCheats : MonoBehaviour
@@ -126,10 +127,10 @@ public class DebugCheats : MonoBehaviour
         // ---- 오른쪽 열: 스킬별 사용 금지 ----
         var skillsToShow = SkillList();
         if (skillsToShow.Count == 0) return;
-        float sx = x + w + 18, sw = 250;
+        float sx = x + w + 18, sw = 250, lw = 74;
         float stop = H - 12 - (skillsToShow.Count + 1) * (bh + gap);
         GUI.color = UIStyles.Dim;
-        GUI.DrawTexture(new Rect(sx - 6, stop - 6, sw + 12, (skillsToShow.Count + 1) * (bh + gap) + 6), UIStyles.White);
+        GUI.DrawTexture(new Rect(sx - 6, stop - 6, sw + lw + 18, (skillsToShow.Count + 1) * (bh + gap) + 6), UIStyles.White);
         GUI.color = Color.white;
         GUI.Label(new Rect(sx, stop, sw, bh), "스킬별 사용 금지", UIStyles.Small);
         for (int k = 0; k < skillsToShow.Count; k++)
@@ -139,6 +140,11 @@ public class DebugCheats : MonoBehaviour
             string kind = SkillCatalog.KindLabel(e.kind);
             if (GUI.Button(r, $"{e.name} <size=13>[{kind}]</size>  {OnOff(disabledSkills.Contains(e.id))}", Small))
                 ToggleSkill(e.id);
+            var owned = Player.I != null ? Player.I.GetSkill(e.id) : null;
+            GUI.enabled = owned != null && owned.IsGeneral && owned.level < owned.LevelCap;
+            if (GUI.Button(new Rect(sx + sw + 6, r.y, lw, bh), owned != null ? $"Lv.{owned.level}+1" : "Lv+1", Small))
+                GameManager.I?.DebugUpgradeSkill(owned);
+            GUI.enabled = true;
         }
     }
 

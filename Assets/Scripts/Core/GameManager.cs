@@ -31,6 +31,7 @@ public class GameManager : MonoBehaviour
     class Upgrade
     {
         public string title, desc;
+        /// <summary>null = 선택 불가 (회색 표시, 눌러도 반응 없음)</summary>
         public Action apply;
     }
 
@@ -203,6 +204,7 @@ public class GameManager : MonoBehaviour
     void Pick(int i)
     {
         if (i < 0 || i >= choices.Count) return;
+        if (choices[i].apply == null) return;   // 선택 불가 후보
         int serial = menuSerial;
         choices[i].apply();
         if (menuSerial != serial) return;      // 이어지는 선택 화면이 열림 (기본 강화 → 특수 강화)
@@ -250,8 +252,10 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 스킬 Lv.5·10·15 특수 강화 선택 (기본 강화 직후). 효과·선택지 수는 기획 미설계 →
-    /// 스킬이 선택지를 주지 않으면 확인 버튼 하나만 (효과 없음).
+    /// 스킬 Lv.5·10·15 특수 강화 선택 (기본 강화 직후, 3개 중 1개).
+    /// - 선택 불가 후보: 회색 + 이유 표시 (예: 타오름 보유 시 연속 폭발)
+    /// - 경고 후보: 확인 창 → 그래도 선택 / 취소 (예: 뇌진탕 보유 시 타오름)
+    /// 스킬이 선택지를 주지 않으면(기획 미설계) 확인 버튼 하나만 (효과 없음).
     /// </summary>
     void ShowSpecialUpgrade(Skill s)
     {
@@ -261,7 +265,23 @@ public class GameManager : MonoBehaviour
         for (int k = 0; k < opts.Length; k++)
         {
             int idx = k;
-            list.Add(new Upgrade { title = opts[k].title, desc = opts[k].desc, apply = () => s.ApplySpecial(lv, idx) });
+            var o = opts[k];
+            if (o.locked)
+                list.Add(new Upgrade
+                {
+                    title = $"<color=#777777>{o.title}</color>",
+                    desc = $"<color=#FF8080>{o.lockReason}</color>",
+                    apply = null,
+                });
+            else if (!string.IsNullOrEmpty(o.warning))
+                list.Add(new Upgrade
+                {
+                    title = $"{o.title}  <size=14><color=#FF9A50>[경고]</color></size>",
+                    desc = o.desc,
+                    apply = () => ShowSpecialWarning(s, lv, idx, o),
+                });
+            else
+                list.Add(new Upgrade { title = o.title, desc = o.desc, apply = () => s.ApplySpecial(lv, idx) });
         }
         if (list.Count == 0)
             list.Add(new Upgrade
@@ -274,7 +294,25 @@ public class GameManager : MonoBehaviour
         ShowMenu($"{s.Entry.name} {order} 특수 강화", $"스킬 Lv.{lv} 도달", list);
     }
 
+    /// <summary>특수 강화 경고 확인: 그래도 선택 → 획득 / 취소 → 특수 강화 선택 화면으로</summary>
+    void ShowSpecialWarning(Skill s, int lv, int idx, SpecialUpgradeOption o)
+    {
+        var list = new List<Upgrade>
+        {
+            new Upgrade { title = $"그래도 {o.title} 선택", desc = o.desc, apply = () => s.ApplySpecial(lv, idx) },
+            new Upgrade { title = "취소", desc = "다른 특수 강화를 고릅니다", apply = () => ShowSpecialUpgrade(s) },
+        };
+        ShowMenu("경고", $"<color=#FF9A50>{o.warning}</color>", list);
+    }
+
     static string Pct(float v) => $"{Mathf.RoundToInt(v * 100f)}%";
+
+    /// <summary>테스트: 보유 스킬 강화 화면 바로 열기 (치트 패널 → 스킬별 Lv +1)</summary>
+    public void DebugUpgradeSkill(Skill s)
+    {
+        if (State != GameState.Playing || s == null || !s.IsGeneral || s.level >= s.LevelCap) return;
+        ShowBasicUpgrade(s);
+    }
 
     /// <summary>
     /// 레벨업 선택지 3개 (기획서 2.3 / v0.2 3장). 자동·수동·이동·패시브·궁극기가 함께 후보로 등장.
@@ -501,6 +539,12 @@ public class GameManager : MonoBehaviour
                     $"<size=13><color=#AAAAAA>{SkillCatalog.KindLabel(k)}</color></size>  {s.Entry.name}  Lv.{s.level}{ups}",
                     SkillListStyle);
                 y += 22;
+                string spSummary = s.IsGeneral ? s.SpecialSummary : "";
+                if (spSummary.Length > 0)
+                {
+                    GUI.Label(new Rect(28, y - 2, 560, 24), $"<size=12><color=#F2BF4C>★ {spSummary}</color></size>", SkillListStyle);
+                    y += 18;
+                }
             }
         }
 
@@ -520,7 +564,9 @@ public class GameManager : MonoBehaviour
             for (int i = 0; i < choices.Count; i++)
             {
                 var c = choices[i];
+                GUI.enabled = c.apply != null;   // 선택 불가 후보는 회색
                 if (GUI.Button(new Rect(bx, by + i * (bh + 14), bw, bh), $"[{i + 1}] {c.title}\n<size=16>{c.desc}</size>", UIStyles.Button)) Pick(i);
+                GUI.enabled = true;
             }
         }
         else if (State == GameState.Paused)

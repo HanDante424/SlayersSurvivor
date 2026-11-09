@@ -31,7 +31,7 @@ MonoBehaviour:
   - 4.5
   - 7
   upgradeDamage: 0.1
-  upgradeRange: 0.15
+  upgradeRange: 0.1
   upgradeCooldown: 0.05
   cooldownReductionCap: 0.9
   fireSlash:
@@ -72,6 +72,29 @@ MonoBehaviour:
     near: 0.3
     knockback: 5
   solarExplosionDelay: 0.45
+  fireTrackRange: 12
+  fireWaveSpeed: 14
+  fireWaveDistance: 12
+  fireWaveWidth: 1
+  fireWaveDelay: 0.05
+  fireChainOffset: 0.5
+  fireChainDelay: 0.1
+  fireTripleDelay: 0.08
+  fireEchoDelay: 0.1
+  solarMultiIntervalRatio: 1
+  solarEchoGap: 0.15
+  solarBurn:
+    shape: 0
+    forward: 2.2
+    back: 0.9
+    width: 1.6
+    radius: 4
+    halfAngle: 180
+    near: 0.3
+    knockback: 0.3
+  solarBurnKnockEveryTick: 1
+  concussionWindow: 0.35
+  concussionStunsOther: 0
   autoSlots: 6
   passiveSlots: 6
   manualSlots: 3

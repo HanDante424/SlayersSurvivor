@@ -150,6 +150,7 @@ public static class HitDebug
 {
     public static readonly Color SlashColor = new Color(1f, 0.92f, 0.2f);   // 노랑: 베기
     public static readonly Color BlastColor = new Color(1f, 0.45f, 0.15f);  // 주황: 폭발
+    public static readonly Color KnockColor = new Color(0.35f, 0.85f, 1f);  // 하늘색: 넉백만 (피해 없음, 솔라 슬래시 넉백 범위)
     public const float Duration = 0.35f;
 
     public static void Sector(Vector2 c, Vector2 dir, float r, float halfAngle, float near, Color col)

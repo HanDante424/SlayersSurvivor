@@ -7,10 +7,17 @@ public enum SkillKind { Auto, Manual, Movement, Passive, Ultimate }
 /// <summary>기본 강화 3종 (기획 v0.2 4장). 1회 선택 효과는 SkillTuning (공격력 +10% / 범위 +10% / 쿨타임 -5%)</summary>
 public enum BasicUpgrade { Damage, Range, Cooldown }
 
-/// <summary>특수 강화 선택지 1개 (기획 미설계 → 아직 어떤 스킬도 만들지 않음)</summary>
+/// <summary>특수 강화 선택지 1개. 스킬별 SpecialOptions 가 만들어 줌</summary>
 public class SpecialUpgradeOption
 {
+    /// <summary>스킬 안에서 고유한 식별자 (예: "F5A"). 획득 여부는 Skill.HasSpecial(id)</summary>
+    public string id;
     public string title, desc;
+    /// <summary>선택 불가 (다른 특수 강화와 충돌). 화면에는 회색으로 표시, lockReason 을 설명으로</summary>
+    public bool locked;
+    public string lockReason;
+    /// <summary>선택 시 확인 창을 띄울 경고문 (null = 바로 적용)</summary>
+    public string warning;
 }
 
 /// <summary>
@@ -76,46 +83,105 @@ public abstract class Skill : MonoBehaviour
     }
 
     // ---------- 특수 강화 (Lv.5·10·15, 스킬 레벨 기준) ----------
-    readonly System.Collections.Generic.HashSet<int> specialTaken = new System.Collections.Generic.HashSet<int>();
+    // 단계별로 1개씩 고르고, 고른 강화는 모두 유지·중첩. 효과는 각 스킬이 HasSpecial(id) 로 확인해서 적용.
+    readonly System.Collections.Generic.Dictionary<int, string> specialPicks = new System.Collections.Generic.Dictionary<int, string>();
 
     /// <summary>현재 레벨이 특수 강화 레벨인데 아직 고르지 않았으면 true</summary>
-    public bool SpecialPending => IsGeneral && IsMilestone(level) && !specialTaken.Contains(level);
+    public bool SpecialPending => IsGeneral && IsMilestone(level) && !specialPicks.ContainsKey(level);
+
+    /// <summary>이 특수 강화를 획득했는지</summary>
+    public bool HasSpecial(string id) => !string.IsNullOrEmpty(id) && specialPicks.ContainsValue(id);
 
     /// <summary>
-    /// 특수 강화 선택지. 기획 미설계 → 기본은 비어 있음 (선택 화면에는 "미설계" 확인 버튼만 표시).
-    /// 효과가 확정되면 스킬별로 override.
+    /// 특수 강화 선택지 (스킬별 override). 비어 있으면 선택 화면에 "미설계" 확인 버튼만 표시.
+    /// 선택 불가·경고는 이미 고른 강화를 보고 여기서 채움.
     /// </summary>
     public virtual SpecialUpgradeOption[] SpecialOptions(int lv) => NoSpecialOptions;
 
     /// <param name="option">SpecialOptions 의 인덱스, 선택지가 없으면 -1</param>
     public void ApplySpecial(int lv, int option)
     {
-        if (!specialTaken.Add(lv)) return;
-        OnSpecialUpgrade(lv, option);
+        if (specialPicks.ContainsKey(lv)) return;
+        var opts = SpecialOptions(lv);
+        string id = "";
+        if (option >= 0 && option < opts.Length)
+        {
+            if (opts[option].locked) return;   // 선택 불가 후보
+            id = opts[option].id;
+        }
+        specialPicks[lv] = id;
+        OnSpecialUpgrade(lv, id);
     }
 
-    protected virtual void OnSpecialUpgrade(int lv, int option) { }
+    /// <summary>HUD 표시용: 획득한 특수 강화 이름 (Lv 순)</summary>
+    public string SpecialSummary
+    {
+        get
+        {
+            var names = new System.Collections.Generic.List<string>();
+            foreach (int lv in MilestoneLevels)
+            {
+                if (!specialPicks.TryGetValue(lv, out var id) || string.IsNullOrEmpty(id)) continue;
+                foreach (var o in SpecialOptions(lv)) if (o.id == id) { names.Add(o.title); break; }
+            }
+            return string.Join(" · ", names);
+        }
+    }
+
+    protected virtual void OnSpecialUpgrade(int lv, string id) { }
+
+    // 특수 강화가 더하는 수치 (스킬별 override). 기본 강화와 같은 종류끼리 합연산.
+    /// <summary>특수 강화 피해 증가율 합계</summary>
+    protected virtual float SpecialDamageBonus => 0f;
+    /// <summary>특수 강화 공격 범위 증가율 합계</summary>
+    protected virtual float SpecialRangeBonus => 0f;
+    /// <summary>특수 강화 쿨타임 감소율 (기본 강화 감소율과 합산 후 90% 상한)</summary>
+    protected virtual float SpecialCooldownReduction => 0f;
+    /// <summary>특수 강화 쿨타임 증가율 (+25% = 0.25). 감소율과 합연산: 배율 = 1 - 감소 + 증가</summary>
+    protected virtual float SpecialCooldownIncrease => 0f;
+
+    /// <summary>피해 증가율 전체 (기본 + 특수)</summary>
+    public float TotalDamageBonus => DamageBonus + SpecialDamageBonus;
+    /// <summary>공격 범위 증가율 전체 (기본 + 특수)</summary>
+    public float TotalRangeBonus => RangeBonus + SpecialRangeBonus;
     protected virtual void OnLevelChanged() { }
 
     // ---------- 최종 수치 (기본 수치 + 기본 강화 합연산) ----------
     /// <summary>1타 최종 피해량 = floor(기본 × (1 + 공격력 증가율 합계)). 다단히트는 타마다 이 값</summary>
     protected int HitDamage(float baseDamage) =>
-        Mathf.FloorToInt(baseDamage * (1f + DamageBonus) * P.damageMul + 1e-4f);   // 1e-4: 10×1.3 같은 부동소수 오차 보정
+        Mathf.FloorToInt(baseDamage * (1f + TotalDamageBonus) * P.damageMul + 1e-4f);   // 1e-4: 10×1.3 같은 부동소수 오차 보정
 
-    /// <summary>최종 쿨타임 = 기본 × (1 - min(감소율 합계, 0.9))</summary>
+    /// <summary>
+    /// 쿨타임 배율 (치트 제외). 기본 = (1 - min(기본+특수 감소율, 0.9) + 특수 증가율), 최소 0.1.
+    /// 계산 순서가 따로 정해진 강화(파이어 슬래시 빠른 공격·묵직한 일격)는 스킬에서 override.
+    /// </summary>
+    protected virtual float CooldownMultiplier => GeneralCooldownMultiplier;
+
+    /// <summary>일반 감소·증가만 적용한 쿨타임 배율 (최종 10% 미만으로는 안 내려감)</summary>
+    protected float GeneralCooldownMultiplier
+    {
+        get
+        {
+            float cap = T.cooldownReductionCap;
+            float red = Mathf.Min(CooldownReduction + SpecialCooldownReduction, cap);
+            return Mathf.Max(1f - cap, (1f - red + SpecialCooldownIncrease) * P.cooldownMul);
+        }
+    }
+
+    /// <summary>최종 쿨타임 = 기본 × CooldownMultiplier</summary>
     protected float CooldownOf(float baseSeconds) =>
-        DebugCheats.NoCooldown ? 0f : baseSeconds * (1f - CooldownReduction) * P.cooldownMul;   // 치트 F6: 쿨타임 0
+        DebugCheats.NoCooldown ? 0f : baseSeconds * CooldownMultiplier;   // 치트 F6: 쿨타임 0
 
-    /// <summary>최종 범위 = 기본 × (1 + 범위 증가율 합계). 정수화 규칙은 미정 → 그대로</summary>
-    protected float RangeOf(float baseRange) => baseRange * (1f + RangeBonus) * P.areaMul;
+    /// <summary>최종 범위 = 기본 × (1 + 범위 증가율 합계(기본+특수)). 정수화 규칙은 미정 → 그대로</summary>
+    protected float RangeOf(float baseRange) => baseRange * (1f + TotalRangeBonus) * P.areaMul;
     /// <summary>범위 배율 (판정 도형 전체에 곱함)</summary>
     protected float RangeScale => RangeOf(1f);
 
     // ---------- 등급 → 숫자 (기본 수치가 아직 없는 스킬용 임시 환산표) ----------
-    protected float Damage(Power p) => T.Damage(p) * (1f + DamageBonus) * P.damageMul;
+    protected float Damage(Power p) => T.Damage(p) * (1f + TotalDamageBonus) * P.damageMul;
     protected float Cooldown(Tier t) => CooldownOf(T.Cooldown(t));
     protected float Range(Tier t) => RangeOf(T.Range(t));
-    protected float Reach(Tier t) => T.Reach(t) * (1f + RangeBonus);
+    protected float Reach(Tier t) => T.Reach(t) * (1f + TotalRangeBonus);
 
     // ---------- 자동 스킬용 ----------
     /// <summary>매 프레임 (Playing 상태에서만) 호출</summary>
@@ -197,9 +263,12 @@ public abstract class AutoSkill : Skill
         if (timer > 0) return;
         // 발동할 대상이 없으면 쿨타임을 소모하지 않고 다음 프레임에 다시 확인
         if (!Fire()) { timer = 0f; return; }
-        timer = CooldownSeconds;
+        timer = CooldownSeconds + CastDuration;
     }
 
     /// <summary>발동. 대상이 없어 발동하지 않았으면 false</summary>
     protected abstract bool Fire();
+
+    /// <summary>쿨타임이 공격 종료 후부터 도는 지속형 공격의 지속시간 (솔라 슬래시 타오름 등). 기본 0 = 발동 즉시 쿨타임</summary>
+    protected virtual float CastDuration => 0f;
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -6,6 +7,13 @@ public enum EnemyKind { Bat, Runner, Tank, Boss }
 public class Enemy : MonoBehaviour
 {
     public static readonly List<Enemy> All = new List<Enemy>();
+
+    /// <summary>
+    /// 적 사망 이벤트 (적 1마리당 정확히 1번). 처치 연쇄 강화(죽음의 메아리 등)가 구독.
+    /// 인자 = 죽은 적 (이 호출 직후 파괴됨 → 위치 등은 즉시 복사해서 쓸 것)
+    /// </summary>
+    public static event Action<Enemy> Killed;
+    bool dead;
 
     public EnemyKind kind;
     public float hp, maxHp, speed, damage, radius;
@@ -21,6 +29,17 @@ public class Enemy : MonoBehaviour
     float stunLeft;
     float slowLeft, slowMul = 1f;
     public bool IsStunned => stunLeft > 0;
+
+    // 뇌진탕 (솔라 슬래시 S5-B): 넉백된 뒤 window 동안 다른 적과 부딪히면 기절
+    float concussLeft, concussStun;
+    bool concussStunsOther;
+
+    /// <summary>이 적이 넉백되는 동안 다른 적과 충돌하면 stun 초 기절 (충돌 1회로 끝)</summary>
+    public void MarkConcussion(float window, float stun, bool stunOther)
+    {
+        if (kind == EnemyKind.Boss) return;   // 보스는 넉백되지 않음
+        concussLeft = window; concussStun = stun; concussStunsOther = stunOther;
+    }
 
     /// <summary>기절: 이동·접촉 공격 중지 (더 긴 쪽 유지)</summary>
     public void Stun(float seconds) => stunLeft = Mathf.Max(stunLeft, seconds);
@@ -107,6 +126,8 @@ public class Enemy : MonoBehaviour
         bool stunned = stunLeft > 0;
         if (stunned) stunLeft -= Time.deltaTime;
 
+        if (concussLeft > 0) CheckConcussion(pos);
+
         float moveSpeed = stunned ? 0f : speed * slowMul;
         pos += (dir * moveSpeed + knockback) * Time.deltaTime;
         knockback = Vector2.Lerp(knockback, Vector2.zero, KnockDecay * Time.deltaTime);
@@ -120,7 +141,7 @@ public class Enemy : MonoBehaviour
         // 너무 멀어지면 플레이어 근처로 재배치 (뱀서 방식)
         // 기준은 카메라 시야에 맞춰 자동 (화면 밖 생성 거리 + 6 넘으면 화면 밖 생성 거리로)
         float far = GameManager.OffscreenRadius;
-        if (dist > far + 6f) transform.position = (Vector2)p.transform.position + Random.insideUnitCircle.normalized * far;
+        if (dist > far + 6f) transform.position = (Vector2)p.transform.position + UnityEngine.Random.insideUnitCircle.normalized * far;
 
         if (flash > 0)
         {
@@ -133,6 +154,26 @@ public class Enemy : MonoBehaviour
             sr.color = stunLeft > 0 ? Color.Lerp(baseColor, new Color(1f, 0.95f, 0.3f), 0.6f)
                      : slowLeft > 0 ? Color.Lerp(baseColor, new Color(0.4f, 0.6f, 1f), 0.5f)
                      : baseColor;
+        }
+    }
+
+    void CheckConcussion(Vector2 pos)
+    {
+        concussLeft -= Time.deltaTime;
+        if (knockback.sqrMagnitude < 0.25f) { if (concussLeft <= 0) concussLeft = 0; return; }   // 거의 안 밀리는 중
+        foreach (var o in All)
+        {
+            if (o == this || o.hp <= 0) continue;
+            Vector2 d = (Vector2)o.transform.position - pos;
+            float min = radius + o.radius;
+            // 밀려나는 방향 앞쪽에서 닿은 적 = 충돌
+            if (d.sqrMagnitude < min * min && Vector2.Dot(d, knockback) > 0f)
+            {
+                Stun(concussStun);
+                if (concussStunsOther) o.Stun(concussStun);
+                concussLeft = 0;
+                return;
+            }
         }
     }
 
@@ -149,7 +190,10 @@ public class Enemy : MonoBehaviour
 
     void Die()
     {
+        if (dead) return;   // 사망 처리는 한 번만 (메아리 무한 재발동 방지)
+        dead = true;
         GameManager.I.OnEnemyKilled(this);
+        Killed?.Invoke(this);
         Gem.Spawn(transform.position, xp);
         Destroy(gameObject);
     }

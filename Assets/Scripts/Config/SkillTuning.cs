@@ -47,6 +47,26 @@ public class SkillTuning : ScriptableObject
     [Tooltip("A02 솔라 슬래시: 베기 → 폭발 간격(초). 기획 미정 → 이펙트 폭발 프레임(10번째, 20fps)에 맞춘 값")]
     public float solarExplosionDelay = 0.45f;
 
+    [Header("[임시] 파이어 슬래시 특수 강화 — 기획서에 수치가 없는 값 (플레이 테스트로 조정)")]
+    [Tooltip("F5-A 대상 추적: 가장 가까운 적을 찾는 거리(유닛). 범위 안에 적이 없으면 바라보는 방향")] public float fireTrackRange = 12f;
+    [Tooltip("F10-A 검기 발사: 검기 속도(유닛/초)")] public float fireWaveSpeed = 14f;
+    [Tooltip("F10-A 검기 발사: 검기 최대 사거리(유닛, 범위 강화 적용)")] public float fireWaveDistance = 12f;
+    [Tooltip("F10-A 검기 발사: 검기 판정 폭 = 파이어 슬래시 판정 폭 × 이 값")] public float fireWaveWidth = 1f;
+    [Tooltip("F10-A 검기 발사: 근접 참격 후 검기가 나가기까지(초)")] public float fireWaveDelay = 0.05f;
+    [Tooltip("F10-B 연속 공격 생성: 추가 참격 생성 위치 = 원래 참격 시작점에서 공격 방향으로 (판정 앞 길이 × 이 값)")] public float fireChainOffset = 0.5f;
+    [Tooltip("F10-B 연속 공격 생성: 원래 참격 후 추가 참격까지(초)")] public float fireChainDelay = 0.1f;
+    [Tooltip("F15-A 삼연발: 원래 공격 후 좌우 60도 공격까지(초)")] public float fireTripleDelay = 0.08f;
+    [Tooltip("F15-C 죽음의 메아리: 적 사망 후 메아리 참격까지(초). 0 보다 커야 연쇄가 한 프레임에 몰리지 않음")] public float fireEchoDelay = 0.1f;
+
+    [Header("[임시] 솔라 슬래시 특수 강화 — 기획서에 수치가 없는 값 (플레이 테스트로 조정)")]
+    [Tooltip("S15-A 연속 폭발: 추가 폭발 간격 = 베기→폭발 간격(solarExplosionDelay) × 이 값")] public float solarMultiIntervalRatio = 1f;
+    [Tooltip("S10-A 메아리: 원래 솔라 슬래시 종료 후 재발동까지(초)")] public float solarEchoGap = 0.15f;
+    [Tooltip("S10-B 타오름: 지속 공격 판정 (플레이어 중심 원). 실제 넉백 범위 = 이 반경 (넉백 범위 증가 미적용)")]
+    public SkillHitbox solarBurn = new SkillHitbox { radius = 4f, halfAngle = 180f, knockback = 0.3f };
+    [Tooltip("S10-B 타오름: true = 매 틱 넉백 / false = 첫 틱만 넉백 (기획: 넉백 시점 미정)")] public bool solarBurnKnockEveryTick = true;
+    [Tooltip("S5-B 뇌진탕: 폭발에 넉백된 뒤 충돌을 확인하는 시간(초)")] public float concussionWindow = 0.35f;
+    [Tooltip("S5-B 뇌진탕: 부딪힌 상대 적도 기절시킬지 (기획: 기절 적용 대상 미정)")] public bool concussionStunsOther = false;
+
     [Header("슬롯 (기획서: 자동 6, 패시브 6 확정 / 나머지 임시)")]
     public int autoSlots = 6;
     public int passiveSlots = 6;
