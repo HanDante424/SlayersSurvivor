@@ -96,7 +96,8 @@ public class Enemy : MonoBehaviour
     public void Hit(float dmg, Vector2 fromDir, float knock = 3f)
     {
         if (hp <= 0) return;
-        hp -= dmg;
+        if (DebugCheats.OneHitKill) dmg = Mathf.Max(dmg, hp);   // 테스트: 한 방에 처치
+        if (!DebugCheats.ImmortalEnemies) hp -= dmg;            // 테스트: 피해 숫자만 표시
         flash = 0.08f;
         if (kind != EnemyKind.Boss) knockback = fromDir.normalized * knock;
         DamageText.Show(transform.position, dmg);

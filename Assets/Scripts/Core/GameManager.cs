@@ -53,6 +53,10 @@ public class GameManager : MonoBehaviour
         var pgo = new GameObject("Player");
         var player = pgo.AddComponent<Player>();
         player.AddWeapon<MagicBolt>();
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        gameObject.AddComponent<DebugCheats>();   // 테스트용 치트 패널 (F2)
+#endif
     }
 
     void Update()
