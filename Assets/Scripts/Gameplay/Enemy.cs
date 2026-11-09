@@ -48,6 +48,17 @@ public class Enemy : MonoBehaviour
     void OnEnable() => All.Add(this);
     void OnDisable() => All.Remove(this);
 
+    /// <summary>
+    /// All 의 사본을 buffer 에 채워 돌려줍니다.
+    /// 순회 중 Hit() 으로 적이 죽어 All 이 바뀌어도 안전하게 돌 수 있습니다. (죽은 적은 hp &lt;= 0)
+    /// </summary>
+    public static List<Enemy> CopyAll(List<Enemy> buffer)
+    {
+        buffer.Clear();
+        buffer.AddRange(All);
+        return buffer;
+    }
+
     void Update()
     {
         if (GameManager.I.State != GameState.Playing) return;

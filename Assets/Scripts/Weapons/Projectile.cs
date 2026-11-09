@@ -7,6 +7,7 @@ public class Projectile : MonoBehaviour
     float speed, damage, life, radius;
     int pierce;
     readonly HashSet<Enemy> hitSet = new HashSet<Enemy>();
+    static readonly List<Enemy> targets = new List<Enemy>();   // 투사체끼리 공유 (Update 는 겹쳐 돌지 않음)
 
     public static Projectile Spawn(Vector2 pos, Vector2 dir, float speed, float damage, int pierce, float life, string sprite, Color color, float scale)
     {
@@ -29,7 +30,7 @@ public class Projectile : MonoBehaviour
         if (life <= 0) { Destroy(gameObject); return; }
 
         Vector2 pos = transform.position;
-        foreach (var e in Enemy.All)
+        foreach (var e in Enemy.CopyAll(targets))
         {
             if (e.hp <= 0 || hitSet.Contains(e)) continue;
             float r = radius + e.radius;
