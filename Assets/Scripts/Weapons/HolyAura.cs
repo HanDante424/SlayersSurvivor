@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>플레이어 주변에 지속 피해를 주는 오라</summary>
@@ -8,6 +9,7 @@ public class HolyAura : Weapon
     float Damage => 4f + (level - 1) * 2f;
     float Radius => (1.4f + (level - 1) * 0.18f) * P.areaMul;
     const float TickRate = 0.4f;
+    readonly List<Enemy> targets = new List<Enemy>();
 
     public override string NextDescription(int lv) => lv == 1
         ? "주변 적에게 지속적으로 피해를 줍니다."
@@ -37,7 +39,7 @@ public class HolyAura : Weapon
 
         Vector2 pp = P.transform.position;
         float r = Radius;
-        foreach (var e in Enemy.All)
+        foreach (var e in Enemy.CopyAll(targets))
         {
             if (e.hp <= 0) continue;
             Vector2 d = (Vector2)e.transform.position - pp;

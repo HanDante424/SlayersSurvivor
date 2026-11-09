@@ -16,6 +16,7 @@ public class Lightning : Weapon
         : lv % 3 == 0 ? "낙뢰 횟수 +1" : "피해량 증가, 쿨다운 감소";
 
     readonly List<Enemy> candidates = new List<Enemy>();
+    readonly List<Enemy> targets = new List<Enemy>();
 
     public override void Tick(float dt)
     {
@@ -48,7 +49,7 @@ public class Lightning : Weapon
         CameraFollow.Shake(0.05f, 0.05f);
 
         float dmg = Damage * P.damageMul;
-        foreach (var e in Enemy.All)
+        foreach (var e in Enemy.CopyAll(targets))
         {
             if (e.hp <= 0) continue;
             Vector2 d = (Vector2)e.transform.position - at;

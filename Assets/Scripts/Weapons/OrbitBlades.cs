@@ -18,6 +18,7 @@ public class OrbitBlades : Weapon
     readonly List<Transform> blades = new List<Transform>();
     readonly Dictionary<Enemy, float> hitCooldown = new Dictionary<Enemy, float>();
     readonly List<Enemy> expired = new List<Enemy>();
+    readonly List<Enemy> targets = new List<Enemy>();
     float angle;
 
     void Start() => Rebuild();
@@ -60,7 +61,7 @@ public class OrbitBlades : Weapon
         foreach (var b in blades)
         {
             Vector2 bp = b.position;
-            foreach (var e in Enemy.All)
+            foreach (var e in Enemy.CopyAll(targets))
             {
                 if (e.hp <= 0 || hitCooldown.ContainsKey(e)) continue;
                 float r = 0.3f + e.radius;
