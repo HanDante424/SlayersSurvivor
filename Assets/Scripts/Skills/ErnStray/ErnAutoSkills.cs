@@ -205,7 +205,7 @@ public class FireSlash : AutoSkill
     void OnEnemyKilled(Enemy e)
     {
         if (!HasSpecial(DeathEcho) || DebugCheats.NoAutoSkills || CheatDisabled) return;
-        // 적 1마리 사망 = 메아리 1회 (Enemy.Die 는 적마다 한 번만). 메아리 참격은 Lv.10 추가 공격을 만들지 않음
+        // 적 1마리 사망 = 메아리 1회 (Enemy.Die 는 적마다 한 번만). 메아리 참격도 검기를 발사 (연속 공격 생성은 미적용)
         StartCoroutine(EchoAt(e.transform.position));
     }
 
@@ -216,7 +216,12 @@ public class FireSlash : AutoSkill
         else yield return null;
         Vector2 d0 = Random.insideUnitCircle.normalized;   // [임시] 3방향의 기준 각도 미정 → 무작위
         if (d0.sqrMagnitude < 0.001f) d0 = Vector2.right;
-        for (int k = 0; k < 3; k++) SlashOnce(at, Rotate(d0, ChainAngle * k));
+        for (int k = 0; k < 3; k++)
+        {
+            Vector2 d = Rotate(d0, ChainAngle * k);
+            SlashOnce(at, d);
+            if (HasSpecial(Wave)) StartCoroutine(WaveAfter(at, d));   // 검기 → 죽음의 메아리 루트
+        }
     }
 
     static Vector2 Rotate(Vector2 v, float deg)
