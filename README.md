@@ -36,4 +36,6 @@ Unity Hub → Add → 이 폴더 → Play (타이틀부터 시작).
 `Assets/Resources/Sprites/` 에 정해진 이름으로 넣으면 자동 적용, 없으면 도형으로 대체.
 - 캐릭터: `ErnStray_Run`, `ErnStray_Idle`, `ErnStray_SlashH`, `ErnStray_SlashV`, `ErnStray_Thrust` (4행 x 8열)
 - 이펙트: `ErnStray_FireSlash`, `ErnStray_FireSlashCrit`, `FireBall`
+- 스킬 이펙트 (FireForge 제작, `ErnSkillFx` 에서 로드 · 크기/속도는 각 스킬 `[임시] Fx*` 상수):
+  `ErnStray_SkillFireSlash` 1행 x 4열 · `ErnStray_SkillTripleSlash` 2행 x 5열 · `ErnStray_SkillSolarSlash` 4행 x 3열
 - 기타: `Enemy_Bat`, `Enemy_Runner`, `Enemy_Tank`, `Enemy_Boss`, `Gem`, `Ground`

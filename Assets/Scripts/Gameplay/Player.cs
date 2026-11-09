@@ -136,11 +136,12 @@ public class Player : MonoBehaviour
     /// 공격 모션 재생 (애니메이션만, 판정 없음). dir 이 0이면 현재 바라보는 방향.
     /// 이전 공격 모션이 끝나기 전에는 무시되고 false 를 돌려줍니다.
     /// 수평베기는 치명타 판정 후 일반/치명타 화염 이펙트를 함께 출력합니다.
+    /// 스킬이 자기 이펙트를 직접 띄울 때는 baseFx = false 로 기본 공격 이펙트를 끕니다.
     /// </summary>
-    public bool PlayAttack(string clip, Vector2 dir = default)
+    public bool PlayAttack(string clip, Vector2 dir = default, bool baseFx = true)
     {
         if (anim == null || !anim.Play(clip, dir)) return false;
-        if (clip == SlashH)
+        if (clip == SlashH && baseFx)
         {
             fxCrit = RollCrit();
             fxTimer = Cfg.fxDelay;

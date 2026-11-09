@@ -11,6 +11,9 @@ public class TripleSlash : ActiveSkill
 {
     const float Interval = 0.15f;       // [임시] 베기 간격
     const float HalfAngle = 75f;        // [임시]
+    const float FxFps = 20f;            // [임시] 10프레임 → 0.5초 (3타 전체를 한 시트로)
+    const float FxWidth = 1.8f;         // [임시] 한 칸 가로 = 범위 x 이 값
+    const float FxForward = 0.45f;      // [임시] 이펙트 중심 = 플레이어 앞 범위 x 이 값
 
     protected override float CooldownSeconds => Cooldown(Tier.Mid);
 
@@ -20,13 +23,19 @@ public class TripleSlash : ActiveSkill
     {
         string[] clips = { Player.SlashH, Player.SlashV, Player.Thrust };
         float per = Damage(Power.High) / 3f;   // 총 피해 '높음'을 3타로 나눔 [임시 해석]
+        float r0 = Range(Tier.Mid);
+        // 트리플 슬래시 시트는 3타를 한 번에 그린 10프레임 → 첫 타에 한 번만 띄움
+        var frames = ErnSkillFx.TripleSlash;
+        if (frames != null)
+            ErnSkillFx.SpawnDirected(frames, FxFps, (Vector2)P.transform.position + P.Facing * (r0 * FxForward),
+                                     P.Facing, r0 * FxWidth);
         for (int i = 0; i < 3; i++)
         {
             Vector2 from = P.transform.position;
             Vector2 dir = P.Facing;
-            P.PlayAttack(clips[i], dir);
+            P.PlayAttack(clips[i], dir, baseFx: frames == null);
             float r = Range(Tier.Mid);
-            Fx.Arc(from, dir, r, i == 2 ? Fx.FireBright : Fx.Fire, 0.15f);
+            if (frames == null) Fx.Arc(from, dir, r, i == 2 ? Fx.FireBright : Fx.Fire, 0.15f);
             SkillHits.Sector(from, dir, r, HalfAngle, per, 3f);
             yield return new WaitForSeconds(Interval);
         }

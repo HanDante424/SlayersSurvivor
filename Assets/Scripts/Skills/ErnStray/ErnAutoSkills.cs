@@ -7,10 +7,41 @@ using UnityEngine;
 // 기획서에 등급조차 없는 값은 각 클래스 맨 위 "[임시]" 상수로 모아 둠.
 // Lv.5·10·15 특수 강화는 기획 미설계 → 구현하지 않음.
 
+/// <summary>
+/// 에른 스트레이 스킬 전용 스프라이트 시트 이펙트 (FireForge 제작).
+/// 시트가 없으면 Load 가 null → 각 스킬이 기존 도형 이펙트(Fx.*)로 대체.
+/// </summary>
+public static class ErnSkillFx
+{
+    public const string FireSlashSheet = "ErnStray_SkillFireSlash";     // 1행 x 4열
+    public const string TripleSlashSheet = "ErnStray_SkillTripleSlash"; // 2행 x 5열
+    public const string SolarSlashSheet = "ErnStray_SkillSolarSlash";   // 4행 x 3열
+
+    public static Sprite[] FireSlash => SpriteEffect.LoadFrames(FireSlashSheet, 1, 4, 1f);
+    public static Sprite[] TripleSlash => SpriteEffect.LoadFrames(TripleSlashSheet, 2, 5, 1f);
+    public static Sprite[] SolarSlash => SpriteEffect.LoadFrames(SolarSlashSheet, 4, 3, 1f);
+
+    /// <summary>
+    /// 오른쪽을 향해 그려진 시트를 dir 방향으로 띄움. 왼쪽 방향은 뒤집힌 그림이 되지 않도록 좌우 반전.
+    /// width = 한 칸의 월드 가로 길이 (LoadFrames 를 1유닛 기준으로 잘랐으므로 scale 로 사용).
+    /// </summary>
+    public static SpriteEffect SpawnDirected(Sprite[] frames, float fps, Vector2 at, Vector2 dir, float width)
+    {
+        if (frames == null) return null;
+        float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        bool flip = dir.x < 0f;
+        if (flip) angle -= 180f;
+        return SpriteEffect.Spawn(frames, fps, null, at, angle, flip, 11, width);
+    }
+}
+
 /// <summary>A01 파이어 슬래시: 범위 좁음 · 쿨 짧음 · 피해 낮음</summary>
 public class FireSlash : AutoSkill
 {
     const float HalfAngle = 70f;        // [임시] 베기 각도 (좌우)
+    const float FxFps = 16f;            // [임시] 시트 재생 속도 (4프레임 → 0.25초)
+    const float FxWidth = 1.7f;         // [임시] 이펙트 한 칸 가로 = 범위 x 이 값
+    const float FxForward = 0.55f;      // [임시] 이펙트 중심 = 플레이어 앞 범위 x 이 값
 
     protected override float CooldownSeconds => Cooldown(Tier.Short);
     float Radius => Range(Tier.Short);
@@ -23,8 +54,13 @@ public class FireSlash : AutoSkill
         if (target == null) return false;
         Vector2 dir = ((Vector2)target.transform.position - from).normalized;
 
-        // 기존 수평베기 모션 + 화염 이펙트 (이미 다른 모션 중이면 판정만)
-        if (!P.PlayAttack(Player.SlashH, dir)) Fx.Arc(from, dir, Radius, Fx.Fire, 0.15f);
+        // 수평베기 모션 + 파이어 슬래시 시트 (시트가 없으면 기존 기본 공격 이펙트 / 도형)
+        var frames = ErnSkillFx.FireSlash;
+        bool played = P.PlayAttack(Player.SlashH, dir, baseFx: frames == null);
+        if (frames != null)
+            ErnSkillFx.SpawnDirected(frames, FxFps, from + dir * (Radius * FxForward), dir, Radius * FxWidth);
+        else if (!played)
+            Fx.Arc(from, dir, Radius, Fx.Fire, 0.15f);
         SkillHits.Sector(from, dir, Radius, HalfAngle, Damage(Power.Low), 2.5f);
         return true;
     }
@@ -33,6 +69,9 @@ public class FireSlash : AutoSkill
 /// <summary>A02 솔라 슬래시: 전방위 · 범위 중간 · 쿨 중간 · 피해 중간</summary>
 public class SolarSlash : AutoSkill
 {
+    const float FxFps = 20f;            // [임시] 12프레임 → 0.6초 (원형 베기 → 태양 → 폭발)
+    const float FxWidth = 2.6f;         // [임시] 한 칸 가로 = 범위 x 이 값 (마지막 폭발 고리 ≈ 판정 원)
+
     protected override float CooldownSeconds => Cooldown(Tier.Mid);
     float Radius => Range(Tier.Mid);
 
@@ -41,7 +80,11 @@ public class SolarSlash : AutoSkill
         Vector2 from = P.transform.position;
         if (Nearest(from, Radius) == null) return false;
         P.PlayAttack(Player.SlashV);
-        Fx.Circle(from, Radius, Fx.FireBright, 0.3f, P.transform);
+        var frames = ErnSkillFx.SolarSlash;
+        if (frames != null)   // 플레이어를 따라다니도록 자식으로
+            SpriteEffect.Spawn(frames, FxFps, P.transform, Vector2.zero, 0f, false, 11, Radius * FxWidth);
+        else
+            Fx.Circle(from, Radius, Fx.FireBright, 0.3f, P.transform);
         SkillHits.Circle(from, Radius, Damage(Power.Mid), 3f);
         return true;
     }
