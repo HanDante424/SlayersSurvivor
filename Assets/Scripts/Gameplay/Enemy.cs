@@ -194,7 +194,7 @@ public class Enemy : MonoBehaviour
         dead = true;
         GameManager.I.OnEnemyKilled(this);
         Killed?.Invoke(this);
-        Gem.Spawn(transform.position, xp);
+        if (!DebugCheats.NoXpDrop) Gem.Spawn(transform.position, xp);   // 치트 F9
         Destroy(gameObject);
     }
 
