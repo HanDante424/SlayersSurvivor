@@ -30,8 +30,84 @@ public class Player : MonoBehaviour
     /// <summary>치명타 판정 (critChance 확률로 true)</summary>
     public bool RollCrit() => Random.value < critChance;
 
-    public readonly List<Weapon> weapons = new List<Weapon>();
+    /// <summary>캐릭터 스킬 목록 (기획서 기준). 캐릭터가 늘면 선택된 캐릭터의 목록으로 바뀜</summary>
+    public List<SkillEntry> Catalog => SkillCatalog.ErnStray;
+    /// <summary>보유 스킬 (획득 순서). 수동 스킬은 획득 순서대로 J/K/L 에 배정</summary>
+    public readonly List<Skill> skills = new List<Skill>();
     public Vector2 Facing { get; private set; } = Vector2.right;
+
+    // ---------- 스킬이 쓰는 상태 ----------
+    float skillInvuln;      // 스킬 무적 (피격 무적과 별개)
+    float rootLeft;         // 이동 불가
+    Vector2 dashVel;        // 돌진 속도
+    float dashLeft;
+    System.Action dashStep, dashEnd;
+
+    /// <summary>돌진 중이거나 이동 불가 상태 → 다른 수동 스킬 사용 불가</summary>
+    public bool IsBusy => dashLeft > 0 || rootLeft > 0;
+    public bool IsInvulnerable => skillInvuln > 0 || dashLeft > 0 && dashInvuln;
+    bool dashInvuln;
+
+    public void SetInvulnerable(float seconds) => skillInvuln = Mathf.Max(skillInvuln, seconds);
+    public void Root(float seconds) => rootLeft = Mathf.Max(rootLeft, seconds);
+
+    /// <summary>
+    /// 돌진. distance 를 duration 동안 이동. onStep 은 매 프레임(위치 이동 후) 호출.
+    /// </summary>
+    public void Dash(Vector2 dir, float distance, float duration, bool invulnerable,
+                     System.Action onStep = null, System.Action onEnd = null)
+    {
+        if (dir.sqrMagnitude < 0.01f) dir = Facing;
+        dir.Normalize();
+        dashVel = dir * (distance / Mathf.Max(0.01f, duration));
+        dashLeft = duration;
+        dashInvuln = invulnerable;
+        dashStep = onStep;
+        dashEnd = onEnd;
+        Facing = dir;
+        if (anim != null) anim.SetMove(dir);
+    }
+
+    public Skill GetSkill(string id)
+    {
+        foreach (var s in skills) if (s.Entry.id == id) return s;
+        return null;
+    }
+
+    public int CountKind(SkillKind k)
+    {
+        int n = 0;
+        foreach (var s in skills) if (s.Entry.kind == k) n++;
+        return n;
+    }
+
+    /// <summary>스킬 획득 또는 강화</summary>
+    public Skill AddOrLevelSkill(SkillEntry entry)
+    {
+        var existing = GetSkill(entry.id);
+        if (existing != null) { existing.LevelUp(); return existing; }
+        var go = new GameObject("Skill_" + entry.id);
+        go.transform.SetParent(transform, false);
+        var s = (Skill)go.AddComponent(entry.type);
+        s.Init(entry);
+        skills.Add(s);
+        return s;
+    }
+
+    /// <summary>수동 스킬 n번째 (J=0, K=1, L=2)</summary>
+    public Skill ManualSlot(int i)
+    {
+        int n = 0;
+        foreach (var s in skills)
+            if (s.Entry.kind == SkillKind.Manual) { if (n == i) return s; n++; }
+        return null;
+    }
+
+    public Skill FirstOfKind(SkillKind k)
+    {
+        foreach (var s in skills) if (s.Entry.kind == k) return s;
+        return null;
+    }
 
     /// <summary>체력 바를 그릴 위치 (플레이어 기준 아래쪽 거리)</summary>
     public float HealthBarOffset { get; private set; } = 0.65f;
@@ -141,19 +217,42 @@ public class Player : MonoBehaviour
         if (anim != null)
             foreach (var key in AttackClips) anim.SetClipFps(key, Cfg.attackFps);
 
+        float dt = Time.deltaTime;
+        if (skillInvuln > 0) skillInvuln -= dt;
+        if (rootLeft > 0) rootLeft -= dt;
+
         var input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
         if (input.sqrMagnitude > 1f) input.Normalize();
-        if (input.sqrMagnitude > 0.01f) Facing = input.normalized;
-        transform.position += (Vector3)(input * moveSpeed * Time.deltaTime);
-        if (anim != null) anim.SetMove(input);
-        else if (Mathf.Abs(input.x) > 0.01f) sr.flipX = input.x < 0;
 
-#if UNITY_EDITOR
-        // 애니메이션 확인용 (에디터 전용): J 수평베기 / K 수직베기 / L 찌르기
-        if (Input.GetKeyDown(KeyCode.J)) PlayAttack(SlashH);
-        if (Input.GetKeyDown(KeyCode.K)) PlayAttack(SlashV);
-        if (Input.GetKeyDown(KeyCode.L)) PlayAttack(Thrust);
-#endif
+        if (dashLeft > 0)
+        {
+            // 돌진 중: 입력 무시하고 정해진 속도로 이동
+            float step = Mathf.Min(dt, dashLeft);
+            transform.position += (Vector3)(dashVel * step);
+            dashLeft -= dt;
+            dashStep?.Invoke();
+            if (dashLeft <= 0) { var end = dashEnd; dashStep = dashEnd = null; end?.Invoke(); }
+        }
+        else if (rootLeft > 0)
+        {
+            // 이동 불가: 방향 전환만 허용
+            if (input.sqrMagnitude > 0.01f) Facing = input.normalized;
+            if (anim != null) anim.SetMove(Vector2.zero);
+        }
+        else
+        {
+            if (input.sqrMagnitude > 0.01f) Facing = input.normalized;
+            transform.position += (Vector3)(input * moveSpeed * dt);
+            if (anim != null) anim.SetMove(input);
+            else if (Mathf.Abs(input.x) > 0.01f) sr.flipX = input.x < 0;
+        }
+
+        // 스킬 입력 [임시 키: SkillTuning]
+        var T = Tuning.Skills;
+        for (int i = 0; i < T.manualKeys.Length; i++)
+            if (Input.GetKeyDown(T.manualKeys[i])) ManualSlot(i)?.TryActivate();
+        if (Input.GetKeyDown(T.movementKey)) FirstOfKind(SkillKind.Movement)?.TryActivate();
+        if (Input.GetKeyDown(T.ultimateKey)) FirstOfKind(SkillKind.Ultimate)?.TryActivate();
 
         if (fxTimer >= 0f)
         {
@@ -171,12 +270,16 @@ public class Player : MonoBehaviour
             if (invuln <= 0) sr.color = baseColor;
         }
 
-        foreach (var w in weapons) w.Tick(Time.deltaTime);
+        // 스킬 쿨타임/자동 발동 (획득·강화로 목록이 바뀔 수 있어 인덱스로 순회)
+        for (int i = 0; i < skills.Count; i++) skills[i].Tick(dt);
+
+        // 스킬 무적 표시: 살짝 밝게
+        if (invuln <= 0) sr.color = IsInvulnerable ? new Color(1f, 0.85f, 0.6f, 0.8f) : baseColor;
     }
 
     public void TakeDamage(float dmg)
     {
-        if (DebugCheats.God || invuln > 0 || GameManager.I.State != GameState.Playing) return;
+        if (DebugCheats.God || invuln > 0 || IsInvulnerable || GameManager.I.State != GameState.Playing) return;
         hp -= dmg;
         invuln = 0.35f;
         CameraFollow.Shake(0.12f, 0.15f);
@@ -187,19 +290,4 @@ public class Player : MonoBehaviour
         }
     }
 
-    public T GetWeapon<T>() where T : Weapon
-    {
-        foreach (var w in weapons) if (w is T t) return t;
-        return null;
-    }
-
-    public void AddWeapon<T>() where T : Weapon
-    {
-        var existing = GetWeapon<T>();
-        if (existing != null) { existing.LevelUp(); return; }
-        var go = new GameObject(typeof(T).Name);
-        go.transform.SetParent(transform, false);
-        var w = go.AddComponent<T>();
-        weapons.Add(w);
-    }
 }

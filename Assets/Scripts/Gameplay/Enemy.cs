@@ -17,6 +17,28 @@ public class Enemy : MonoBehaviour
     Vector2 knockback;
     float baseScale = 1f;
 
+    // 상태이상
+    float stunLeft;
+    float slowLeft, slowMul = 1f;
+    public bool IsStunned => stunLeft > 0;
+
+    /// <summary>기절: 이동·접촉 공격 중지 (더 긴 쪽 유지)</summary>
+    public void Stun(float seconds) => stunLeft = Mathf.Max(stunLeft, seconds);
+
+    /// <summary>슬로우: 이동 속도 배율 (더 강한 쪽 유지)</summary>
+    public void Slow(float mul, float seconds)
+    {
+        if (slowLeft <= 0 || mul < slowMul) slowMul = mul;
+        slowLeft = Mathf.Max(slowLeft, seconds);
+    }
+
+    /// <summary>피해 없이 밀어내기</summary>
+    public void Push(Vector2 dir, float force)
+    {
+        if (kind == EnemyKind.Boss) return;
+        knockback = dir.normalized * force;
+    }
+
     public static Enemy Spawn(EnemyKind kind, Vector2 pos, float hpMul)
     {
         var go = new GameObject("Enemy_" + kind);
@@ -75,13 +97,19 @@ public class Enemy : MonoBehaviour
         float dist = toPlayer.magnitude;
         Vector2 dir = dist > 0.001f ? toPlayer / dist : Vector2.zero;
 
-        pos += (dir * speed + knockback) * Time.deltaTime;
+        if (slowLeft > 0) { slowLeft -= Time.deltaTime; if (slowLeft <= 0) slowMul = 1f; }
+        bool stunned = stunLeft > 0;
+        if (stunned) stunLeft -= Time.deltaTime;
+
+        float moveSpeed = stunned ? 0f : speed * slowMul;
+        pos += (dir * moveSpeed + knockback) * Time.deltaTime;
         knockback = Vector2.Lerp(knockback, Vector2.zero, 10f * Time.deltaTime);
         transform.position = pos;
-        sr.flipX = dir.x < 0;
+        if (!stunned) sr.flipX = dir.x < 0;
 
+        // 기절 중에는 접촉 공격 없음
         float touch = radius + p.radius;
-        if ((p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);
+        if (!stunned && (p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);
 
         // 너무 멀어지면 플레이어 근처로 재배치 (뱀서 방식)
         if (dist > 22f) transform.position = (Vector2)p.transform.position + Random.insideUnitCircle.normalized * 14f;
@@ -90,6 +118,13 @@ public class Enemy : MonoBehaviour
         {
             flash -= Time.deltaTime;
             sr.color = flash > 0 ? Color.white : baseColor;
+        }
+        else
+        {
+            // 상태 표시: 기절 = 노랑, 슬로우 = 파랑
+            sr.color = stunLeft > 0 ? Color.Lerp(baseColor, new Color(1f, 0.95f, 0.3f), 0.6f)
+                     : slowLeft > 0 ? Color.Lerp(baseColor, new Color(0.4f, 0.6f, 1f), 0.5f)
+                     : baseColor;
         }
     }
 

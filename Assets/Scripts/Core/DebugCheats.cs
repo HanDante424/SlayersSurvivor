@@ -5,6 +5,7 @@ using UnityEngine;
 /// 테스트용 치트 패널 (에디터 / 개발 빌드 전용, GameManager 가 붙여줌).
 /// 화면 왼쪽 아래 버튼 또는 단축키로 켜고 끕니다.
 ///  F1 판정 표시 / F2 패널 열기 / F3 무적 / F4 원히트킬 / F5 적 체력 무제한
+///  레벨 +1 / +10 (궁극기 획득 Lv.45 확인용), 궁극기 게이지 채우기
 /// 상태는 static 이라 재시작(R)해도 유지됩니다.
 /// </summary>
 public class DebugCheats : MonoBehaviour
@@ -68,6 +69,9 @@ public class DebugCheats : MonoBehaviour
             $"원히트킬 (F4)  {OnOff(OneHitKill)}",
             $"적 체력 무제한 (F5)  {OnOff(ImmortalEnemies)}",
             $"판정 표시 (F1)  {OnOff(HitboxView.Show)}",
+            "레벨 +1",
+            "레벨 +10",
+            "궁극기 게이지 채우기",
             "닫기 (F2)",
         };
         float top = H - 12 - labels.Length * (bh + gap);
@@ -86,7 +90,10 @@ public class DebugCheats : MonoBehaviour
                 case 1: SetOneHitKill(!OneHitKill); break;
                 case 2: SetImmortalEnemies(!ImmortalEnemies); break;
                 case 3: HitboxView.Show = !HitboxView.Show; break;
-                case 4: open = false; break;
+                case 4: GameManager.I?.DebugAddLevels(1); break;
+                case 5: GameManager.I?.DebugAddLevels(10); break;
+                case 6: GameManager.I?.DebugFillUltimate(); break;
+                case 7: open = false; break;
             }
         }
     }

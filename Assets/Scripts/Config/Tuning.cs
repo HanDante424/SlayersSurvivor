@@ -7,6 +7,10 @@ public static class Tuning
 {
     static PlayerConfig ernStray;
     static EnemyConfig enemy;
+    static SkillTuning skills;
+
+    /// <summary>스킬 등급 → 숫자 임시 환산표</summary>
+    public static SkillTuning Skills => skills != null ? skills : (skills = Load<SkillTuning>("Config/SkillTuning"));
 
     public static PlayerConfig ErnStray => ernStray != null ? ernStray : (ernStray = Load<PlayerConfig>("Config/ErnStrayConfig"));
     public static EnemyConfig Enemy => enemy != null ? enemy : (enemy = Load<EnemyConfig>("Config/EnemyConfig"));

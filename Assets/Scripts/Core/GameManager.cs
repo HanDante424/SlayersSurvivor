@@ -52,7 +52,8 @@ public class GameManager : MonoBehaviour
 
         var pgo = new GameObject("Player");
         var player = pgo.AddComponent<Player>();
-        player.AddWeapon<MagicBolt>();
+        // [임시] 시작 스킬은 기획 미정 → 파이어 슬래시로 시작
+        player.AddOrLevelSkill(SkillCatalog.Find(player.Catalog, "A01"));
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         gameObject.AddComponent<DebugCheats>();   // 테스트용 치트 패널 (F2)
@@ -127,7 +128,31 @@ public class GameManager : MonoBehaviour
     }
 
     // ---------- 경험치 / 레벨업 ----------
-    public void OnEnemyKilled(Enemy e) => Kills++;
+    public void OnEnemyKilled(Enemy e)
+    {
+        Kills++;
+        // 궁극기 게이지: 적 처치 수 기반 (기획서 확정). [임시] 궁극기 보유 중에만 충전
+        var p = Player.I;
+        if (p != null && p.FirstOfKind(SkillKind.Ultimate) != null)
+            ultimateGauge = Mathf.Min(Tuning.Skills.gaugeMax, ultimateGauge + Tuning.Skills.gaugePerKill);
+    }
+
+    // ---------- 궁극기 게이지 ----------
+    float ultimateGauge;
+    public float UltimateGaugeFraction => Mathf.Clamp01(ultimateGauge / Mathf.Max(1f, Tuning.Skills.gaugeMax));
+    public bool UltimateReady => ultimateGauge >= Tuning.Skills.gaugeMax;
+    /// <summary>[임시] 사용 시 0으로 초기화 (기획 미정)</summary>
+    public void ConsumeUltimateGauge() => ultimateGauge = 0f;
+
+    // ---------- 테스트용 (DebugCheats 패널에서 호출) ----------
+    /// <summary>테스트: 레벨 올리기 (선택지도 레벨 수만큼 열림)</summary>
+    public void DebugAddLevels(int n)
+    {
+        Level += n;
+        pendingLevelUps += n;
+        if (State == GameState.Playing) OpenLevelUp();
+    }
+    public void DebugFillUltimate() => ultimateGauge = Tuning.Skills.gaugeMax;
 
     public void AddXp(int amount)
     {
@@ -143,9 +168,13 @@ public class GameManager : MonoBehaviour
 
     void OpenLevelUp()
     {
-        pendingLevelUps--;
-        BuildChoices();
-        SetState(GameState.LevelUp);
+        while (pendingLevelUps > 0)
+        {
+            pendingLevelUps--;
+            BuildChoices();
+            if (choices.Count > 0) { SetState(GameState.LevelUp); return; }
+            // 고를 수 있는 스킬이 하나도 없으면 이번 레벨업은 건너뜀
+        }
     }
 
     void Pick(int i)
@@ -156,27 +185,52 @@ public class GameManager : MonoBehaviour
         if (pendingLevelUps > 0) OpenLevelUp();
     }
 
+    /// <summary>
+    /// 레벨업 선택지 3개 (기획서 2.3). 자동·수동·이동·패시브·궁극기가 함께 후보로 등장.
+    /// [임시] 후보별 출현 확률 미정 → 모두 같은 확률
+    /// [임시] 최대 레벨 스킬은 후보에서 제외, 슬롯이 가득 찬 종류의 신규 스킬도 제외 (기획 미정)
+    /// </summary>
     void BuildChoices()
     {
         var p = Player.I;
+        var T = Tuning.Skills;
         var pool = new List<Upgrade>();
 
-        AddWeaponOption<MagicBolt>(pool, p);
-        AddWeaponOption<OrbitBlades>(pool, p);
-        AddWeaponOption<HolyAura>(pool, p);
-        AddWeaponOption<Lightning>(pool, p);
+        foreach (var entry in p.Catalog)
+        {
+            var owned = p.GetSkill(entry.id);
+            string kind = SkillCatalog.KindLabel(entry.kind);
 
-        pool.Add(new Upgrade { title = "체력 강화", desc = "최대 체력 +20, 체력 회복", apply = () => { p.maxHp += 20; p.hp = Mathf.Min(p.maxHp, p.hp + 20); } });
-        pool.Add(new Upgrade { title = "신속", desc = "이동 속도 +8%", apply = () => p.moveSpeedMul *= 1.08f });
-        pool.Add(new Upgrade { title = "재생", desc = "초당 체력 회복 +0.5", apply = () => p.regen += 0.5f });
-        pool.Add(new Upgrade { title = "자석", desc = "획득 범위 +30%", apply = () => p.pickupMul *= 1.3f });
-        pool.Add(new Upgrade { title = "힘", desc = "모든 피해량 +10%", apply = () => p.damageMul += 0.1f });
-        if (p.cooldownMul > 0.5f)
-            pool.Add(new Upgrade { title = "가속", desc = "모든 쿨다운 -8%", apply = () => p.cooldownMul *= 0.92f });
-        pool.Add(new Upgrade { title = "확장", desc = "공격 범위 +10%", apply = () => p.areaMul += 0.1f });
+            if (owned != null)
+            {
+                if (owned.level >= owned.LevelCap) continue;
+                // 궁극기 강화는 캐릭터 Lv.60 부터 (잠정)
+                if (entry.kind == SkillKind.Ultimate && Level < T.ultimateUpgradeLevel) continue;
+                int next = owned.level + 1;
+                string extra = entry.kind != SkillKind.Ultimate && Skill.IsMilestone(next)
+                    ? "  <color=#F2BF4C>★ 특수 강화 (기획 미설계)</color>" : "";
+                pool.Add(new Upgrade
+                {
+                    title = $"{entry.name}  Lv.{owned.level} → {next}  <size=14>[{kind}]</size>",
+                    desc = (entry.kind == SkillKind.Ultimate ? "궁극기 강화" : "피해량·쿨타임·범위 강화") + extra,
+                    apply = () => p.AddOrLevelSkill(entry),
+                });
+            }
+            else
+            {
+                if (!HasFreeSlot(p, entry.kind)) continue;
+                // 궁극기 획득은 캐릭터 Lv.45 부터 (잠정)
+                if (entry.kind == SkillKind.Ultimate && Level < T.ultimateUnlockLevel) continue;
+                pool.Add(new Upgrade
+                {
+                    title = $"{entry.name}  <size=16>(신규)</size>  <size=14>[{kind}]</size>",
+                    desc = entry.summary + KeyHint(p, entry.kind),
+                    apply = () => p.AddOrLevelSkill(entry),
+                });
+            }
+        }
 
         choices.Clear();
-        // 무기 옵션이 나올 확률을 조금 높이기 위해 무기 먼저 섞어서 뽑기
         for (int n = 0; n < 3 && pool.Count > 0; n++)
         {
             int idx = Random.Range(0, pool.Count);
@@ -185,24 +239,31 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    void AddWeaponOption<T>(List<Upgrade> pool, Player p) where T : Weapon
+    static bool HasFreeSlot(Player p, SkillKind k)
     {
-        var w = p.GetWeapon<T>();
-        if (w != null && w.level >= Weapon.MaxLevel) return;
-        if (w == null && p.weapons.Count >= 6) return;
-
-        // 설명 문자열을 얻기 위해 임시 인스턴스 대신 이름/설명을 가진 컴포넌트를 사용
-        string name, desc;
-        if (w != null) { name = $"{w.DisplayName} Lv.{w.level + 1}"; desc = w.NextDescription(w.level + 1); }
-        else
+        var T = Tuning.Skills;
+        int count = p.CountKind(k);
+        return k switch
         {
-            var tmp = new GameObject("tmp").AddComponent<T>();
-            name = $"{tmp.DisplayName} (신규)"; desc = tmp.NextDescription(1);
-            DestroyImmediate(tmp.gameObject);
-        }
-        var entry = new Upgrade { title = name, desc = desc, apply = () => p.AddWeapon<T>() };
-        pool.Add(entry);
-        pool.Add(entry); // 무기는 가중치 2배
+            SkillKind.Auto => count < T.autoSlots,
+            SkillKind.Passive => count < T.passiveSlots,
+            SkillKind.Manual => count < Mathf.Min(T.manualSlots, T.manualKeys.Length),
+            SkillKind.Movement => count < T.movementSlots,
+            SkillKind.Ultimate => count < 1,   // [임시] 2종 동시 보유 여부 미정 → 1개
+            _ => false,
+        };
+    }
+
+    static string KeyHint(Player p, SkillKind k)
+    {
+        var T = Tuning.Skills;
+        return k switch
+        {
+            SkillKind.Manual => $"  <color=#9AD0FF>[{T.manualKeys[p.CountKind(SkillKind.Manual)]}]</color>",
+            SkillKind.Movement => $"  <color=#9AD0FF>[{T.movementKey}]</color>",
+            SkillKind.Ultimate => $"  <color=#9AD0FF>[{T.ultimateKey}]</color>",
+            _ => "",
+        };
     }
 
     // ---------- 상태 ----------
@@ -217,6 +278,59 @@ public class GameManager : MonoBehaviour
 
     void Restart() => SceneLoader.Load(SceneManager.GetActiveScene().name);
     void ToTitle() => SceneLoader.Load(SceneLoader.Title);
+
+    // ---------- 스킬 슬롯 바 (화면 아래 가운데) ----------
+    static GUIStyle skillListStyle, slotKey, slotName, slotBadge;
+    static GUIStyle SkillListStyle => skillListStyle ??= new GUIStyle(UIStyles.Small) { richText = true, wordWrap = false };
+
+    void DrawSkillBar(Player p, float W, float H)
+    {
+        var T = Tuning.Skills;
+        slotKey ??= new GUIStyle(UIStyles.Label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperLeft };
+        slotName ??= new GUIStyle(UIStyles.Small) { fontSize = 12, alignment = TextAnchor.LowerCenter, wordWrap = true };
+        slotBadge ??= new GUIStyle(UIStyles.Label) { fontSize = 14, alignment = TextAnchor.UpperRight };
+
+        int manualCount = Mathf.Min(T.manualSlots, T.manualKeys.Length);
+        int n = manualCount + 2;
+        float size = 64, gap = 8;
+        float x0 = (W - (n * size + (n - 1) * gap)) / 2, yy = H - size - 16;
+
+        for (int i = 0; i < n; i++)
+        {
+            Skill s; string key;
+            if (i < manualCount) { s = p.ManualSlot(i); key = T.manualKeys[i].ToString(); }
+            else if (i == manualCount) { s = p.FirstOfKind(SkillKind.Movement); key = KeyLabel(T.movementKey); }
+            else { s = p.FirstOfKind(SkillKind.Ultimate); key = T.ultimateKey.ToString(); }
+
+            var r = new Rect(x0 + i * (size + gap), yy, size, size);
+            GUI.color = new Color(0, 0, 0, s != null ? 0.7f : 0.35f);
+            GUI.DrawTexture(r, UIStyles.White);
+
+            if (s != null)
+            {
+                // 쿨타임: 위에서부터 어둡게 덮음
+                float cd = s.CooldownFraction;
+                if (cd > 0)
+                {
+                    GUI.color = new Color(0, 0, 0, 0.6f);
+                    GUI.DrawTexture(new Rect(r.x, r.y, r.width, r.height * cd), UIStyles.White);
+                }
+                else
+                {
+                    GUI.color = new Color(1f, 0.55f, 0.15f, 0.9f);
+                    GUI.DrawTexture(new Rect(r.x, r.yMax - 3, r.width, 3), UIStyles.White);
+                }
+                GUI.color = Color.white;
+                GUI.Label(new Rect(r.x + 2, r.y, r.width - 4, r.height - 2), s.Entry.name, slotName);
+                if (s.Badge != null) GUI.Label(new Rect(r.x, r.y + 2, r.width - 4, 20), s.Badge, slotBadge);
+            }
+            GUI.color = s != null ? Color.white : new Color(1, 1, 1, 0.4f);
+            GUI.Label(new Rect(r.x + 5, r.y + 2, 40, 20), key, slotKey);
+            GUI.color = Color.white;
+        }
+    }
+
+    static string KeyLabel(KeyCode k) => k == KeyCode.Space ? "SPC" : k.ToString();
 
     // ---------- UI (IMGUI 임시 UI, 스타일은 UIStyles 공용) ----------
     void OnGUI()
@@ -237,13 +351,21 @@ public class GameManager : MonoBehaviour
         var sp = Camera.main.WorldToScreenPoint(p.transform.position + Vector3.down * p.HealthBarOffset);
         UIStyles.Bar(new Rect(sp.x - 30, H - sp.y, 60, 7), p.hp / p.maxHp, new Color(0.9f, 0.25f, 0.25f));
 
-        // 보유 무기
+        // 보유 스킬 (종류별)
         float y = 52;
-        foreach (var w in p.weapons)
+        foreach (SkillKind k in Enum.GetValues(typeof(SkillKind)))
         {
-            GUI.Label(new Rect(12, y, 300, 26), $"{w.DisplayName}  Lv.{w.level}", UIStyles.Small);
-            y += 22;
+            foreach (var s in p.skills)
+            {
+                if (s.Entry.kind != k) continue;
+                GUI.Label(new Rect(12, y, 360, 26),
+                    $"<size=13><color=#AAAAAA>{SkillCatalog.KindLabel(k)}</color></size>  {s.Entry.name}  Lv.{s.level}",
+                    SkillListStyle);
+                y += 22;
+            }
         }
+
+        DrawSkillBar(p, W, H);
 
         float mbw = 260, mbh = 56;
         float mbx = (W - mbw) / 2;

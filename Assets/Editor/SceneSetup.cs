@@ -23,10 +23,24 @@ public static class SceneSetup
         {
             if (EditorApplication.isPlayingOrWillChangePlaymode) return;
             if (!System.IO.File.Exists(TitlePath)) CreateTitleScene();
+            EnsureConfig<SkillTuning>("Assets/Resources/Config/SkillTuning.asset");
             ApplyBuildSettings();
             ApplyPlayModeStartScene();
         };
     }
+
+    /// <summary>설정 파일이 없으면 기본값으로 만들어 Inspector 에서 조정할 수 있게 함</summary>
+    public static void EnsureConfig<T>(string path) where T : ScriptableObject
+    {
+        if (System.IO.File.Exists(path)) return;
+        System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path));
+        AssetDatabase.CreateAsset(ScriptableObject.CreateInstance<T>(), path);
+        AssetDatabase.SaveAssets();
+        Debug.Log("[SceneSetup] Config created: " + path);
+    }
+
+    /// <summary>batchmode용: 설정 파일 생성</summary>
+    public static void CreateConfigs() => EnsureConfig<SkillTuning>("Assets/Resources/Config/SkillTuning.asset");
 
     [MenuItem("SlayersSurvivor/메인 씬 다시 만들기")]
     public static void CreateMainScene()
