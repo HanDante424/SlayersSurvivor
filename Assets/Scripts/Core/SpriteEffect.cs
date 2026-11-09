@@ -16,7 +16,8 @@ public class SpriteEffect : MonoBehaviour
 
     /// <summary>시트를 잘라 프레임 배열로 (시트 이름별 캐시). 시트가 없으면 null.</summary>
     /// <param name="cellWorldWidth">한 칸의 가로 길이(월드 유닛). 같은 시트는 처음 값으로 캐시됩니다.</param>
-    public static Sprite[] LoadFrames(string sheetName, int rows, int cols, float cellWorldWidth)
+    /// <param name="frameCount">실제 프레임 수 (마지막 칸들이 비어 있는 시트용). 0 이면 rows × cols 전부</param>
+    public static Sprite[] LoadFrames(string sheetName, int rows, int cols, float cellWorldWidth, int frameCount = 0)
     {
         // 씬 전환 시 Unity 가 안 쓰는 스프라이트를 정리하므로 파괴됐으면 다시 만듦
         if (cache.TryGetValue(sheetName, out var cached) && cached != null && cached[0] != null) return cached;
@@ -26,10 +27,12 @@ public class SpriteEffect : MonoBehaviour
 
         float cw = tex.width / (float)cols, ch = tex.height / (float)rows;
         float ppu = cw / cellWorldWidth;
-        var f = new Sprite[rows * cols];
+        int n = frameCount > 0 ? Mathf.Min(frameCount, rows * cols) : rows * cols;
+        var f = new Sprite[n];
         for (int r = 0; r < rows; r++)
         for (int c = 0; c < cols; c++)
         {
+            if (r * cols + c >= n) break;
             // 텍스처 좌표는 아래에서 위로 → 시트의 r행은 (rows-1-r)
             var rect = new Rect(c * cw, (rows - 1 - r) * ch, cw, ch);
             var s = Sprite.Create(tex, rect, new Vector2(0.5f, 0.5f), ppu, 0, SpriteMeshType.FullRect);

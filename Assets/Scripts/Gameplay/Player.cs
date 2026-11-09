@@ -81,11 +81,14 @@ public class Player : MonoBehaviour
         return n;
     }
 
-    /// <summary>스킬 획득 또는 강화</summary>
+    /// <summary>
+    /// 스킬 신규 획득 (Lv.1). 이미 보유 중이면 아무것도 하지 않음 —
+    /// 보유 스킬 강화는 레벨업 화면의 기본 강화(Skill.ApplyBasicUpgrade) / 궁극기 강화(Skill.LevelUp) 경유.
+    /// </summary>
     public Skill AddOrLevelSkill(SkillEntry entry)
     {
         var existing = GetSkill(entry.id);
-        if (existing != null) { existing.LevelUp(); return existing; }
+        if (existing != null) return existing;
         var go = new GameObject("Skill_" + entry.id);
         go.transform.SetParent(transform, false);
         var s = (Skill)go.AddComponent(entry.type);
@@ -124,33 +127,28 @@ public class Player : MonoBehaviour
     public const string Thrust = "Thrust";   // 찌르기
     static readonly string[] AttackClips = { SlashH, SlashV, Thrust };
 
-    // 기본 공격(수평베기) 화염 이펙트: 일반 / 치명타
-    //  - 일반   ErnStray_FireSlash     2행 x 8열 (16프레임)
-    //  - 치명타 ErnStray_FireSlashCrit 4행 x 6열 (24프레임)
+    // 기본 공격(수평베기) 화염 이펙트: ErnStray_FireSlash 2행 x 8열 (16프레임)
+    // 치명타여도 같은 이펙트 (치명타 전용 이펙트 교체는 취소됨)
     // 타이밍·거리·크기·속도는 설정 파일에서 조정
-    Sprite[] fxSlash, fxSlashCrit;
+    Sprite[] fxSlash;
     float fxTimer = -1f;
-    bool fxCrit;
 
     /// <summary>
     /// 공격 모션 재생 (애니메이션만, 판정 없음). dir 이 0이면 현재 바라보는 방향.
     /// 이전 공격 모션이 끝나기 전에는 무시되고 false 를 돌려줍니다.
-    /// 수평베기는 치명타 판정 후 일반/치명타 화염 이펙트를 함께 출력합니다.
+    /// 수평베기는 화염 이펙트를 함께 출력합니다.
+    /// 스킬이 자기 이펙트를 직접 띄울 때는 baseFx = false 로 기본 공격 이펙트를 끕니다.
     /// </summary>
-    public bool PlayAttack(string clip, Vector2 dir = default)
+    public bool PlayAttack(string clip, Vector2 dir = default, bool baseFx = true)
     {
         if (anim == null || !anim.Play(clip, dir)) return false;
-        if (clip == SlashH)
-        {
-            fxCrit = RollCrit();
-            fxTimer = Cfg.fxDelay;
-        }
+        if (clip == SlashH && baseFx) fxTimer = Cfg.fxDelay;
         return true;
     }
 
-    void SpawnSlashFx(bool crit)
+    void SpawnSlashFx()
     {
-        var frames = crit ? fxSlashCrit : fxSlash;
+        var frames = fxSlash;
         if (frames == null) return;
 
         // 이펙트 원본은 오른쪽으로 휘두르는 모양 → 방향에 맞게 회전/반전
@@ -166,9 +164,8 @@ public class Player : MonoBehaviour
         var o = Cfg.fxOffset;
         Vector2 offset = anim.Facing == Facing4.Left ? new Vector2(-o.x, o.y)
                        : (Vector2)(Quaternion.Euler(0, 0, angle) * o);
-        SpriteEffect.Spawn(frames, crit ? Cfg.fxCritFps : Cfg.fxFps, transform,
-                           dir * Cfg.fxDistance + offset, angle, flip, 11,
-                           crit ? Cfg.fxCritSize : Cfg.fxSize);
+        SpriteEffect.Spawn(frames, Cfg.fxFps, transform,
+                           dir * Cfg.fxDistance + offset, angle, flip, 11, Cfg.fxSize);
     }
 
     void Awake()
@@ -188,7 +185,6 @@ public class Player : MonoBehaviour
                 anim.LoadClip(key, CharacterId + "_" + key, 4, 8, cell, pivotY, Cfg.attackFps, false);
             // 크기는 Spawn 때 설정 값으로 맞추므로 1유닛 기준으로 자름
             fxSlash = SpriteEffect.LoadFrames(CharacterId + "_FireSlash", 2, 8, 1f);
-            fxSlashCrit = SpriteEffect.LoadFrames(CharacterId + "_FireSlashCrit", 4, 6, 1f);
             transform.localScale = Vector3.one;
             HealthBarOffset = cell * (pivotY - 0.06f) + 0.15f; // 발 바로 아래
         }
@@ -257,7 +253,7 @@ public class Player : MonoBehaviour
         if (fxTimer >= 0f)
         {
             fxTimer -= Time.deltaTime;
-            if (fxTimer < 0f) SpawnSlashFx(fxCrit);
+            if (fxTimer < 0f) SpawnSlashFx();
         }
 
         if (regen > 0) hp = Mathf.Min(maxHp, hp + regen * Time.deltaTime);

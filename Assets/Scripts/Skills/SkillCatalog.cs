@@ -21,15 +21,15 @@ public static class SkillCatalog
     public static readonly List<SkillEntry> ErnStray = new List<SkillEntry>
     {
         // 자동 6종
-        E("A01", "파이어 슬래시", "Fire Slash", SkillKind.Auto, typeof(FireSlash), "화염 검격. 범위 좁음 · 쿨타임 짧음 · 피해 낮음"),
-        E("A02", "솔라 슬래시", "Solar Slash", SkillKind.Auto, typeof(SolarSlash), "전방위 베기. 범위 중간 · 쿨타임 중간 · 피해 중간"),
+        E("A01", "파이어 슬래시", "Fire Slash", SkillKind.Auto, typeof(FireSlash), "기본 무장. 바라보는 방향 화염 검격 · 쿨타임 3초 · 피해 10"),
+        E("A02", "솔라 슬래시", "Solar Slash", SkillKind.Auto, typeof(SolarSlash), "플레이어 중심 전방위 베기 후 폭발 · 쿨타임 5초 · 피해 5 + 12"),
         E("A03", "파이어 볼", "Fire Ball", SkillKind.Auto, typeof(FireBall), "화염 투사체. 사거리 김 · 범위 좁음 · 쿨타임 짧음 · 피해 낮음"),
         E("A04", "파이어 버스터", "Fire Buster", SkillKind.Auto, typeof(FireBuster), "주변 적 밀치기. 범위 중간 · 쿨타임 중간 · 피해 중간"),
         E("A05", "파이어 블레이드", "Fire Blade", SkillKind.Auto, typeof(FireBlade), "범위 내 대상 다수 참격 후 폭발. 범위 중간 · 쿨타임 김 · 총 피해 높음"),
         E("A06", "파이어 스톰", "Fire Storm", SkillKind.Auto, typeof(FireStorm), "지속 피해 + 슬로우 후 폭발하며 밀치기. 쿨타임 중간 · 피해 중간"),
 
         // 수동 5종
-        E("M01", "트리플 슬래시", "Triple Slash", SkillKind.Manual, typeof(TripleSlash), "3연속 베기. 범위 중간 · 피해 높음 · 쿨타임 중간"),
+        E("M01", "트리플 슬래시", "Triple Slash", SkillKind.Manual, typeof(TripleSlash), "바라보는 방향 3연속 베기 · 쿨타임 8초 · 피해 8 × 3타"),
         E("M02", "파이어 차지", "Fire Charge", SkillKind.Manual, typeof(FireCharge), "돌진 이동기. 무적 · 주변 적 밀치기 · 피해 매우 낮음"),
         E("M03", "오버 플레임 슬래시", "Over Flame Slash", SkillKind.Manual, typeof(OverFlameSlash), "긴 사거리 일직선 베기 + 기절. 피해 매우 높음 · 쿨타임 김"),
         E("M04", "파이어 브레이커", "Fire Breaker", SkillKind.Manual, typeof(FireBreaker), "범위 피해 + 1초 기절, 2초 후 같은 위치 재발동"),
@@ -41,6 +41,12 @@ public static class SkillCatalog
         // 궁극기 1종 (U02 미설계)
         E("U01", "블레이징 스톰", "Blazing Storm", SkillKind.Ultimate, typeof(BlazingStorm), "화면 전체 매우 높은 피해 후 모든 적 기절. 사용 중 무적"),
     };
+
+    /// <summary>
+    /// [임시] 레벨업 후보에 나오는 스킬 (이미지 리소스가 있는 것만): 파이어 슬래시 · 솔라 슬래시 · 트리플 슬래시.
+    /// 나머지 스킬은 코드는 남아 있지만 후보에 나오지 않음. 리소스가 추가되면 여기에 id 를 더하면 됨.
+    /// </summary>
+    public static readonly HashSet<string> LevelUpPool = new HashSet<string> { "A01", "A02", "M01" };
 
     static SkillEntry E(string id, string name, string en, SkillKind kind, Type type, string summary)
         => new SkillEntry { id = id, name = name, nameEn = en, kind = kind, type = type, summary = summary };

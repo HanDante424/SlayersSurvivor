@@ -36,7 +36,5 @@ public class PlayerConfig : ScriptableObject
     [Tooltip("위치 미세 조정 (오른쪽을 볼 때 기준, 방향에 맞춰 회전)")]
     public Vector2 fxOffset = Vector2.zero;
     [Range(0.3f, 5f)] public float fxSize = 2.0f;
-    [Range(0.3f, 5f)] public float fxCritSize = 2.6f;
     [Range(8f, 60f)] public float fxFps = 32f;
-    [Range(8f, 60f)] public float fxCritFps = 36f;
 }
