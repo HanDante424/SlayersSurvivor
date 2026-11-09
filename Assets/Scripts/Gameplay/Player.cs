@@ -8,16 +8,24 @@ public class Player : MonoBehaviour
     [Header("기본 스탯")]
     public float maxHp = 100f;
     public float hp;
-    public float moveSpeed = 4.5f;
     public float regen = 0f;            // 초당 회복
-    public float pickupRadius = 2.0f;
     public float damageMul = 1f;
     public float cooldownMul = 1f;
     public float areaMul = 1f;
-    public float radius = 0.4f;
 
-    [Header("치명타")]
-    [Range(0f, 1f)] public float critChance = 0.5f;   // 기본 50%
+    [Header("업그레이드 배율")]
+    public float moveSpeedMul = 1f;
+    public float pickupMul = 1f;
+
+    // 감각 조정 값은 설정 파일에서 (Assets/Resources/Config/ErnStrayConfig.asset)
+    static PlayerConfig Cfg => Tuning.ErnStray;
+    public float moveSpeed => Cfg.moveSpeed * moveSpeedMul;
+    public float pickupRadius => Cfg.pickupRadius * pickupMul;
+    /// <summary>피격 판정 반경</summary>
+    public float radius => Cfg.hurtRadius;
+    /// <summary>피격 판정 중심 (월드 좌표)</summary>
+    public Vector2 HurtCenter => (Vector2)transform.position + Cfg.hurtOffset;
+    public float critChance => Cfg.critChance;
 
     /// <summary>치명타 판정 (critChance 확률로 true)</summary>
     public bool RollCrit() => Random.value < critChance;
@@ -39,14 +47,12 @@ public class Player : MonoBehaviour
     public const string SlashV = "SlashV";   // 수직베기
     public const string Thrust = "Thrust";   // 찌르기
     static readonly string[] AttackClips = { SlashH, SlashV, Thrust };
-    const float AttackFps = 16f;             // 8프레임 → 0.5초
 
     // 기본 공격(수평베기) 화염 이펙트: 일반 / 치명타
     //  - 일반   ErnStray_FireSlash     2행 x 8열 (16프레임)
     //  - 치명타 ErnStray_FireSlashCrit 4행 x 6열 (24프레임)
+    // 타이밍·거리·크기·속도는 설정 파일에서 조정
     Sprite[] fxSlash, fxSlashCrit;
-    const float FxDelay = 0.125f;      // 모션 시작 후 이펙트가 나오기까지 (16fps 기준 3번째 프레임)
-    const float FxDistance = 0.7f;     // 플레이어 중심에서 바라보는 방향으로 떨어진 거리
     float fxTimer = -1f;
     bool fxCrit;
 
@@ -61,7 +67,7 @@ public class Player : MonoBehaviour
         if (clip == SlashH)
         {
             fxCrit = RollCrit();
-            fxTimer = FxDelay;
+            fxTimer = Cfg.fxDelay;
         }
         return true;
     }
@@ -80,7 +86,13 @@ public class Player : MonoBehaviour
             case Facing4.Down:  dir = Vector2.down;  angle = -90f; break;
             default:            dir = Vector2.right; break;
         }
-        SpriteEffect.Spawn(frames, crit ? 36f : 32f, transform, dir * FxDistance, angle, flip, 11);
+        // fxOffset 은 오른쪽 기준 → 바라보는 방향에 맞춰 회전 (왼쪽은 좌우 반전)
+        var o = Cfg.fxOffset;
+        Vector2 offset = anim.Facing == Facing4.Left ? new Vector2(-o.x, o.y)
+                       : (Vector2)(Quaternion.Euler(0, 0, angle) * o);
+        SpriteEffect.Spawn(frames, crit ? Cfg.fxCritFps : Cfg.fxFps, transform,
+                           dir * Cfg.fxDistance + offset, angle, flip, 11,
+                           crit ? Cfg.fxCritSize : Cfg.fxSize);
     }
 
     void Awake()
@@ -97,9 +109,10 @@ public class Player : MonoBehaviour
         {
             anim.LoadClip(SpriteSheetAnimator.Idle, CharacterId + "_Idle", 4, 8, cell, pivotY, 8f, true);
             foreach (var key in AttackClips)
-                anim.LoadClip(key, CharacterId + "_" + key, 4, 8, cell, pivotY, AttackFps, false);
-            fxSlash = SpriteEffect.LoadFrames(CharacterId + "_FireSlash", 2, 8, 2.0f);
-            fxSlashCrit = SpriteEffect.LoadFrames(CharacterId + "_FireSlashCrit", 4, 6, 2.6f);
+                anim.LoadClip(key, CharacterId + "_" + key, 4, 8, cell, pivotY, Cfg.attackFps, false);
+            // 크기는 Spawn 때 설정 값으로 맞추므로 1유닛 기준으로 자름
+            fxSlash = SpriteEffect.LoadFrames(CharacterId + "_FireSlash", 2, 8, 1f);
+            fxSlashCrit = SpriteEffect.LoadFrames(CharacterId + "_FireSlashCrit", 4, 6, 1f);
             transform.localScale = Vector3.one;
             HealthBarOffset = cell * (pivotY - 0.06f) + 0.15f; // 발 바로 아래
         }
@@ -112,11 +125,21 @@ public class Player : MonoBehaviour
             transform.localScale = Vector3.one * 0.9f;
         }
         baseColor = sr.color;
+
+        HitboxView.Attach(transform, HitboxView.HurtColor, () => radius, () => HurtCenter);
+        HitboxView.Attach(transform, HitboxView.PickupColor * new Color(1, 1, 1, 0.5f), () => pickupRadius);
     }
 
     void Update()
     {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        // 판정 범위 표시 켜기/끄기
+        if (Input.GetKeyDown(KeyCode.F1)) HitboxView.Show = !HitboxView.Show;
+#endif
         if (GameManager.I.State != GameState.Playing) return;
+
+        if (anim != null)
+            foreach (var key in AttackClips) anim.SetClipFps(key, Cfg.attackFps);
 
         var input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
         if (input.sqrMagnitude > 1f) input.Normalize();
