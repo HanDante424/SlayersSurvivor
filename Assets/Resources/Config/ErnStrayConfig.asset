@@ -22,6 +22,4 @@ MonoBehaviour:
   fxDistance: 0.7
   fxOffset: {x: 0, y: 0}
   fxSize: 2
-  fxCritSize: 2.6
   fxFps: 32
-  fxCritFps: 36
