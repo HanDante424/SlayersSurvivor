@@ -44,6 +44,9 @@ public class Enemy : MonoBehaviour
     /// <summary>기절: 이동·접촉 공격 중지 (더 긴 쪽 유지)</summary>
     public void Stun(float seconds) => stunLeft = Mathf.Max(stunLeft, seconds);
 
+    /// <summary>화상 표시 (파티클만 — 화상 피해 규칙은 기획 미정)</summary>
+    public void ShowBurn(float seconds) => BurnFx.Show(transform, () => radius, seconds);
+
     /// <summary>슬로우: 이동 속도 배율 (더 강한 쪽 유지)</summary>
     public void Slow(float mul, float seconds)
     {
