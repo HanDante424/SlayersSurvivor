@@ -14,7 +14,7 @@ public class SkillEntry
 
 /// <summary>
 /// 캐릭터별 스킬 목록. 기획서(Docs/Design/GDD_v0.1.md) 4~7장 기준.
-/// 패시브는 기획 미설계라 비어 있고, 두 번째 궁극기(U02)도 미설계라 없음.
+/// 패시브는 화염의 검만 구현 (옥염 · 흡수 가열 예정), 두 번째 궁극기(U02)는 미설계라 없음.
 /// </summary>
 public static class SkillCatalog
 {
@@ -38,15 +38,18 @@ public static class SkillCatalog
         // 이동 1종
         E("D01", "파이어 스트림", "Fire Stream", SkillKind.Movement, typeof(FireStream), "3스택 고속 이동. 무적 · 피해 낮음"),
 
+        // 패시브 (전투 통합 기획서 v1.0 8장 — 옥염 · 흡수 가열은 이후 구현)
+        E("P01", "화염의 검", "Flame Sword", SkillKind.Passive, typeof(FlameSword), "직접 피해마다 화상 1스택 · 스택당 초당 피해 2 · 3초 · 최대 5스택"),
+
         // 궁극기 1종 (U02 미설계)
         E("U01", "블레이징 스톰", "Blazing Storm", SkillKind.Ultimate, typeof(BlazingStorm), "화면 전체 매우 높은 피해 후 모든 적 기절. 사용 중 무적"),
     };
 
     /// <summary>
-    /// [임시] 레벨업 후보에 나오는 스킬 (이미지 리소스가 있는 것만): 파이어 슬래시 · 솔라 슬래시 · 트리플 슬래시.
+    /// [임시] 레벨업 후보에 나오는 스킬 (이미지 리소스가 있는 것만): 파이어 슬래시 · 솔라 슬래시 · 트리플 슬래시 + 화염의 검(패시브).
     /// 나머지 스킬은 코드는 남아 있지만 후보에 나오지 않음. 리소스가 추가되면 여기에 id 를 더하면 됨.
     /// </summary>
-    public static readonly HashSet<string> LevelUpPool = new HashSet<string> { "A01", "A02", "M01" };
+    public static readonly HashSet<string> LevelUpPool = new HashSet<string> { "A01", "A02", "M01", "P01" };
 
     static SkillEntry E(string id, string name, string en, SkillKind kind, Type type, string summary)
         => new SkillEntry { id = id, name = name, nameEn = en, kind = kind, type = type, summary = summary };

@@ -40,13 +40,19 @@ public struct DamageInfo
     public string tag;
     /// <summary>대상 의존 최종 피해량 배율 (고열 절삭 등). null = 없음</summary>
     public Func<Enemy, float> perTarget;
+    /// <summary>직접 피해가 아니어도 화염의 검 화상을 부여하는 예외 (솔라 슬래시 타오름)</summary>
+    public bool canBurn;
 
     public DamageInfo(float amount, DamageType type = DamageType.Direct, Skill source = null,
                       CastKind cast = CastKind.Direct, bool isFixed = false, string tag = null)
     {
         this.amount = amount; this.type = type; this.source = source; this.cast = cast;
-        this.isFixed = isFixed; this.tag = tag; perTarget = null;
+        this.isFixed = isFixed; this.tag = tag; perTarget = null; canBurn = false;
     }
+
+    /// <summary>'화상' 태그 (화염의 검 화상 틱 · 살아있는 폭탄 · 일촉즉발)</summary>
+    public const string BurnTag = "burn";
+    public bool IsBurn => tag == BurnTag;
 
     /// <summary>예전 호출(숫자만)은 출처 없는 직접 피해로 취급 — 아직 새 구조로 옮기지 않은 임시 스킬용</summary>
     public static implicit operator DamageInfo(float amount) => new DamageInfo(amount);

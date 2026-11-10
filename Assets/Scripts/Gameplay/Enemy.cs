@@ -54,6 +54,12 @@ public class Enemy : MonoBehaviour
         slowLeft = Mathf.Max(slowLeft, seconds);
     }
 
+    /// <summary>Hit 의 knock 에 넘기면 넉백을 건드리지 않음 (지속 피해 틱 등). 0 은 "넉백 멈춤"</summary>
+    public const float NoKnock = -1f;
+
+    /// <summary>상태 효과 이동속도 배율 (끈적한 화염 등). 슬로우와 곱연산</summary>
+    public float statusSpeedMul = 1f;
+
     /// <summary>넉백 속도가 초당 줄어드는 비율. 밀려나는 총 거리 = 넉백 속도 / 이 값</summary>
     public const float KnockDecay = 10f;
 
@@ -131,7 +137,7 @@ public class Enemy : MonoBehaviour
 
         if (concussLeft > 0) CheckConcussion(pos);
 
-        float moveSpeed = stunned ? 0f : speed * slowMul;
+        float moveSpeed = stunned ? 0f : speed * slowMul * statusSpeedMul;
         pos += (dir * moveSpeed + knockback) * Time.deltaTime;
         knockback = Vector2.Lerp(knockback, Vector2.zero, KnockDecay * Time.deltaTime);
         transform.position = pos;
@@ -197,7 +203,7 @@ public class Enemy : MonoBehaviour
         if (DebugCheats.OneHitKill) dmg = Mathf.Max(dmg, hp);   // 테스트: 한 방에 처치
         if (!DebugCheats.ImmortalEnemies) hp -= dmg;            // 테스트: 피해 숫자만 표시
         flash = 0.08f;
-        if (kind != EnemyKind.Boss) knockback = fromDir.normalized * knock;
+        if (kind != EnemyKind.Boss && knock >= 0f) knockback = fromDir.normalized * knock;   // NoKnock = 진행 중인 넉백 유지
         DamageText.Show(transform.position, dmg);
         if (info.type != DamageType.Special) Damaged?.Invoke(this, info, (int)dmg);
         if (hp <= 0) Die();

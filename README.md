@@ -1,7 +1,8 @@
 # SlayersSurvivor
 
 Unity 6 (6000.3.22f1) 2D 뱀서라이크 액션. 기획 기준: [Docs/Design/GDD_v0.1.md](Docs/Design/GDD_v0.1.md),
-전투·스킬 성장은 [Docs/Design/Combat_SkillGrowth_v0.2.md](Docs/Design/Combat_SkillGrowth_v0.2.md) 우선
+전투·스킬 성장은 [Docs/Design/Combat_Decisions_v1.0.md](Docs/Design/Combat_Decisions_v1.0.md) (확정 결정 · 최우선)
+→ [Combat_Unified_v1.0.md](Docs/Design/Combat_Unified_v1.0.md) (통합 기획서 원문) → [Combat_SkillGrowth_v0.2.md](Docs/Design/Combat_SkillGrowth_v0.2.md) 순
 
 ## 실행
 Unity Hub → Add → 이 폴더 → Play (타이틀부터 시작).
@@ -26,9 +27,12 @@ Unity Hub → Add → 이 폴더 → Play (타이틀부터 시작).
   스킬 Lv.5·10·15 는 이어서 특수 강화 화면 (3개 중 1개, 이전 단계 강화 유지·중첩).
   특수 강화 구현: 파이어 슬래시 · 솔라 슬래시 각 9종 (`Docs/Design/SpecialUpgrades_FireSolar_v1.0.md`).
   트리플 슬래시 등 나머지는 기획 미설계 → "확인"만, 효과 없음. 획득한 특수 강화는 화면 왼쪽 위 스킬 목록에 ★ 로 표시
-  피해량 내림, 쿨타임 감소 최대 90%. 스킬 Lv.15 는 후보에서 제외
-- 패시브, 두 번째 궁극기: 기획 미설계라 없음
-- [임시] 레벨업 후보는 이미지 리소스가 있는 파이어 슬래시 · 솔라 슬래시 · 트리플 슬래시만 (`SkillCatalog.LevelUpPool`). 나머지 스킬·궁극기는 후보에 안 나옴
+  피해 계산: 초기 피해량 → 피해량 → 추가 피해량 → 최종 피해량 → (대상) 받는 최종 피해량 → 내림 (`Core/Damage.cs`).
+  쿨타임: 기본 강화 배율 × 독립 배율 곱연산, 최종 감소 최대 90%. 스킬 Lv.15 는 후보에서 제외
+- 패시브: 화염의 검 (기본 + 고유 강화 3종 + 특수 강화 9종, `ErnPassives.cs`). 옥염 · 흡수 가열은 예정
+- 두 번째 궁극기: 기획 미설계라 없음
+- 치트 패널 오른쪽 열: 미보유 스킬은 "획득" 버튼으로 바로 획득. 화염의 검 보유 시 "화상 1스택 부여 (화면 안 적)"
+- [임시] 레벨업 후보는 이미지 리소스가 있는 파이어 슬래시 · 솔라 슬래시 · 트리플 슬래시 + 화염의 검만 (`SkillCatalog.LevelUpPool`). 나머지 스킬·궁극기는 후보에 안 나옴
 
 ## 임시값 위치
 기획서의 정성 등급(짧음/중간/김, 낮음/높음 …)은 코드에 등급 그대로 들어가 있고,

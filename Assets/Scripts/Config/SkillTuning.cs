@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 /// <summary>피해량 등급 (기획서: 매우 낮음 ~ 매우 높음)</summary>
 public enum Power { VeryLow, Low, Mid, High, VeryHigh }
@@ -59,6 +59,10 @@ public class SkillTuning : ScriptableObject
     [Tooltip("F15-C 죽음의 메아리: 적 사망 후 메아리 참격까지(초). 0 이어도 다음 프레임 이후·일시정지 중에는 발동 안 함")] public float fireEchoDelay = 0.1f;
     [Tooltip("F15-C 죽음의 메아리: 한 프레임에 발동하는 메아리 최대 수. 넘치는 메아리는 버리지 않고 다음 프레임으로 미룸 (총량 유지)")] [Min(1)] public int fireEchoMaxPerFrame = 4;
     [Tooltip("F15-C 죽음의 메아리 + 난사: 120° 세 방향 각각에서 ± 이 각도(도) 안 무작위로 3회. 60 = 각 방향이 맡은 120° 칸 전체")] [Range(0f, 60f)] public float fireEchoScatterSpread = 60f;
+
+    [Header("[임시] 화염의 검 — 기획서에 수치가 없는 값 (플레이 테스트로 조정)")]
+    [Tooltip("B5-C 확산되는 불길: 화상 상태로 죽은 적 주변에 화상 1스택을 부여하는 반경(유닛). 결정 기록: 임시 3")] public float flameSpreadRadius = 3f;
+    [Tooltip("B10-B 살아있는 폭탄: 폭발 반경(유닛)")] public float flameBombRadius = 1.5f;
 
     [Header("[임시] 솔라 슬래시 특수 강화 — 기획서에 수치가 없는 값 (플레이 테스트로 조정)")]
     [Tooltip("S15-A 연속 폭발: 추가 폭발 간격 = 베기→폭발 간격(solarExplosionDelay) × 이 값")] public float solarMultiIntervalRatio = 1f;

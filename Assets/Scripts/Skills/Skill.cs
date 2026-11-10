@@ -20,6 +20,12 @@ public class SpecialUpgradeOption
     public string warning;
 }
 
+/// <summary>패시브 고유 기본 강화 선택지 1개</summary>
+public class PassiveUpgradeOption
+{
+    public string title, desc;
+}
+
 /// <summary>
 /// 모든 스킬의 공통 기반.
 /// - 스킬 레벨 1~15 (캐릭터 레벨과 별개)
@@ -73,6 +79,24 @@ public abstract class Skill : MonoBehaviour
         level++;
         OnLevelChanged();
     }
+
+    // ---------- 패시브 고유 기본 강화 (공통 기본 강화 대신 패시브마다 3종) ----------
+    /// <summary>패시브 고유 기본 강화 선택지. null = 공통 기본 강화(피해량·범위·쿨타임) 사용</summary>
+    public virtual PassiveUpgradeOption[] PassiveBasicOptions() => null;
+
+    /// <summary>패시브 고유 기본 강화 1개 적용 후 스킬 레벨 +1</summary>
+    public void ApplyPassiveBasic(int index)
+    {
+        if (!IsGeneral || level >= LevelCap) return;
+        OnPassiveBasic(index);
+        level++;
+        OnLevelChanged();
+    }
+
+    protected virtual void OnPassiveBasic(int index) { }
+
+    /// <summary>HUD 표시용 기본 강화 누적 요약 (null = 공통 기본 강화 표시)</summary>
+    public virtual string BasicSummary => null;
 
     /// <summary>궁극기 강화 (기본 강화 없이 레벨만)</summary>
     public void LevelUp()

@@ -569,8 +569,10 @@ public class SolarSlash : AutoSkill
             if (frames == null) Fx.Disc(at, r, Fx.Fire, 0.25f);
             else if (i > 0) SpawnBlastFx(frames, r);
 
-            // 타오름 = '지속 피해' (결정 기록 v1.0 · 화염의 검 화상 부여는 예외로 허용 — 화염의 검 구현 때 연결)
-            SkillHits.Circle(at, r, MakeDamage(SlashDamage + ExplosionDamage, CastKind.Direct, DamageType.DoT), 0f, e =>
+            // 타오름 = '지속 피해' (결정 기록 v1.0). 예외로 화염의 검 화상은 부여 (canBurn)
+            var burnDmg = MakeDamage(SlashDamage + ExplosionDamage, CastKind.Direct, DamageType.DoT);
+            burnDmg.canBurn = true;
+            SkillHits.Circle(at, r, burnDmg, 0f, e =>
             {
                 OnDamaged(e);
                 if (!knockThisTick) return;

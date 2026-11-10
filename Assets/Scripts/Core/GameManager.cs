@@ -219,6 +219,21 @@ public class GameManager : MonoBehaviour
         var T = Tuning.Skills;
         int from = s.level, to = s.level + 1;
         string special = Skill.IsMilestone(to) ? $"\n<color=#F2BF4C>선택 후 Lv.{to} 특수 강화가 이어집니다</color>" : "";
+
+        // 패시브: 공통 기본 강화 대신 고유 강화 3종
+        var passive = s.PassiveBasicOptions();
+        if (passive != null)
+        {
+            var plist = new List<Upgrade>();
+            for (int k = 0; k < passive.Length; k++)
+            {
+                int idx = k;
+                plist.Add(new Upgrade { title = passive[k].title, desc = passive[k].desc, apply = () => FinishPassiveBasic(s, idx) });
+            }
+            ShowMenu($"{s.Entry.name} 고유 강화", $"Lv.{from} → {to}{special}", plist);
+            return;
+        }
+
         float cdNow = s.CooldownReduction, cdNext = Mathf.Min(T.upgradeCooldown * (s.CooldownUps + 1), T.cooldownReductionCap);
         string cdCap = cdNext <= cdNow ? "  <color=#FF8080>(최대 90% 도달 — 더 줄지 않음)</color>" : "";
         var list = new List<Upgrade>
@@ -249,6 +264,13 @@ public class GameManager : MonoBehaviour
     void FinishBasic(Skill s, BasicUpgrade u)
     {
         s.ApplyBasicUpgrade(u);
+        if (s.SpecialPending) ShowSpecialUpgrade(s);
+    }
+
+    /// <summary>패시브 고유 강화 확정 → 스킬 레벨 +1 → 특수 강화 레벨이면 특수 강화 화면</summary>
+    void FinishPassiveBasic(Skill s, int index)
+    {
+        s.ApplyPassiveBasic(index);
         if (s.SpecialPending) ShowSpecialUpgrade(s);
     }
 
@@ -346,7 +368,9 @@ public class GameManager : MonoBehaviour
                     pool.Add(new Upgrade
                     {
                         title = $"{entry.name}  Lv.{owned.level} → {next}  <size=14>[{kind}]</size>",
-                        desc = "기본 강화 선택: 공격력 / 범위 / 쿨타임" + extra,
+                        desc = (owned.PassiveBasicOptions() is { } po
+                                   ? "고유 강화 선택: " + string.Join(" / ", System.Array.ConvertAll(po, o => o.title))
+                                   : "기본 강화 선택: 공격력 / 범위 / 쿨타임") + extra,
                         apply = () => ShowBasicUpgrade(owned),
                     });
                 }
@@ -631,9 +655,9 @@ public class GameManager : MonoBehaviour
             {
                 if (s.Entry.kind != k) continue;
                 // 기본 강화 누적치도 표시 (합연산 확인용)
-                string ups = s.IsGeneral && s.level > 1
-                    ? $"  <size=12><color=#AAAAAA>공 +{Pct(s.DamageBonus)} · 범 +{Pct(s.RangeBonus)} · 쿨 -{Pct(s.CooldownReduction)}</color></size>"
-                    : "";
+                string ups = !s.IsGeneral || s.level <= 1 ? ""
+                    : s.BasicSummary != null ? $"  <size=12><color=#AAAAAA>{s.BasicSummary}</color></size>"
+                    : $"  <size=12><color=#AAAAAA>공 +{Pct(s.DamageBonus)} · 범 +{Pct(s.RangeBonus)} · 쿨 -{Pct(s.CooldownReduction)}</color></size>";
                 GUI.Label(new Rect(12, y, 480, 26),
                     $"<size=13><color=#AAAAAA>{SkillCatalog.KindLabel(k)}</color></size>  {s.Entry.name}  Lv.{s.level}{ups}",
                     SkillListStyle);

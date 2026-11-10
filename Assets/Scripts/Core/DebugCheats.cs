@@ -102,7 +102,7 @@ public class DebugCheats : MonoBehaviour
             "레벨 +1",
             "레벨 +10",
             "궁극기 게이지 채우기",
-            "화상 표시 테스트 (화면 안 적 5초)",
+            FlameSword.I != null ? "화상 1스택 부여 (화면 안 적)" : "화상 표시 테스트 (화면 안 적 5초)",
             "닫기 (F2)",
         };
         float top = H - 12 - labels.Length * (bh + gap);
@@ -128,7 +128,11 @@ public class DebugCheats : MonoBehaviour
                 case 8: GameManager.I?.DebugAddLevels(1); break;
                 case 9: GameManager.I?.DebugAddLevels(10); break;
                 case 10: GameManager.I?.DebugFillUltimate(); break;
-                case 11: foreach (var e in SkillHits.OnScreen(onScreen)) e.ShowBurn(5f); break;
+                case 11:
+                    // 화염의 검 보유 시 실제 화상 (피해·지속시간 규칙 적용), 없으면 표시만
+                    foreach (var e in SkillHits.OnScreen(onScreen))
+                        if (FlameSword.I != null) FlameSword.I.AddStacks(e, 1); else e.ShowBurn(5f);
+                    break;
                 case 12: open = false; break;
             }
         }
@@ -150,8 +154,14 @@ public class DebugCheats : MonoBehaviour
             if (GUI.Button(r, $"{e.name} <size=13>[{kind}]</size>  {OnOff(disabledSkills.Contains(e.id))}", Small))
                 ToggleSkill(e.id);
             var owned = Player.I != null ? Player.I.GetSkill(e.id) : null;
-            GUI.enabled = owned != null && owned.IsGeneral && owned.level < owned.LevelCap;
-            if (GUI.Button(new Rect(sx + sw + 6, r.y, lw, bh), owned != null ? $"Lv.{owned.level}+1" : "Lv+1", Small))
+            if (owned == null)
+            {
+                // 미보유: 바로 획득 (슬롯 제한 무시 — 테스트용)
+                if (GUI.Button(new Rect(sx + sw + 6, r.y, lw, bh), "획득", Small)) Player.I?.AddOrLevelSkill(e);
+                continue;
+            }
+            GUI.enabled = owned.IsGeneral && owned.level < owned.LevelCap;
+            if (GUI.Button(new Rect(sx + sw + 6, r.y, lw, bh), $"Lv.{owned.level}+1", Small))
                 GameManager.I?.DebugUpgradeSkill(owned);
             GUI.enabled = true;
         }
