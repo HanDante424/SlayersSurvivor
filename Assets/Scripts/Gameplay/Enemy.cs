@@ -193,6 +193,18 @@ public class Enemy : MonoBehaviour
     public static event Action<Enemy, DamageInfo, int> Damaged;
 
     /// <summary>
+    /// Damaged 구독자가 모두 끝난 뒤 (같은 피해의 화상 부여 등이 반영된 상태). 강제 발화처럼 "이번 타격까지 포함한 상태"를 보는 효과용.
+    /// 특수 피해는 발생하지 않음
+    /// </summary>
+    public static event Action<Enemy, DamageInfo, int> AfterDamaged;
+
+    /// <summary>
+    /// 체력 감소 직후, Damaged 보다 먼저. 같은 피해의 트리거(화상 부여 등)가 반영되기 **전** 상태를 봐야 하는 효과용 (강제 발화).
+    /// 특수 피해는 발생하지 않음
+    /// </summary>
+    public static event Action<Enemy, DamageInfo, int> Damaging;
+
+    /// <summary>
     /// 피해 전달 = ② 대상 단계 (대상 의존 최종 피해량 · 받는 최종 피해량 → 내림) → 체력 감소 → ③ Damaged 트리거 → 사망.
     /// 숫자만 넘기는 예전 호출은 출처 없는 직접 피해 (DamageInfo 암시적 변환).
     /// </summary>
@@ -205,7 +217,12 @@ public class Enemy : MonoBehaviour
         flash = 0.08f;
         if (kind != EnemyKind.Boss && knock >= 0f) knockback = fromDir.normalized * knock;   // NoKnock = 진행 중인 넉백 유지
         DamageText.Show(transform.position, dmg);
-        if (info.type != DamageType.Special) Damaged?.Invoke(this, info, (int)dmg);
+        if (info.type != DamageType.Special)
+        {
+            Damaging?.Invoke(this, info, (int)dmg);
+            Damaged?.Invoke(this, info, (int)dmg);
+            AfterDamaged?.Invoke(this, info, (int)dmg);
+        }
         if (hp <= 0) Die();
     }
 

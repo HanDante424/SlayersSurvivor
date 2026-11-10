@@ -90,6 +90,20 @@ public class FlameSword : Skill
         I != null && e != null && I.burns.TryGetValue(e, out var b) ? b.stacks : 0;
     public static bool IsBurning(Enemy e) => StacksOn(e) > 0;
 
+    /// <summary>
+    /// 강제 발화용: 이 적의 화상이 **전체 지속시간** 동안 줄 총 피해 = 틱 수 × 내림한 1틱 피해 (실제 화상과 같은 내림, 결정 2026-11-10).
+    /// 1틱 = 공격자 단계까지 (화상 강화 · 옥염 반영, 받는 최종 피해량은 고정 피해라 미반영).
+    /// 전체 지속시간 = 실제 지속시간 (핵융합 3초), 영원의 불꽃이면 지속시간 스탯 (무한대 취급 금지)
+    /// </summary>
+    public static float TotalBurnDamage(Enemy e)
+    {
+        if (I == null || e == null || !I.burns.TryGetValue(e, out var b) || b.stacks <= 0) return 0f;
+        float full = I.Permanent ? I.DurationStat : I.Duration;
+        int ticks = Mathf.FloorToInt(full / I.Interval + 1e-4f);
+        int perTick = Mathf.FloorToInt(I.TickDamage(b).amount + 1e-4f);
+        return (float)ticks * perTick;
+    }
+
     /// <summary>화상 1틱 피해 (공격자 단계, 내림 전) — 살아있는 폭탄 · 일촉즉발 · 강제 발화가 참조</summary>
     DamageInfo TickDamage(Burn b, float scale = 1f)
     {
