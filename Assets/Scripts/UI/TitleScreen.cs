@@ -26,7 +26,9 @@ public class TitleScreen : MonoBehaviour
     void Awake()
     {
         Time.timeScale = 1f;
-        items.Add(new MenuItem { label = "플레이", enabled = true, action = () => SceneLoader.Load(SceneLoader.Game) });
+        items.Add(new MenuItem { label = "플레이", enabled = true, action = () => { Player.Visual = Player.ErnStrayVisual; SceneLoader.Load(SceneLoader.Game); } });
+        // [임시] 신규 캐릭터 외형 확인용 — 스킬은 에른 스트레이 그대로
+        items.Add(new MenuItem { label = "레니아 외형 테스트", enabled = true, action = () => { Player.Visual = Player.LeniaVisual; SceneLoader.Load(SceneLoader.Game); } });
         items.Add(new MenuItem { label = "설정", enabled = false, action = () => ShowToast("설정은 준비 중입니다.") });
         items.Add(new MenuItem { label = "게임 종료", enabled = true, action = SceneLoader.Quit });
 

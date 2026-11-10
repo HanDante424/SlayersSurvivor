@@ -120,8 +120,39 @@ public class Player : MonoBehaviour
     Color baseColor;
     SpriteSheetAnimator anim;
 
-    // 캐릭터 스프라이트 시트: Resources/Sprites/{CharacterId}_{동작}.png
-    const string CharacterId = "ErnStray";
+    // 캐릭터 스프라이트 시트: Resources/Sprites/{Visual.id}_{동작}.png
+    /// <summary>
+    /// 캐릭터 외형 1종의 시트 규격. 시트 행 = 아래·왼쪽·오른쪽·위 (SpriteSheetAnimator 규칙).
+    /// cell = 칸 1개의 월드 크기, pivotY = 칸 안에서 transform 이 놓일 높이 (0 = 아래)
+    /// </summary>
+    public struct CharacterVisual
+    {
+        public string id;
+        public float cell, pivotY;
+        public int idleCols, runCols;
+        public float idleFps, runFps;
+    }
+
+    /// <summary>에른 스트레이: Run · Idle 4×8, 공격 모션 3종 + 화염 이펙트</summary>
+    public static readonly CharacterVisual ErnStrayVisual = new CharacterVisual
+    {
+        id = "ErnStray", cell = 1.9f, pivotY = 0.4f, idleCols = 8, runCols = 8, idleFps = 8f, runFps = 12f,
+    };
+
+    /// <summary>
+    /// 레니아 (외형 테스트): Tools/normalize_character_sheets.py 로 정렬한 시트 (칸 256px, 캐릭터 키 200px, 발끝 = 아래 16px).
+    /// 에른과 화면 키(약 1.62유닛)·발 기준 transform 높이(발 위 0.64유닛)가 같도록:
+    ///   cell = 1.62 / (200/256) ≈ 2.07,  pivotY = 16/256 + 0.64/2.07 ≈ 0.372
+    /// 정지 = 방향마다 1장, 이동 = 8프레임 10fps. 공격 모션은 아직 없음 (공격 시 모션 없이 판정만)
+    /// </summary>
+    public static readonly CharacterVisual LeniaVisual = new CharacterVisual
+    {
+        id = "Lenia", cell = 2.07f, pivotY = 0.372f, idleCols = 1, runCols = 8, idleFps = 1f, runFps = 10f,
+    };
+
+    /// <summary>다음 게임에서 쓸 외형 (타이틀 화면에서 선택). 스킬은 아직 모두 에른 스트레이 것</summary>
+    public static CharacterVisual Visual = ErnStrayVisual;
+    static string CharacterId => Visual.id;
     public const string SlashH = "SlashH";   // 수평베기
     public const string SlashV = "SlashV";   // 수직베기
     public const string Thrust = "Thrust";   // 찌르기
@@ -177,10 +208,12 @@ public class Player : MonoBehaviour
         sr = gameObject.AddComponent<SpriteRenderer>();
         sr.sortingOrder = 10;
         anim = gameObject.AddComponent<SpriteSheetAnimator>();
-        const float cell = 1.9f, pivotY = 0.4f;
-        if (anim.LoadClip(SpriteSheetAnimator.Run, CharacterId + "_Run", 4, 8, cell, pivotY, 12f, true))
+        var v = Visual;
+        float cell = v.cell, pivotY = v.pivotY;
+        if (anim.LoadClip(SpriteSheetAnimator.Run, CharacterId + "_Run", 4, v.runCols, cell, pivotY, v.runFps, true))
         {
-            anim.LoadClip(SpriteSheetAnimator.Idle, CharacterId + "_Idle", 4, 8, cell, pivotY, 8f, true);
+            anim.LoadClip(SpriteSheetAnimator.Idle, CharacterId + "_Idle", 4, v.idleCols, cell, pivotY, v.idleFps, true);
+            // 공격 모션 · 기본 공격 이펙트는 시트가 있는 캐릭터만 (없으면 LoadClip/LoadFrames 가 건너뜀)
             foreach (var key in AttackClips)
                 anim.LoadClip(key, CharacterId + "_" + key, 4, 8, cell, pivotY, Cfg.attackFps, false);
             // 크기는 Spawn 때 설정 값으로 맞추므로 1유닛 기준으로 자름
