@@ -81,6 +81,8 @@ MonoBehaviour:
   fireChainDelay: 0.1
   fireTripleDelay: 0.08
   fireEchoDelay: 0.1
+  fireEchoMaxPerFrame: 4
+  fireEchoScatterSpread: 60
   solarMultiIntervalRatio: 1
   solarEchoGap: 0.15
   solarBurn:

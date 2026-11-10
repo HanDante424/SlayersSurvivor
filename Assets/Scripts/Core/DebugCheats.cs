@@ -6,7 +6,7 @@ using UnityEngine;
 /// 화면 왼쪽 아래 버튼 또는 단축키로 켜고 끕니다.
 ///  F1 판정 표시 / F2 패널 열기 / F3 무적 / F4 원히트킬 / F5 적 체력 무제한
 ///  F6 쿨타임 감소 100% / F7 자동 스킬 사용 금지 / F8 적 생성 중지 / F9 경험치 미드랍
-///  레벨 +1 / +10 (궁극기 획득 Lv.45 확인용), 궁극기 게이지 채우기
+///  레벨 +1 / +10 (궁극기 획득 Lv.45 확인용), 궁극기 게이지 채우기, 화상 표시 테스트 (파티클 확인용)
 ///  오른쪽 열: 스킬별 사용 금지 (레벨업 후보 스킬 + 보유 스킬) / Lv+1 = 그 스킬의 기본 강화 화면 바로 열기
 ///            (Lv.5·10·15 특수 강화 확인용, 캐릭터 레벨은 그대로)
 /// 상태는 static 이라 재시작(R)해도 유지됩니다.
@@ -34,6 +34,7 @@ public class DebugCheats : MonoBehaviour
     static void ToggleSkill(string id) { if (!disabledSkills.Remove(id)) disabledSkills.Add(id); }
 
     static bool open;
+    static readonly List<Enemy> onScreen = new List<Enemy>();
 
     void Update()
     {
@@ -101,6 +102,7 @@ public class DebugCheats : MonoBehaviour
             "레벨 +1",
             "레벨 +10",
             "궁극기 게이지 채우기",
+            "화상 표시 테스트 (화면 안 적 5초)",
             "닫기 (F2)",
         };
         float top = H - 12 - labels.Length * (bh + gap);
@@ -126,7 +128,8 @@ public class DebugCheats : MonoBehaviour
                 case 8: GameManager.I?.DebugAddLevels(1); break;
                 case 9: GameManager.I?.DebugAddLevels(10); break;
                 case 10: GameManager.I?.DebugFillUltimate(); break;
-                case 11: open = false; break;
+                case 11: foreach (var e in SkillHits.OnScreen(onScreen)) e.ShowBurn(5f); break;
+                case 12: open = false; break;
             }
         }
 
