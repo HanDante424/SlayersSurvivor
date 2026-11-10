@@ -158,6 +158,7 @@ public class FireSlash : AutoSkill
     IEnumerator TripleAfter(Vector2 from, List<Vector2> dirs)
     {
         if (T.fireTripleDelay > 0) yield return new WaitForSeconds(T.fireTripleDelay);
+        if (Blocked) yield break;   // 지연 중에 F7 / 스킬 사용 금지 → 예약된 추가 공격도 취소
         foreach (var d in dirs)
         {
             Strike(from, Rotate(d, TripleAngle));
@@ -187,6 +188,7 @@ public class FireSlash : AutoSkill
     IEnumerator WaveAfter(Vector2 from, Vector2 dir)
     {
         if (T.fireWaveDelay > 0) yield return new WaitForSeconds(T.fireWaveDelay);
+        if (Blocked) yield break;
         FireWave.Spawn(from, dir, T.fireWaveSpeed, T.fireWaveDistance * RangeScale,
                        Hit.width * RangeScale * T.fireWaveWidth * 0.5f, HitDamage(BaseDamage),
                        Enemy.KnockSpeed(Hit.knockback), ErnSkillFx.FireSlash, Radius * FxWidth);
@@ -195,34 +197,59 @@ public class FireSlash : AutoSkill
     IEnumerator ChainAfter(Vector2 at, Vector2 dir)
     {
         if (T.fireChainDelay > 0) yield return new WaitForSeconds(T.fireChainDelay);
+        if (Blocked) yield break;
         for (int k = 0; k < 3; k++) SlashOnce(at, Rotate(dir, ChainAngle * k));
     }
 
     // ---------- 죽음의 메아리 (처치 조건 연쇄) ----------
     void OnEnable() => Enemy.Killed += OnEnemyKilled;
-    protected override void OnDisable() { base.OnDisable(); Enemy.Killed -= OnEnemyKilled; }
+    protected override void OnDisable() { base.OnDisable(); Enemy.Killed -= OnEnemyKilled; echoQueue.Clear(); }
+
+    /// <summary>예약된 메아리 1회: 사망 위치 · 발동 가능 시각 · 예약된 프레임</summary>
+    struct PendingEcho { public Vector2 at; public float readyAt; public int frame; }
+    readonly Queue<PendingEcho> echoQueue = new Queue<PendingEcho>();
+    float lastEchoReadyAt;
+
+    /// <summary>F7 자동 스킬 금지 / 치트 패널 스킬별 사용 금지</summary>
+    bool Blocked => DebugCheats.NoAutoSkills || CheatDisabled;
 
     void OnEnemyKilled(Enemy e)
     {
-        if (!HasSpecial(DeathEcho) || DebugCheats.NoAutoSkills || CheatDisabled) return;
+        if (!HasSpecial(DeathEcho) || Blocked) return;
         // 적 1마리 사망 = 메아리 1회 (Enemy.Die 는 적마다 한 번만) → 처치가 있어야만 생성되므로 무한 생성 없음.
         // 메아리 참격에도 Lv.5 방향 강화 + Lv.10 추가 공격(검기·연속 공격 생성)을 적용해 최대한 많이 발생
-        StartCoroutine(EchoAt(e.transform.position));
+        // Play 중 fireEchoDelay 를 줄여도 예약 순서가 뒤집히지 않게 앞 예약보다 이르지 않도록
+        float readyAt = Mathf.Max(Time.time + T.fireEchoDelay, lastEchoReadyAt);
+        lastEchoReadyAt = readyAt;
+        echoQueue.Enqueue(new PendingEcho { at = e.transform.position, readyAt = readyAt, frame = Time.frameCount });
     }
 
-    IEnumerator EchoAt(Vector2 at)
+    /// <summary>
+    /// Tick 은 Playing 상태에서만 불림 → 레벨업 화면 등 일시정지 중에는 메아리가 나가지 않음.
+    /// 예약된 다음 프레임 이후에만 발동 (연쇄가 한 프레임 안에서 쌓이지 않음),
+    /// 한 프레임에 최대 fireEchoMaxPerFrame 회. 남은 메아리는 버리지 않고 다음 프레임으로 (총량 유지)
+    /// </summary>
+    public override void Tick(float dt)
     {
-        // 다음 프레임 이후에 생성 → 연쇄가 한 프레임 안에서 재귀로 쌓이지 않음
-        if (T.fireEchoDelay > 0) yield return new WaitForSeconds(T.fireEchoDelay);
-        else yield return null;
-        foreach (var d in EchoDirections(at)) Strike(at, d);   // 참격 + 검기 / 연속 공격 생성
+        int budget = Mathf.Max(1, T.fireEchoMaxPerFrame);
+        while (budget > 0 && echoQueue.Count > 0)
+        {
+            var next = echoQueue.Peek();
+            if (next.frame >= Time.frameCount || next.readyAt > Time.time) break;   // 예약 순서 = 발동 순서
+            echoQueue.Dequeue();
+            if (Blocked || !HasSpecial(DeathEcho)) continue;   // 발동 직전에 다시 확인 → 금지된 뒤에는 버림
+            foreach (var d in EchoDirections(next.at)) Strike(next.at, d);   // 참격 + 검기 / 연속 공격 생성
+            budget--;
+        }
+        base.Tick(dt);
     }
 
     /// <summary>
     /// 메아리 3방향(120°)에 Lv.5 특수 강화 적용 [해석]
     ///  대상 추적: 기준 방향 = 사망 위치에서 가장 가까운 적 (없으면 무작위) → 3방향
     ///  양방향 공격: 3방향 + 각 정반대 = 6방향
-    ///  난사: 3방향 각각을 무작위 3회로 → 9방향
+    ///  난사: 메아리 → 난사 순서. 120° 3방향을 먼저 정하고, 방향마다 ± fireEchoScatterSpread 안 무작위 3회 → 9방향
+    ///        (기본 60° = 각 방향이 맡은 120° 칸 전체 → 세 칸에 3개씩, 한쪽으로 몰리지 않음)
     /// </summary>
     List<Vector2> EchoDirections(Vector2 at)
     {
@@ -241,10 +268,7 @@ public class FireSlash : AutoSkill
             Vector2 d = Rotate(d0, ChainAngle * k);
             if (HasSpecial(Scatter))
                 for (int i = 0; i < ScatterCount; i++)
-                {
-                    var r = Random.insideUnitCircle.normalized;
-                    list.Add(r.sqrMagnitude < 0.001f ? d : r);
-                }
+                    list.Add(Rotate(d, Random.Range(-T.fireEchoScatterSpread, T.fireEchoScatterSpread)));
             else
             {
                 list.Add(d);

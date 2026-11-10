@@ -48,7 +48,7 @@ public class SkillTuning : ScriptableObject
     public float solarExplosionDelay = 0.45f;
 
     [Header("[임시] 파이어 슬래시 특수 강화 — 기획서에 수치가 없는 값 (플레이 테스트로 조정)")]
-    [Tooltip("F5-A 대상 추적: 가장 가까운 적을 찾는 거리(유닛). 범위 안에 적이 없으면 바라보는 방향")] public float fireTrackRange = 12f;
+    [Tooltip("F5-A 대상 추적: 가장 가까운 적을 찾는 거리(유닛). 범위 안에 적이 없으면 바라보는 방향 (죽음의 메아리는 무작위 방향)")] public float fireTrackRange = 12f;
     [Tooltip("F10-A 검기 발사: 검기 속도(유닛/초)")] public float fireWaveSpeed = 14f;
     [Tooltip("F10-A 검기 발사: 검기 최대 사거리(유닛, 범위 강화 적용)")] public float fireWaveDistance = 12f;
     [Tooltip("F10-A 검기 발사: 검기 판정 폭 = 파이어 슬래시 판정 폭 × 이 값")] public float fireWaveWidth = 1f;
@@ -56,7 +56,9 @@ public class SkillTuning : ScriptableObject
     [Tooltip("F10-B 연속 공격 생성: 추가 참격 생성 위치 = 원래 참격 시작점에서 공격 방향으로 (판정 앞 길이 × 이 값)")] public float fireChainOffset = 0.5f;
     [Tooltip("F10-B 연속 공격 생성: 원래 참격 후 추가 참격까지(초)")] public float fireChainDelay = 0.1f;
     [Tooltip("F15-A 삼연발: 원래 공격 후 좌우 60도 공격까지(초)")] public float fireTripleDelay = 0.08f;
-    [Tooltip("F15-C 죽음의 메아리: 적 사망 후 메아리 참격까지(초). 0 보다 커야 연쇄가 한 프레임에 몰리지 않음")] public float fireEchoDelay = 0.1f;
+    [Tooltip("F15-C 죽음의 메아리: 적 사망 후 메아리 참격까지(초). 0 이어도 다음 프레임 이후·일시정지 중에는 발동 안 함")] public float fireEchoDelay = 0.1f;
+    [Tooltip("F15-C 죽음의 메아리: 한 프레임에 발동하는 메아리 최대 수. 넘치는 메아리는 버리지 않고 다음 프레임으로 미룸 (총량 유지)")] [Min(1)] public int fireEchoMaxPerFrame = 4;
+    [Tooltip("F15-C 죽음의 메아리 + 난사: 120° 세 방향 각각에서 ± 이 각도(도) 안 무작위로 3회. 60 = 각 방향이 맡은 120° 칸 전체")] [Range(0f, 60f)] public float fireEchoScatterSpread = 60f;
 
     [Header("[임시] 솔라 슬래시 특수 강화 — 기획서에 수치가 없는 값 (플레이 테스트로 조정)")]
     [Tooltip("S15-A 연속 폭발: 추가 폭발 간격 = 베기→폭발 간격(solarExplosionDelay) × 이 값")] public float solarMultiIntervalRatio = 1f;

@@ -46,18 +46,20 @@
 - 공통: `Skill.SpecialOptions(lv)` (id · locked · warning), `HasSpecial(id)`, `SpecialDamageBonus / SpecialRangeBonus / SpecialCooldownReduction / SpecialCooldownIncrease` 훅,
   `CooldownMultiplier` override(계산 순서가 정해진 강화), `AutoSkill.CastDuration`(지속형 → 종료 후 쿨타임), `Enemy.Killed`(적마다 1회) — 다른 캐릭터 스킬도 재사용
 - 파이어 슬래시 생성 단계: Lv.5 방향 → 삼연발 ×3 → 참격마다 Lv.10 추가 공격 1회. 추가 참격은 다시 추가 공격을 만들지 않음 (난사 + 연속 + 삼연발 = 36)
-- 죽음의 메아리: `Enemy.Die` 는 적마다 한 번 → 메아리 1회. 다음 프레임 이후(`fireEchoDelay`) 생성해 한 프레임 재귀를 막음
+- 죽음의 메아리: `Enemy.Die` 는 적마다 한 번 → 메아리 1회 예약. 예약된 다음 프레임 이후 + `fireEchoDelay` 뒤에 `FireSlash.Tick` 에서 발동해 한 프레임 재귀를 막음.
+  한 프레임 최대 `fireEchoMaxPerFrame` 회 (넘치면 다음 프레임으로 미룸, 총량 유지). Tick 은 Playing 상태에서만 → 레벨업 화면 중 발동 없음.
+  F7 / 스킬 사용 금지는 발동 직전에 다시 확인 (예약된 메아리·지연 중인 검기·연속 공격·삼연발도 취소)
 - 쿨타임 일반식: 기본 × max(0.1, 1 − min(감소 합, 0.9) + 증가 합). 감소(기본 강화·플레어)와 증가(메아리·초신성)를 합연산
 
 ### 구현 시 해석한 항목 (확인 필요)
 1. **넉백 범위** = 후속 폭발이 적을 밀어내는 원. 기본은 폭발 피해 원과 같고, 넉백 범위 증가는 이 원만 키움 → 피해 원 밖 ~ 넉백 범위 안의 적은 피해 없이 밀려남 (F1 하늘색 원). 기본 강화 "범위"도 넉백 범위에 합연산
 2. 쿨타임 증가·감소가 함께 있을 때 합연산 (예: 기본 강화 -50% + 초신성 +50% = 기본 쿨타임)
-3. 죽음의 메아리 참격 = 120° 3방향 (삼연발은 같은 Lv.15라 해당 없음). **확정**: 의도 = 조건 없는 무한 생성이 아닌 선에서 최대한 많이 발생. Lv.5 적용 [해석] — 대상 추적: 기준 방향 = 사망 위치에서 가장 가까운 적 / 양방향: 각 정반대 추가 = 6방향 / 난사: 방향마다 무작위 3회 = 9방향. 그 위에 Lv.10 추가 공격 적용 (검기 → 참격마다 검기, 연속 공격 생성 → 참격마다 3방향 추가 참격 = 메아리 1회에 12참격, 난사+연속 공격 생성이면 36참격). 처치(적마다 1회)가 있어야만 생성되므로 무한 생성 없음. 기준 각도는 대상 추적이 아니면 무작위. 어떤 스킬로 죽은 적이든 발동
+3. 죽음의 메아리 참격 = 120° 3방향 (삼연발은 같은 Lv.15라 해당 없음). **확정**: 의도 = 조건 없는 무한 생성이 아닌 선에서 최대한 많이 발생. Lv.5 적용 **확정 (2026-11-10)** — 대상 추적: 기준 방향 = 사망 위치에서 가장 가까운 적, 없으면 무작위 방향 / 양방향: 각 정반대 추가 = 6방향 / 난사: 메아리 → 난사 순서 = 120° 3방향을 먼저 정하고 방향마다 ±`fireEchoScatterSpread`(임시 60°) 안 무작위 3회 = 9방향. 그 위에 Lv.10 추가 공격 적용 (검기 → 참격마다 검기, 연속 공격 생성 → 참격마다 3방향 추가 참격 = 메아리 1회에 12참격, 난사+연속 공격 생성이면 36참격). 처치(적마다 1회)가 있어야만 생성되므로 무한 생성 없음. 기준 각도는 대상 추적이 아니면 무작위. 어떤 스킬로 죽은 적이든 발동
 4. 연속 폭발 간격 = 기본 베기→폭발 간격 × 비율 (흑점 폭발로 첫 폭발이 즉시여도 간격은 기본값)
 5. ~~메아리·연속 폭발은 쿨타임이 발동 시점부터 돎~~ → **확정**: 메아리·연속 폭발이 있으면 베기 → 폭발(+연속) → 메아리 → 폭발(+연속)이 모두 끝난 뒤 쿨타임 시작. 기본 솔라 슬래시도 베기 → 폭발이 끝난 뒤부터 (타오름은 5초 지속 공격 종료 후)
 6. 타오름 틱: 0·1·2·3·4초에 5회, 넉백은 매 틱 (`solarBurnKnockEveryTick`), 뇌진탕 기절 대상은 넉백된 적만 (`concussionStunsOther`)
 7. 검기: 관통, 적마다 1회 피해
 
 ### 플레이 테스트로 조정할 항목 (`SkillTuning.asset`)
-`fireTrackRange`, `fireWaveSpeed / Distance / Width / Delay`, `fireChainOffset / Delay`, `fireTripleDelay`, `fireEchoDelay`,
+`fireTrackRange`, `fireWaveSpeed / Distance / Width / Delay`, `fireChainOffset / Delay`, `fireTripleDelay`, `fireEchoDelay`, `fireEchoMaxPerFrame`, `fireEchoScatterSpread`,
 `solarMultiIntervalRatio`, `solarEchoGap`, `solarBurn`(판정·넉백), `solarBurnKnockEveryTick`, `concussionWindow`, `concussionStunsOther`
