@@ -80,6 +80,10 @@ public abstract class CombatModifier
     public virtual float ReceivedMul(Enemy target, in DamageInfo d) => 1f;
     /// <summary>쿨타임 독립 배율 (감소 0.9 · 증가 1.25 …). 곱연산</summary>
     public virtual float CooldownMul(Skill s) => 1f;
+    /// <summary>모든 지속 피해의 피해 간격 감소(초). 합산 후 최소 간격까지 (가속 연소)</summary>
+    public virtual float DotIntervalReduce() => 0f;
+    /// <summary>궁극기 게이지 획득량 % (합연산, 에너지 흡수)</summary>
+    public virtual float UltimateGaugePct() => 0f;
 }
 
 /// <summary>현재 적용 중인 전투 수정자 모음 (패시브 획득 시 등록)</summary>
@@ -97,6 +101,18 @@ public static class CombatMods
     public static float FinalMul(in DamageInfo d) { float p = 1f; foreach (var m in mods) p *= m.FinalMul(d); return p; }
     public static float ReceivedMul(Enemy e, in DamageInfo d) { float p = 1f; foreach (var m in mods) p *= m.ReceivedMul(e, d); return p; }
     public static float CooldownMul(Skill s) { float p = 1f; foreach (var m in mods) p *= m.CooldownMul(s); return p; }
+    public static float UltimateGaugeMul() { float s = 0f; foreach (var m in mods) s += m.UltimateGaugePct(); return 1f + s; }
+
+    /// <summary>지속 피해 최소 피해 간격 (가속 연소 하한, 결정 2026-11-10)</summary>
+    public const float MinDotInterval = 0.1f;
+
+    /// <summary>지속 피해의 실제 피해 간격 = 기본 간격 − 감소 합 (감소가 있으면 최소 0.1초)</summary>
+    public static float DotInterval(float baseInterval)
+    {
+        float r = 0f;
+        foreach (var m in mods) r += m.DotIntervalReduce();
+        return r > 0f ? Mathf.Max(MinDotInterval, baseInterval - r) : baseInterval;
+    }
 }
 
 /// <summary>피해 계산 공식 (한 곳에서만)</summary>

@@ -85,6 +85,7 @@ MonoBehaviour:
   fireEchoScatterSpread: 60
   flameSpreadRadius: 4
   flameBombRadius: 3
+  absorbDetectRadius: 6
   solarMultiIntervalRatio: 1
   solarEchoGap: 0.15
   solarBurn:

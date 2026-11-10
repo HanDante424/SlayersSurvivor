@@ -559,8 +559,9 @@ public class SolarSlash : AutoSkill
         if (frames != null) SpriteEffect.Spawn(frames, FxFps, P.transform, Vector2.zero, 0f, false, 11, r0 * FxWidth);
         var ring = Fx.Circle(P.transform.position, r0, Fx.FireDeep, BurnDuration, P.transform, 0f);
 
-        int ticks = Mathf.RoundToInt(BurnDuration / BurnTick);
-        for (int i = 0; i < ticks; i++)
+        // 0초부터 피해 간격마다 (기본 1초 → 0·1·2·3·4초 5회). 가속 연소면 간격이 줄어 더 자주
+        float elapsed = 0f;
+        for (int i = 0; elapsed < BurnDuration - 1e-4f; i++)
         {
             Vector2 at = P.transform.position;
             float r = RangeOf(T.solarBurn.radius);
@@ -585,7 +586,10 @@ public class SolarSlash : AutoSkill
             });
             HitDebug.Circle(at, r, HitDebug.BlastColor);
             if (knockThisTick && r > knockR + 0.001f) HitDebug.Circle(at, knockR, HitDebug.KnockColor);
-            yield return new WaitForSeconds(BurnTick);
+            // 마지막 대기는 남은 지속시간까지만 (간격이 5초를 나누어떨어지지 않아도 5초에 끝나고 쿨타임 시작)
+            float iv = Mathf.Min(CombatMods.DotInterval(BurnTick), BurnDuration - elapsed);
+            yield return new WaitForSeconds(iv);
+            elapsed += iv;
         }
         if (ring != null) Destroy(ring.gameObject);
         Casting = false;
@@ -747,11 +751,14 @@ public class FireStorm : AutoSkill
 
         // [임시 해석] '주변' = 플레이어를 따라다니는 범위
         var ring = Fx.Circle(P.transform.position, rSmall, Fx.FireDeep, Duration, P.transform, 0f);
-        for (int i = 0; i < ticks; i++)
+        // 틱 피해는 기본 간격 기준으로 정하고, 가속 연소면 같은 피해가 더 자주
+        for (float elapsed = 0f; elapsed < Duration - 1e-4f;)
         {
+            float iv = CombatMods.DotInterval(TickInterval);
             SkillHits.Circle(P.transform.position, rSmall, perTick, 0.3f,
-                             e => e.Slow(SlowMul, TickInterval + 0.1f));
-            yield return new WaitForSeconds(TickInterval);
+                             e => e.Slow(SlowMul, iv + 0.1f));
+            yield return new WaitForSeconds(iv);
+            elapsed += iv;
         }
         if (ring != null) Destroy(ring.gameObject);
 

@@ -64,6 +64,9 @@ public class SkillTuning : ScriptableObject
     [Tooltip("B5-C 확산되는 불길: 화상 상태로 죽은 적 주변에 화상 1스택을 부여하는 반경(유닛). 결정 기록: 임시 3")] public float flameSpreadRadius = 3f;
     [Tooltip("B10-B 살아있는 폭탄: 폭발 반경(유닛)")] public float flameBombRadius = 1.5f;
 
+    [Header("[임시] 흡수 가열 — 기획서에 수치가 없는 값")]
+    [Tooltip("P03 흡수 가열: 화상 상태 적을 세는 플레이어 주변 반경(유닛). 열기 응축이면 50%")] public float absorbDetectRadius = 6f;
+
     [Header("[임시] 솔라 슬래시 특수 강화 — 기획서에 수치가 없는 값 (플레이 테스트로 조정)")]
     [Tooltip("S15-A 연속 폭발: 추가 폭발 간격 = 베기→폭발 간격(solarExplosionDelay) × 이 값")] public float solarMultiIntervalRatio = 1f;
     [Tooltip("S10-A 메아리: 원래 솔라 슬래시 종료 후 재발동까지(초)")] public float solarEchoGap = 0.15f;

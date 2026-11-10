@@ -145,7 +145,7 @@ public class GameManager : MonoBehaviour
         // 궁극기 게이지: 적 처치 수 기반 (기획서 확정). [임시] 궁극기 보유 중에만 충전
         var p = Player.I;
         if (p != null && p.FirstOfKind(SkillKind.Ultimate) != null)
-            ultimateGauge = Mathf.Min(Tuning.Skills.gaugeMax, ultimateGauge + Tuning.Skills.gaugePerKill);
+            ultimateGauge = Mathf.Min(Tuning.Skills.gaugeMax, ultimateGauge + Tuning.Skills.gaugePerKill * CombatMods.UltimateGaugeMul());
     }
 
     // ---------- 궁극기 게이지 ----------
@@ -156,7 +156,7 @@ public class GameManager : MonoBehaviour
     public void ConsumeUltimateGauge() => ultimateGauge = 0f;
     /// <summary>궁극기 게이지를 최대치의 fraction 만큼 충전 (화염 공명: 0.01 = +1%)</summary>
     public void AddUltimateGauge(float fraction) =>
-        ultimateGauge = Mathf.Min(Tuning.Skills.gaugeMax, ultimateGauge + Tuning.Skills.gaugeMax * fraction);
+        ultimateGauge = Mathf.Min(Tuning.Skills.gaugeMax, ultimateGauge + Tuning.Skills.gaugeMax * fraction * CombatMods.UltimateGaugeMul());
 
     // ---------- 테스트용 (DebugCheats 패널에서 호출) ----------
     /// <summary>테스트: 레벨 올리기 (선택지도 레벨 수만큼 열림)</summary>

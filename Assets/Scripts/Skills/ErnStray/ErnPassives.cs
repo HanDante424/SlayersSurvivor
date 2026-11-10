@@ -75,8 +75,8 @@ public class FlameSword : Skill
     /// <summary>실제 지속시간 (핵융합이면 3초)</summary>
     float Duration => HasSpecial(Fusion) ? Mathf.Min(DurationStat, FusionDuration) : DurationStat;
     bool Permanent => HasSpecial(Eternal);
-    /// <summary>피해 간격 (가속 연소 등 간격 효과는 흡수 가열 구현 때)</summary>
-    public float Interval => BaseInterval;
+    /// <summary>피해 간격 (가속 연소 등 전역 감소 반영, 최소 0.1초)</summary>
+    public float Interval => CombatMods.DotInterval(BaseInterval);
 
     /// <summary>화염의 검 화상 '피해량' % (대상 무관 부분)</summary>
     float BurnPct =>
@@ -294,6 +294,7 @@ public class FlameSword : Skill
             if (sticky && !b.slowed) { e.statusSpeedMul *= StickyMul; b.slowed = true; }
 
             if (!Permanent) b.left -= dt;
+            if (b.tickIn > interval) b.tickIn = interval;   // 간격이 줄면(가속 연소) 예약된 다음 틱도 새 간격 안으로
             b.tickIn -= dt;
             // 지속시간 끝과 틱이 겹치면 틱 먼저 (3초 · 1초 간격 = 3틱)
             while (b.tickIn <= 1e-4f && b.stacks > 0 && e != null && e.hp > 0)

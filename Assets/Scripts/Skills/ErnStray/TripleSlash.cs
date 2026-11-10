@@ -241,10 +241,14 @@ public class TripleSlash : ActiveSkill
         float scale = RangeScale;
         if (ErnSkillFx.TripleSlash is { } frames)
             ErnSkillFx.SpawnDirected(frames, FxFps * 0.5f, s.from + s.dir * (RangeOf(Hit.radius) * FxForward), s.dir, RangeOf(Hit.radius) * FxWidth * 0.8f);
-        int ticks = Mathf.RoundToInt(EmbersDuration / EmbersInterval);
-        for (int i = 0; i < ticks; i++)
+        // 피해 간격마다 지속시간 끝까지 (기본 1초 → 1·2·3초 3회, 가속 연소면 더 자주)
+        float elapsed = 0f;
+        while (true)
         {
-            yield return new WaitForSeconds(EmbersInterval);
+            float iv = CombatMods.DotInterval(EmbersInterval);
+            if (elapsed + iv > EmbersDuration + 1e-4f) break;
+            yield return new WaitForSeconds(iv);
+            elapsed += iv;
             Fx.Arc(s.from, s.dir, RangeOf(Hit.radius), Fx.FireDeep, 0.25f);
             SkillHits.Directed(Hit, s.from, s.dir, scale, FixedDamage(perTick, DamageType.DoT, CastKind.Indirect));
         }
