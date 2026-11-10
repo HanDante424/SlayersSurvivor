@@ -130,43 +130,57 @@ public abstract class Skill : MonoBehaviour
 
     protected virtual void OnSpecialUpgrade(int lv, string id) { }
 
-    // 특수 강화가 더하는 수치 (스킬별 override). 기본 강화와 같은 종류끼리 합연산.
-    /// <summary>특수 강화 피해 증가율 합계</summary>
+    // 특수 강화가 더하는 수치 (스킬별 override). 키워드별 결합 규칙은 Docs/Design/Combat_Decisions_v1.0.md
+    /// <summary>특수 강화 '피해량' % 합계 (기본 강화 피해량과 합연산)</summary>
     protected virtual float SpecialDamageBonus => 0f;
+    /// <summary>이 스킬 몫의 '최종 피해량' 배율 (독립 효과끼리 곱해서 반환. 예: 플레어 ×1.5)</summary>
+    protected virtual float SpecialFinalDamageMul => 1f;
     /// <summary>특수 강화 공격 범위 증가율 합계</summary>
     protected virtual float SpecialRangeBonus => 0f;
-    /// <summary>특수 강화 쿨타임 감소율 (기본 강화 감소율과 합산 후 90% 상한)</summary>
-    protected virtual float SpecialCooldownReduction => 0f;
-    /// <summary>특수 강화 쿨타임 증가율 (+25% = 0.25). 감소율과 합연산: 배율 = 1 - 감소 + 증가</summary>
-    protected virtual float SpecialCooldownIncrease => 0f;
+    /// <summary>특수 강화 쿨타임 독립 배율 (곱연산. 감소 0.75 · 증가 1.25 …)</summary>
+    protected virtual float SpecialCooldownMul => 1f;
 
-    /// <summary>피해 증가율 전체 (기본 + 특수)</summary>
+    /// <summary>'피해량' % 전체 (기본 + 특수)</summary>
     public float TotalDamageBonus => DamageBonus + SpecialDamageBonus;
     /// <summary>공격 범위 증가율 전체 (기본 + 특수)</summary>
     public float TotalRangeBonus => RangeBonus + SpecialRangeBonus;
     protected virtual void OnLevelChanged() { }
 
-    // ---------- 최종 수치 (기본 수치 + 기본 강화 합연산) ----------
-    /// <summary>1타 최종 피해량 = floor(기본 × (1 + 공격력 증가율 합계)). 다단히트는 타마다 이 값</summary>
-    protected int HitDamage(float baseDamage) =>
-        Mathf.FloorToInt(baseDamage * (1f + TotalDamageBonus) * P.damageMul + 1e-4f);   // 1e-4: 10×1.3 같은 부동소수 오차 보정
+    // ---------- 피해 (① 공격자 단계) ----------
+    /// <summary>
+    /// 이 스킬의 피해 1건 = 초기 피해량 → 피해량(기본+특수+전역) → 추가 피해량 → 최종 피해량(스킬 몫 × 전역).
+    /// 내림은 대상 단계(Enemy.Hit)에서. 다단히트는 타마다 이 값.
+    /// </summary>
+    protected DamageInfo MakeDamage(float initial, CastKind cast = CastKind.Direct, DamageType type = DamageType.Direct)
+    {
+        var d = new DamageInfo(0f, type, this, cast);
+        d.amount = DamageMath.Attacker(d, initial, TotalDamageBonus, 0f, SpecialFinalDamageMul);
+        return d;
+    }
+
+    /// <summary>고정 피해 (모든 증감 무효). 참조값 계산은 호출하는 쪽에서</summary>
+    protected DamageInfo FixedDamage(float amount, DamageType type, CastKind cast = CastKind.Direct) =>
+        new DamageInfo(amount, type, this, cast, isFixed: true);
+
+    // ---------- 쿨타임 ----------
+    /// <summary>스킬 기본 강화 쿨타임 감소 → 배율 1개 (기본 강화끼리 합연산)</summary>
+    protected float BasicCooldownMul => 1f - CooldownReduction;
 
     /// <summary>
-    /// 쿨타임 배율 (치트 제외). 기본 = (1 - min(기본+특수 감소율, 0.9) + 특수 증가율), 최소 0.1.
-    /// 계산 순서가 따로 정해진 강화(파이어 슬래시 빠른 공격·묵직한 일격)는 스킬에서 override.
+    /// 쿨타임 배율 (치트 제외) = 기본 강화 배율 × 특수 강화 독립 배율 × 전역 독립 배율 (모두 곱연산), 최종 감소 90% 상한.
+    /// 계산 순서가 따로 정해진 강화(파이어 슬래시 묵직한 일격)는 스킬에서 override.
     /// </summary>
     protected virtual float CooldownMultiplier => GeneralCooldownMultiplier;
 
-    /// <summary>일반 감소·증가만 적용한 쿨타임 배율 (최종 10% 미만으로는 안 내려감)</summary>
-    protected float GeneralCooldownMultiplier
-    {
-        get
-        {
-            float cap = T.cooldownReductionCap;
-            float red = Mathf.Min(CooldownReduction + SpecialCooldownReduction, cap);
-            return Mathf.Max(1f - cap, (1f - red + SpecialCooldownIncrease) * P.cooldownMul);
-        }
-    }
+    /// <summary>일반 규칙만 적용한 쿨타임 배율 (최종 10% 미만으로는 안 내려감, 증가는 상한 없음)</summary>
+    protected float GeneralCooldownMultiplier =>
+        Mathf.Max(1f - T.cooldownReductionCap, BasicCooldownMul * SpecialCooldownMul * CombatMods.CooldownMul(this) * P.cooldownMul);
+
+    /// <summary>
+    /// 남은 쿨타임 감소 (빠른 준비 · 불길의 순환): 지금 남은 시간 × (1 - ratio). 90% 상한과 무관.
+    /// 쿨타임이 없는 스킬은 무시
+    /// </summary>
+    public virtual void ReduceRemainingCooldown(float ratio) { }
 
     /// <summary>최종 쿨타임 = 기본 × CooldownMultiplier</summary>
     protected float CooldownOf(float baseSeconds) =>
@@ -178,7 +192,12 @@ public abstract class Skill : MonoBehaviour
     protected float RangeScale => RangeOf(1f);
 
     // ---------- 등급 → 숫자 (기본 수치가 아직 없는 스킬용 임시 환산표) ----------
-    protected float Damage(Power p) => T.Damage(p) * (1f + TotalDamageBonus) * P.damageMul;
+    /// <summary>
+    /// 임시 스킬용: 등급 피해 × share 를 초기 피해량으로 한 이 스킬의 피해 1건 (출처·유형 유지).
+    /// 다단히트·지속 피해는 share 로 나눈 값이 이벤트마다 내림됨 (예: 파이어 스톰 틱 1.25 → 1)
+    /// </summary>
+    protected DamageInfo PowerDamage(Power p, float share = 1f, DamageType type = DamageType.Direct) =>
+        MakeDamage(T.Damage(p) * share, CastKind.Direct, type);
     protected float Cooldown(Tier t) => CooldownOf(T.Cooldown(t));
     protected float Range(Tier t) => RangeOf(T.Range(t));
     protected float Reach(Tier t) => T.Reach(t) * (1f + TotalRangeBonus);
@@ -247,6 +266,11 @@ public abstract class ActiveSkill : Skill
     }
 
     protected abstract void Activate();
+
+    public override void ReduceRemainingCooldown(float ratio)
+    {
+        if (cdLeft > 0f) cdLeft *= Mathf.Clamp01(1f - ratio);
+    }
 }
 
 /// <summary>쿨타임마다 자동 발동하는 스킬 공통</summary>
@@ -277,4 +301,13 @@ public abstract class AutoSkill : Skill
     protected bool Casting;
 
     protected virtual void OnDisable() => Casting = false;   // 코루틴이 끊겨도 영구 정지하지 않게
+
+    /// <summary>
+    /// 남은 쿨타임 감소. 공격 진행 중(Casting)에는 쿨타임이 아직 시작 전이라 무시.
+    /// [임시] 지속형(CastDuration)은 지속 시간까지 포함한 대기 시간에 적용 — 타오름 + 남은 쿨타임 감소 조합은 옥염 구현 때 확인
+    /// </summary>
+    public override void ReduceRemainingCooldown(float ratio)
+    {
+        if (!Casting && timer > 0f) timer *= Mathf.Clamp01(1f - ratio);
+    }
 }

@@ -4,12 +4,13 @@ using UnityEngine;
 public class Projectile : MonoBehaviour
 {
     Vector2 dir;
-    float speed, damage, life, radius;
+    float speed, life, radius;
+    DamageInfo damage;
     int pierce;
     readonly HashSet<Enemy> hitSet = new HashSet<Enemy>();
     static readonly List<Enemy> targets = new List<Enemy>();   // 투사체끼리 공유 (Update 는 겹쳐 돌지 않음)
 
-    public static Projectile Spawn(Vector2 pos, Vector2 dir, float speed, float damage, int pierce, float life, string sprite, Color color, float scale)
+    public static Projectile Spawn(Vector2 pos, Vector2 dir, float speed, DamageInfo damage, int pierce, float life, string sprite, Color color, float scale)
     {
         var go = new GameObject("Projectile");
         go.transform.position = pos;

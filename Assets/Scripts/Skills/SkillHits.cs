@@ -25,7 +25,7 @@ public static class SkillHits
     }
 
     /// <summary>원형 범위 피해. 밀치기는 중심에서 바깥 방향</summary>
-    public static int Circle(Vector2 c, float r, float dmg, float knock, Action<Enemy> onHit = null)
+    public static int Circle(Vector2 c, float r, DamageInfo dmg, float knock, Action<Enemy> onHit = null)
     {
         InCircle(c, r, result);
         foreach (var e in result)
@@ -41,7 +41,7 @@ public static class SkillHits
     /// 부채꼴 범위 피해 (dir 기준 좌우 halfAngle 도).
     /// 맞는 조건: ① 적 원이 반경 r 원에 닿고 ② 적 중심이 각도 안. 단, 적 원이 근접 원(near)에 닿으면 각도 무관.
     /// </summary>
-    public static int Sector(Vector2 c, Vector2 dir, float r, float halfAngle, float dmg, float knock,
+    public static int Sector(Vector2 c, Vector2 dir, float r, float halfAngle, DamageInfo dmg, float knock,
                              Action<Enemy> onHit = null, float near = 0.3f)
     {
         dir = dir.normalized;
@@ -66,7 +66,7 @@ public static class SkillHits
     /// 캡슐(둥근 직사각형) 범위 피해. c 에서 dir 방향으로 앞 forward, 뒤 back 까지, 폭 width (양 끝은 반원).
     /// 적 원이 캡슐에 닿으면 맞음.
     /// </summary>
-    public static int Capsule(Vector2 c, Vector2 dir, float forward, float back, float width, float dmg, float knock,
+    public static int Capsule(Vector2 c, Vector2 dir, float forward, float back, float width, DamageInfo dmg, float knock,
                               Action<Enemy> onHit = null)
     {
         dir = dir.normalized;
@@ -93,7 +93,7 @@ public static class SkillHits
     /// SkillHitbox 설정대로 판정 + F1 표시. scale = 범위 배율 (기본 강화 범위 +10% 등).
     /// Capsule 은 앞·뒤·폭 모두, Sector 는 반경·근접 원에 scale 적용.
     /// </summary>
-    public static int Directed(SkillHitbox h, Vector2 c, Vector2 dir, float scale, float dmg, Action<Enemy> onHit = null)
+    public static int Directed(SkillHitbox h, Vector2 c, Vector2 dir, float scale, DamageInfo dmg, Action<Enemy> onHit = null)
     {
         if (h.shape == HitShape.Capsule)
         {
@@ -105,7 +105,7 @@ public static class SkillHits
     }
 
     /// <summary>origin 에서 dir 방향으로 length, 폭 width 인 직사각형 범위 피해</summary>
-    public static int Box(Vector2 origin, Vector2 dir, float length, float width, float dmg, float knock, Action<Enemy> onHit = null)
+    public static int Box(Vector2 origin, Vector2 dir, float length, float width, DamageInfo dmg, float knock, Action<Enemy> onHit = null)
     {
         dir = dir.normalized;
         var side = new Vector2(-dir.y, dir.x);

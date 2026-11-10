@@ -180,14 +180,26 @@ public class Enemy : MonoBehaviour
         }
     }
 
-    public void Hit(float dmg, Vector2 fromDir, float knock = 3f)
+    /// <summary>
+    /// 피해 전달 후 (체력 감소 직후, 사망 처리 전). 인자 = 맞은 적 · 피해 정보 · 실제 피해(내림 후).
+    /// 특수 피해는 발생하지 않음 → 트리거 연쇄 차단. 구독자는 e.hp &lt;= 0 (이번 피해로 사망)을 확인해서 쓸 것.
+    /// </summary>
+    public static event Action<Enemy, DamageInfo, int> Damaged;
+
+    /// <summary>
+    /// 피해 전달 = ② 대상 단계 (대상 의존 최종 피해량 · 받는 최종 피해량 → 내림) → 체력 감소 → ③ Damaged 트리거 → 사망.
+    /// 숫자만 넘기는 예전 호출은 출처 없는 직접 피해 (DamageInfo 암시적 변환).
+    /// </summary>
+    public void Hit(DamageInfo info, Vector2 fromDir, float knock = 3f)
     {
         if (hp <= 0) return;
+        float dmg = DamageMath.Target(this, info);
         if (DebugCheats.OneHitKill) dmg = Mathf.Max(dmg, hp);   // 테스트: 한 방에 처치
         if (!DebugCheats.ImmortalEnemies) hp -= dmg;            // 테스트: 피해 숫자만 표시
         flash = 0.08f;
         if (kind != EnemyKind.Boss) knockback = fromDir.normalized * knock;
         DamageText.Show(transform.position, dmg);
+        if (info.type != DamageType.Special) Damaged?.Invoke(this, info, (int)dmg);
         if (hp <= 0) Die();
     }
 

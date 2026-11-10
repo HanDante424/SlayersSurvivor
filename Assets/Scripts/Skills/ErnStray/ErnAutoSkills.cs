@@ -100,19 +100,13 @@ public class FireSlash : AutoSkill
         return base.SpecialOptions(lv);
     }
 
-    // ---------- 쿨타임 · 피해 (일반 감소 → 빠른 공격 → 묵직한 일격 순서) ----------
-    /// <summary>묵직한 일격 전 최종 쿨타임 배율 = 일반 감소 → 빠른 공격 ×0.5 → 최소 10%</summary>
-    float CooldownMulBeforeHeavy
-    {
-        get
-        {
-            float m = GeneralCooldownMultiplier;
-            if (HasSpecial(Quick)) m = Mathf.Max(1f - T.cooldownReductionCap, m * QuickMul);
-            return m;
-        }
-    }
+    // ---------- 쿨타임 · 피해 (일반 규칙(빠른 공격 = 독립 배율 ×0.5 포함) → 묵직한 일격) ----------
+    protected override float SpecialCooldownMul => HasSpecial(Quick) ? QuickMul : 1f;
 
-    /// <summary>묵직한 일격이 무효화한 최종 쿨타임 감소율 (0.75 = 75%, 빠른 공격 포함)</summary>
+    /// <summary>묵직한 일격 전 최종 쿨타임 배율 = 기본 강화 × 빠른 공격 × 전역 배율 (곱연산), 최소 10%</summary>
+    float CooldownMulBeforeHeavy => GeneralCooldownMultiplier;
+
+    /// <summary>묵직한 일격이 무효화한 최종 쿨타임 감소율 (0.75 = 75%, 빠른 공격·패시브 포함, 실시간)</summary>
     public float HeavyConvertedReduction => Mathf.Round(Mathf.Max(0f, 1f - CooldownMulBeforeHeavy) * 10000f) / 10000f;
 
     protected override float CooldownMultiplier => HasSpecial(Heavy) ? 1f : CooldownMulBeforeHeavy;
@@ -129,7 +123,7 @@ public class FireSlash : AutoSkill
         var frames = ErnSkillFx.FireSlash;
         P.PlayAttack(Player.SlashH, dirs[0], baseFx: frames == null);
 
-        foreach (var d in dirs) Strike(from, d);
+        foreach (var d in dirs) Strike(from, d, CastKind.Direct);
         if (HasSpecial(TripleShot)) StartCoroutine(TripleAfter(from, dirs));
         return true;
     }
@@ -161,44 +155,47 @@ public class FireSlash : AutoSkill
         if (Blocked) yield break;   // 지연 중에 F7 / 스킬 사용 금지 → 예약된 추가 공격도 취소
         foreach (var d in dirs)
         {
-            Strike(from, Rotate(d, TripleAngle));
-            Strike(from, Rotate(d, -TripleAngle));
+            Strike(from, Rotate(d, TripleAngle), CastKind.Direct);
+            Strike(from, Rotate(d, -TripleAngle), CastKind.Direct);
         }
     }
 
-    /// <summary>발동 단계의 참격 1회 + Lv.10 추가 공격. 추가 참격(SlashOnce)은 더 이상 증식하지 않음</summary>
-    void Strike(Vector2 from, Vector2 dir)
+    /// <summary>
+    /// 발동 단계의 참격 1회 + Lv.10 추가 공격. 추가 참격(SlashOnce)은 더 이상 증식하지 않음.
+    /// cast: 쿨타임 발동 = 직접 발동, 죽음의 메아리 = 간접 발동 (검기·연속 공격도 같은 구분을 이어받음)
+    /// </summary>
+    void Strike(Vector2 from, Vector2 dir, CastKind cast)
     {
-        SlashOnce(from, dir);
-        if (HasSpecial(Wave)) StartCoroutine(WaveAfter(from, dir));
-        if (HasSpecial(Chain)) StartCoroutine(ChainAfter(from + dir * (Hit.forward * RangeScale * T.fireChainOffset), dir));
+        SlashOnce(from, dir, cast);
+        if (HasSpecial(Wave)) StartCoroutine(WaveAfter(from, dir, cast));
+        if (HasSpecial(Chain)) StartCoroutine(ChainAfter(from + dir * (Hit.forward * RangeScale * T.fireChainOffset), dir, cast));
     }
 
     /// <summary>참격 1개 (이펙트 + 판정). 추가 공격 없음</summary>
-    void SlashOnce(Vector2 from, Vector2 dir)
+    void SlashOnce(Vector2 from, Vector2 dir, CastKind cast)
     {
         var frames = ErnSkillFx.FireSlash;
         if (frames != null)
             ErnSkillFx.SpawnDirected(frames, FxFps, from + dir * (Radius * FxForward), dir, Radius * FxWidth);
         else
             Fx.Arc(from, dir, Radius, Fx.Fire, 0.15f);
-        SkillHits.Directed(Hit, from, dir, RangeScale, HitDamage(BaseDamage));   // 모양은 SkillTuning.fireSlash
+        SkillHits.Directed(Hit, from, dir, RangeScale, MakeDamage(BaseDamage, cast));   // 모양은 SkillTuning.fireSlash
     }
 
-    IEnumerator WaveAfter(Vector2 from, Vector2 dir)
+    IEnumerator WaveAfter(Vector2 from, Vector2 dir, CastKind cast)
     {
         if (T.fireWaveDelay > 0) yield return new WaitForSeconds(T.fireWaveDelay);
         if (Blocked) yield break;
         FireWave.Spawn(from, dir, T.fireWaveSpeed, T.fireWaveDistance * RangeScale,
-                       Hit.width * RangeScale * T.fireWaveWidth * 0.5f, HitDamage(BaseDamage),
+                       Hit.width * RangeScale * T.fireWaveWidth * 0.5f, MakeDamage(BaseDamage, cast),
                        Enemy.KnockSpeed(Hit.knockback), ErnSkillFx.FireSlash, Radius * FxWidth);
     }
 
-    IEnumerator ChainAfter(Vector2 at, Vector2 dir)
+    IEnumerator ChainAfter(Vector2 at, Vector2 dir, CastKind cast)
     {
         if (T.fireChainDelay > 0) yield return new WaitForSeconds(T.fireChainDelay);
         if (Blocked) yield break;
-        for (int k = 0; k < 3; k++) SlashOnce(at, Rotate(dir, ChainAngle * k));
+        for (int k = 0; k < 3; k++) SlashOnce(at, Rotate(dir, ChainAngle * k), cast);
     }
 
     // ---------- 죽음의 메아리 (처치 조건 연쇄) ----------
@@ -238,7 +235,7 @@ public class FireSlash : AutoSkill
             if (next.frame >= Time.frameCount || next.readyAt > Time.time) break;   // 예약 순서 = 발동 순서
             echoQueue.Dequeue();
             if (Blocked || !HasSpecial(DeathEcho)) continue;   // 발동 직전에 다시 확인 → 금지된 뒤에는 버림
-            foreach (var d in EchoDirections(next.at)) Strike(next.at, d);   // 참격 + 검기 / 연속 공격 생성
+            foreach (var d in EchoDirections(next.at)) Strike(next.at, d, CastKind.Indirect);   // 참격 + 검기 / 연속 공격 생성 (간접 발동)
             budget--;
         }
         base.Tick(dt);
@@ -294,12 +291,13 @@ public class FireWave : MonoBehaviour
     static readonly List<Enemy> buf = new List<Enemy>();
     readonly HashSet<Enemy> hitOnce = new HashSet<Enemy>();
     Vector2 dir;
-    float speed, distLeft, halfWidth, dmg, knock, fxTime, debugTimer;
+    float speed, distLeft, halfWidth, knock, fxTime, debugTimer;
+    DamageInfo dmg;
     Sprite[] frames;
     SpriteRenderer sr;
 
     public static void Spawn(Vector2 from, Vector2 dir, float speed, float distance, float halfWidth,
-                             float dmg, float knock, Sprite[] frames, float fxWidth)
+                             DamageInfo dmg, float knock, Sprite[] frames, float fxWidth)
     {
         var go = new GameObject("FireWave");
         go.transform.position = from;
@@ -390,7 +388,7 @@ public class SolarSlash : AutoSkill
     const float SupernovaKnockRange = 0.5f; // 초신성: 넉백 범위 +50%
     const float SupernovaDamagePerKnock = 1f;   //     누적 넉백 범위 1%당 피해 +1%
     const float SupernovaCooldown = 0.5f;   //         쿨타임 +50%
-    const float FlareDamage = 0.5f;         // 플레어: 총 피해 +50%
+    const float FlareDamage = 0.5f;         // 플레어: 최종 피해량 +50% (독립 배율)
     const float FlareCooldown = 0.25f;      //         쿨타임 -25%
 
     bool Burning => HasSpecial(Burn);
@@ -405,14 +403,18 @@ public class SolarSlash : AutoSkill
         (HasSpecial(Shock) ? ShockKnockRange : 0f) + (HasSpecial(Sunspot) ? SunspotKnockRange : 0f)
         + (HasSpecial(Supernova) ? SupernovaKnockRange : 0f);
 
+    /// <summary>'피해량' % (타오름·초신성 넉백 변환)</summary>
     protected override float SpecialDamageBonus =>
         (Burning ? KnockRangeBonus * BurnDamagePerKnock : 0f)
-        + (HasSpecial(Supernova) ? KnockRangeBonus * SupernovaDamagePerKnock : 0f)
-        + (HasSpecial(Flare) ? FlareDamage : 0f);
+        + (HasSpecial(Supernova) ? KnockRangeBonus * SupernovaDamagePerKnock : 0f);
+    /// <summary>플레어 = '최종 피해량' +50% (결정 기록 v1.0)</summary>
+    protected override float SpecialFinalDamageMul => HasSpecial(Flare) ? 1f + FlareDamage : 1f;
     protected override float SpecialRangeBonus => Burning ? BurnRange + KnockRangeBonus * BurnRangePerKnock : 0f;
-    protected override float SpecialCooldownReduction => HasSpecial(Flare) ? FlareCooldown : 0f;
-    protected override float SpecialCooldownIncrease =>
-        (HasSpecial(Echo) ? EchoCooldown : 0f) + (HasSpecial(Supernova) ? SupernovaCooldown : 0f);
+    /// <summary>쿨타임 독립 배율 곱연산: 플레어 ×0.75 · 메아리 ×1.25 · 초신성 ×1.5</summary>
+    protected override float SpecialCooldownMul =>
+        (HasSpecial(Flare) ? 1f - FlareCooldown : 1f)
+        * (HasSpecial(Echo) ? 1f + EchoCooldown : 1f)
+        * (HasSpecial(Supernova) ? 1f + SupernovaCooldown : 1f);
 
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
     /// <summary>타오름: 지속 공격이 끝난 뒤부터 쿨타임</summary>
@@ -449,8 +451,8 @@ public class SolarSlash : AutoSkill
                     id = Multi, title = "연속 폭발", desc = "후속타 이후 후속타 2회 추가 (총 3회)",
                     locked = HasSpecial(Burn), lockReason = "선택 불가 — 타오름은 후속타가 없어 연속 폭발이 발동하지 않습니다",
                 },
-                new SpecialUpgradeOption { id = Supernova, title = "초신성", desc = "넉백 범위 +50% · 누적 넉백 범위 1%당 피해 +1% · 쿨타임 +50%" },
-                new SpecialUpgradeOption { id = Flare, title = "플레어", desc = "총 피해 +50% · 피해 시 2초간 50% 둔화 · 쿨타임 -25%" },
+                new SpecialUpgradeOption { id = Supernova, title = "초신성", desc = "넉백 범위 +50% · 누적 넉백 범위 1%당 피해량 +1% · 쿨타임 +50%" },
+                new SpecialUpgradeOption { id = Flare, title = "플레어", desc = "최종 피해량 +50% · 피해 시 2초간 50% 둔화 · 쿨타임 -25%" },
             };
         }
         return base.SpecialOptions(lv);
@@ -489,18 +491,19 @@ public class SolarSlash : AutoSkill
         else Fx.Circle(from, slashR, Fx.FireBright, 0.3f, P.transform);
 
         // 1) 베기
-        SkillHits.Circle(from, slashR, HitDamage(SlashDamage), Enemy.KnockSpeed(T.solarSlash.knockback), OnDamaged);
+        var cast = isEcho ? CastKind.Indirect : CastKind.Direct;   // 메아리 재발동 = 간접 발동
+        SkillHits.Circle(from, slashR, MakeDamage(SlashDamage, cast), Enemy.KnockSpeed(T.solarSlash.knockback), OnDamaged);
         HitDebug.Circle(from, slashR, HitDebug.SlashColor);
 
         // 2) 후속 폭발 (흑점 폭발 = 즉시)
         if (!sunspot) yield return new WaitForSeconds(T.solarExplosionDelay);
-        Explode(frames == null, null);
+        Explode(frames == null, null, cast);
         if (MultiActive)
             for (int i = 0; i < MultiExtra; i++)
             {
                 // [임시 해석] 간격 = 기본 베기→폭발 간격 × 비율 (흑점 폭발로 0 이 되어도 기본 간격 사용)
                 yield return new WaitForSeconds(T.solarExplosionDelay * T.solarMultiIntervalRatio);
-                Explode(frames == null, frames);
+                Explode(frames == null, frames, cast);
             }
 
         // 3) 메아리: 연속 폭발까지 모두 끝난 뒤 1회
@@ -513,7 +516,7 @@ public class SolarSlash : AutoSkill
     }
 
     /// <summary>후속 폭발: 피해 원 안 = 피해 + 넉백, 넉백 범위(더 큰 원) 안 = 넉백만</summary>
-    void Explode(bool drawShape, Sprite[] blastFx)
+    void Explode(bool drawShape, Sprite[] blastFx, CastKind cast)
     {
         Vector2 at = P.transform.position;   // 이펙트가 플레이어를 따라가므로 폭발도 현재 위치
         float r = RangeOf(T.solarExplosion.radius);
@@ -523,7 +526,7 @@ public class SolarSlash : AutoSkill
         if (blastFx != null) SpawnBlastFx(blastFx, r);
         if (drawShape) Fx.Disc(at, r, Fx.FireBright, 0.25f);
 
-        SkillHits.Circle(at, r, HitDamage(ExplosionDamage), knock, e => { OnDamaged(e); OnKnocked(e); });
+        SkillHits.Circle(at, r, MakeDamage(ExplosionDamage, cast), knock, e => { OnDamaged(e); OnKnocked(e); });
         HitDebug.Circle(at, r, HitDebug.BlastColor);
 
         if (knockR > r + 0.001f)
@@ -566,7 +569,8 @@ public class SolarSlash : AutoSkill
             if (frames == null) Fx.Disc(at, r, Fx.Fire, 0.25f);
             else if (i > 0) SpawnBlastFx(frames, r);
 
-            SkillHits.Circle(at, r, HitDamage(SlashDamage + ExplosionDamage), 0f, e =>
+            // 타오름 = '지속 피해' (결정 기록 v1.0 · 화염의 검 화상 부여는 예외로 허용 — 화염의 검 구현 때 연결)
+            SkillHits.Circle(at, r, MakeDamage(SlashDamage + ExplosionDamage, CastKind.Direct, DamageType.DoT), 0f, e =>
             {
                 OnDamaged(e);
                 if (!knockThisTick) return;
@@ -617,7 +621,7 @@ public class FireBall : AutoSkill
         Vector2 dir = ((Vector2)target.transform.position - from).normalized;
         // 크기 = 범위 좁음의 일부, 수명 = 사거리 / 속도
         float size = Mathf.Max(0.3f, Range(Tier.Short) * 0.3f);
-        Projectile.Spawn(from, dir, Speed, Damage(Power.Low), Pierce, MaxRange / Speed,
+        Projectile.Spawn(from, dir, Speed, PowerDamage(Power.Low), Pierce, MaxRange / Speed,
                          "FireBall", new Color(1f, 0.55f, 0.15f), size);
         return true;
     }
@@ -636,7 +640,7 @@ public class FireBuster : AutoSkill
         Vector2 from = P.transform.position;
         if (Nearest(from, Radius) == null) return false;
         Fx.Disc(from, Radius, Fx.FireDeep, 0.25f);
-        SkillHits.Circle(from, Radius, Damage(Power.Mid), Knock);
+        SkillHits.Circle(from, Radius, PowerDamage(Power.Mid), Knock);
         CameraFollow.Shake(0.08f, 0.08f);
         return true;
     }
@@ -675,9 +679,9 @@ public class FireBlade : AutoSkill
 
     IEnumerator Run(List<Enemy> targets)
     {
-        float total = Damage(Power.High);
-        float perSlash = total * SlashShare / SlashCount;
-        float explosion = total * (1f - SlashShare);
+        // 베기 = 등급 피해 × 베기 비중 ÷ 횟수, 폭발 = 나머지 (각각 피해 이벤트마다 내림)
+        DamageInfo perSlash = PowerDamage(Power.High, SlashShare / SlashCount);
+        DamageInfo explosion = PowerDamage(Power.High, 1f - SlashShare);
         float expR = Range(Tier.Short) * ExplosionRatio;
 
         var lastPos = new Vector2[targets.Count];
@@ -730,9 +734,9 @@ public class FireStorm : AutoSkill
 
     IEnumerator Run()
     {
-        float total = Damage(Power.Mid);
+        // 지속 구간 = 지속 피해 (틱마다 내림), 마지막 폭발 = 직접 피해
         int ticks = Mathf.Max(1, Mathf.RoundToInt(Duration / TickInterval));
-        float perTick = total * DotShare / ticks;
+        DamageInfo perTick = PowerDamage(Power.Mid, DotShare / ticks, DamageType.DoT);
         float rSmall = Range(Tier.Short);
 
         // [임시 해석] '주변' = 플레이어를 따라다니는 범위
@@ -748,7 +752,7 @@ public class FireStorm : AutoSkill
         Vector2 at = P.transform.position;
         float rBig = Range(Tier.Mid);
         Fx.Disc(at, rBig, Fx.Fire, 0.3f);
-        SkillHits.Circle(at, rBig, total * (1f - DotShare), Knock);
+        SkillHits.Circle(at, rBig, PowerDamage(Power.Mid, 1f - DotShare), Knock);
         CameraFollow.Shake(0.1f, 0.1f);
     }
 }

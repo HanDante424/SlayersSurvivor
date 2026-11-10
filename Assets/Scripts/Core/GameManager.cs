@@ -39,6 +39,7 @@ public class GameManager : MonoBehaviour
     {
         I = this;
         Time.timeScale = 1f;
+        CombatMods.Clear();   // 재시작 시 이전 판의 패시브 수정자가 남지 않게
         Application.targetFrameRate = 120;
 
         var cam = Camera.main;

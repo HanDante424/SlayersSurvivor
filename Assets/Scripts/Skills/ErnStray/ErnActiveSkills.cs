@@ -42,7 +42,7 @@ public class TripleSlash : ActiveSkill
             P.PlayAttack(clips[i], dir, baseFx: frames == null);
             float r = RangeOf(Hit.radius);
             if (frames == null) Fx.Arc(from, dir, r, i == Hits - 1 ? Fx.FireBright : Fx.Fire, 0.15f);
-            SkillHits.Directed(Hit, from, dir, RangeScale, HitDamage(DamagePerHit));   // 모양은 SkillTuning.tripleSlash
+            SkillHits.Directed(Hit, from, dir, RangeScale, MakeDamage(DamagePerHit));   // 모양은 SkillTuning.tripleSlash
             if (i < Hits - 1) yield return new WaitForSeconds(T.tripleSlashInterval);
         }
     }
@@ -63,7 +63,7 @@ public class FireCharge : ActiveSkill
     {
         hit.Clear();
         float r = Range(Tier.Mid) * 0.5f;   // [임시] 돌진 중 판정은 범위 중간의 절반
-        float dmg = Damage(Power.VeryLow);
+        DamageInfo dmg = PowerDamage(Power.VeryLow);
         Fx.Circle(P.transform.position, r, Fx.Fire, DashTime + 0.1f, P.transform, 0f);
         P.Dash(P.Facing, Distance, DashTime, true,
             onStep: () =>
@@ -105,7 +105,7 @@ public class OverFlameSlash : ActiveSkill
         P.PlayAttack(Player.Thrust, dir);
         Fx.Box(from, dir, len, width, Fx.FireBright, 0.3f);
         Fx.Box(from, dir, len, width * 2.2f, Fx.FireDeep, 0.2f);
-        SkillHits.Box(from, dir, len, width, Damage(Power.VeryHigh), 2f, e => e.Stun(StunSeconds));
+        SkillHits.Box(from, dir, len, width, PowerDamage(Power.VeryHigh), 2f, e => e.Stun(StunSeconds));
         CameraFollow.Shake(0.12f, 0.12f);
     }
 }
@@ -138,7 +138,7 @@ public class FireBreaker : ActiveSkill
     void Burst(Vector2 at, float r)
     {
         Fx.Disc(at, r, Fx.Fire, 0.3f);
-        SkillHits.Circle(at, r, Damage(Power.Mid), 1f, e => e.Stun(StunSeconds));
+        SkillHits.Circle(at, r, PowerDamage(Power.Mid), 1f, e => e.Stun(StunSeconds));
         CameraFollow.Shake(0.1f, 0.1f);
     }
 }
@@ -156,7 +156,7 @@ public class FireExecution : ActiveSkill
     IEnumerator Run()
     {
         P.Root(Duration);
-        float per = Damage(Power.VeryHigh) / Hits;
+        DamageInfo per = PowerDamage(Power.VeryHigh, 1f / Hits);
         string[] clips = { Player.SlashH, Player.SlashV, Player.Thrust };
         for (int i = 0; i < Hits; i++)
         {
@@ -211,7 +211,7 @@ public class FireStream : Skill
         stacks--;
 
         hit.Clear();
-        float dmg = Damage(Power.Low);
+        DamageInfo dmg = PowerDamage(Power.Low);
         float r = 0.6f;                 // [임시] 이동 경로 판정 반경
         Fx.Circle(P.transform.position, r, Fx.FireBright, 0.2f);
         P.Dash(P.Facing, Distance, DashTime, true, onStep: () =>
@@ -254,7 +254,7 @@ public class BlazingStorm : Skill
     {
         running = true;
         P.SetInvulnerable(Duration + 0.1f);
-        float per = Damage(Power.VeryHigh) / Hits;
+        DamageInfo per = PowerDamage(Power.VeryHigh, 1f / Hits);
         Fx.ScreenFlash(new Color(1f, 0.45f, 0.1f, 0.45f), Duration);
         for (int i = 0; i < Hits; i++)
         {
