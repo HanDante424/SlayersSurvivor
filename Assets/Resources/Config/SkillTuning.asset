@@ -23,58 +23,58 @@ MonoBehaviour:
   - 4
   - 10
   range:
-  - 1.6
-  - 2.6
-  - 4
+  - 1.07
+  - 1.73
+  - 2.67
   reach:
-  - 2.5
-  - 4.5
-  - 7
+  - 1.67
+  - 3
+  - 4.67
   upgradeDamage: 0.1
   upgradeRange: 0.1
   upgradeCooldown: 0.05
   cooldownReductionCap: 0.9
   fireSlash:
     shape: 1
-    forward: 5
-    back: 1.2
-    width: 3
-    radius: 1.6
+    forward: 3.33
+    back: 0.8
+    width: 2
+    radius: 1.07
     halfAngle: 70
-    near: 0.3
+    near: 0.2
     knockback: 1.5
   tripleSlash:
     shape: 1
-    forward: 8
-    back: 1.5
-    width: 9
-    radius: 2.6
+    forward: 5.33
+    back: 1
+    width: 6
+    radius: 1.73
     halfAngle: 75
-    near: 0.3
+    near: 0.2
     knockback: 0.4
   tripleSlashInterval: 0.15
   solarSlash:
     shape: 0
-    forward: 2.2
-    back: 0.9
-    width: 1.6
-    radius: 2
+    forward: 1.47
+    back: 0.6
+    width: 1.07
+    radius: 1.33
     halfAngle: 180
-    near: 0.3
+    near: 0.2
     knockback: 0.3
   solarExplosion:
     shape: 0
-    forward: 2.2
-    back: 0.9
-    width: 1.6
-    radius: 4
+    forward: 1.47
+    back: 0.6
+    width: 1.07
+    radius: 2.67
     halfAngle: 180
-    near: 0.3
+    near: 0.2
     knockback: 5
   solarExplosionDelay: 0.45
-  fireTrackRange: 12
+  fireTrackRange: 8
   fireWaveSpeed: 14
-  fireWaveDistance: 12
+  fireWaveDistance: 8
   fireWaveWidth: 1
   fireWaveDelay: 0.05
   fireChainOffset: 0.5
@@ -83,19 +83,19 @@ MonoBehaviour:
   fireEchoDelay: 0.1
   fireEchoMaxPerFrame: 4
   fireEchoScatterSpread: 60
-  flameSpreadRadius: 4
-  flameBombRadius: 3
-  absorbDetectRadius: 6
+  flameSpreadRadius: 2.67
+  flameBombRadius: 2
+  absorbDetectRadius: 4
   solarMultiIntervalRatio: 1
   solarEchoGap: 0.15
   solarBurn:
     shape: 0
-    forward: 2.2
-    back: 0.9
-    width: 1.6
-    radius: 4
+    forward: 1.47
+    back: 0.6
+    width: 1.07
+    radius: 2.67
     halfAngle: 180
-    near: 0.3
+    near: 0.2
     knockback: 0.3
   solarBurnKnockEveryTick: 1
   concussionWindow: 0.35

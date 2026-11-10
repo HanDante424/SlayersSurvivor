@@ -19,7 +19,7 @@ MonoBehaviour:
   critChance: 0.5
   attackFps: 16
   fxDelay: 0.125
-  fxDistance: 0.7
+  fxDistance: 0.47
   fxOffset: {x: 0, y: 0}
-  fxSize: 2
+  fxSize: 1.33
   fxFps: 32

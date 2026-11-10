@@ -13,8 +13,8 @@ public class GameManager : MonoBehaviour
     [Header("진행")]
     public float surviveTime = 600f;      // 10분 생존 시 승리
 
-    /// <summary>[임시] 게임 카메라 시야 (화면 세로 절반, 유닛). 기존 7 → 1.5배</summary>
-    public const float ViewSize = 10.5f;
+    /// <summary>[임시] 게임 카메라 시야 (화면 세로 절반, 유닛). 7 → 10.5(1.5배) → 7 (2026-11-10 원래 배율로 복귀)</summary>
+    public const float ViewSize = 7f;
     public GameState State { get; private set; } = GameState.Playing;
     public float Elapsed { get; private set; }
     public int Kills { get; private set; }

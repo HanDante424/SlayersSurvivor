@@ -9,7 +9,7 @@ using UnityEngine;
 /// <summary>M02 파이어 차지: 이동기 · 범위 중간 · 피해 매우 낮음 · 쿨 중간 · 무적 · 주변 적 밀치기</summary>
 public class FireCharge : ActiveSkill
 {
-    const float Distance = 4f;          // [임시] 돌진 거리 (기획 미정)
+    const float Distance = 2.67f;       // [임시] 돌진 거리 (기획 미정). 카메라 시야 7 복귀에 맞춰 4 × 2/3
     const float DashTime = 0.25f;       // [임시]
     const float Knock = 8f;             // [임시]
 
@@ -177,7 +177,7 @@ public class FireStream : Skill
 
         hit.Clear();
         DamageInfo dmg = PowerDamage(Power.Low);
-        float r = 0.6f;                 // [임시] 이동 경로 판정 반경
+        float r = 0.4f;                 // [임시] 이동 경로 판정 반경 (카메라 시야 7 복귀에 맞춰 0.6 × 2/3)
         Fx.Circle(P.transform.position, r, Fx.FireBright, 0.2f);
         P.Dash(P.Facing, Distance, DashTime, true, onStep: () =>
         {
@@ -227,7 +227,7 @@ public class BlazingStorm : Skill
             CameraFollow.Shake(0.2f, 0.25f);
             foreach (var e in SkillHits.OnScreen(targets))
             {
-                Fx.Disc(e.transform.position, 0.6f, Fx.Fire, 0.25f);
+                Fx.Disc(e.transform.position, 0.4f, Fx.Fire, 0.25f);   // 카메라 시야 7 복귀에 맞춰 0.6 × 2/3
                 e.Hit(per, (Vector2)(e.transform.position - P.transform.position), 0.5f);
             }
             yield return new WaitForSeconds(Duration / Hits);

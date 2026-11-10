@@ -703,7 +703,7 @@ public class FireBlade : AutoSkill
                 if (e == null || e.hp <= 0) continue;
                 lastPos[i] = e.transform.position;
                 var d = Random.insideUnitCircle.normalized;
-                Fx.Box(lastPos[i] - d * 0.5f, d, 1f, 0.12f, Fx.FireBright, 0.12f);
+                Fx.Box(lastPos[i] - d * 0.33f, d, 0.67f, 0.08f, Fx.FireBright, 0.12f);   // 카메라 시야 7 복귀에 맞춰 × 2/3
                 e.Hit(perSlash, d, 0.5f);
             }
             yield return new WaitForSeconds(SlashInterval);
