@@ -42,12 +42,14 @@ public struct DamageInfo
     public Func<Enemy, float> perTarget;
     /// <summary>직접 피해가 아니어도 화염의 검 화상을 부여하는 예외 (솔라 슬래시 타오름)</summary>
     public bool canBurn;
+    /// <summary>직접 발동 1회의 식별 번호 (간접 발동 · 출처 없음 = 0). 화염 공명 "발동 1번당 1회" 판정용</summary>
+    public int castId;
 
     public DamageInfo(float amount, DamageType type = DamageType.Direct, Skill source = null,
                       CastKind cast = CastKind.Direct, bool isFixed = false, string tag = null)
     {
         this.amount = amount; this.type = type; this.source = source; this.cast = cast;
-        this.isFixed = isFixed; this.tag = tag; perTarget = null; canBurn = false;
+        this.isFixed = isFixed; this.tag = tag; perTarget = null; canBurn = false; castId = 0;
     }
 
     /// <summary>'화상' 태그 (화염의 검 화상 틱 · 살아있는 폭탄 · 일촉즉발)</summary>

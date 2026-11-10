@@ -178,6 +178,31 @@ public abstract class Skill : MonoBehaviour
     protected DamageInfo MakeDamage(float initial, CastKind cast = CastKind.Direct, DamageType type = DamageType.Direct)
     {
         var d = new DamageInfo(0f, type, this, cast);
+        if (cast == CastKind.Direct) d.castId = CastId;
+        d.amount = DamageMath.Attacker(d, initial, TotalDamageBonus, 0f, SpecialFinalDamageMul);
+        return d;
+    }
+
+    /// <summary>
+    /// 발동 시점에 잡아 둔 발동 구분 + 번호. 지연 공격(삼연발 · 검기 · 연속 공격 · 다단히트)이
+    /// 다음 발동의 번호를 받지 않도록 발동 시작 때 만들어서 넘김
+    /// </summary>
+    protected readonly struct CastRef
+    {
+        public readonly CastKind kind;
+        public readonly int id;
+        public CastRef(CastKind kind, int id) { this.kind = kind; this.id = id; }
+        public static CastRef Indirect => new CastRef(CastKind.Indirect, 0);
+    }
+
+    /// <summary>지금 진행 중인 직접 발동</summary>
+    protected CastRef DirectCast => new CastRef(CastKind.Direct, CastId);
+
+    /// <summary>발동 시점에 잡아 둔 cast 로 피해 1건 (지연 공격용)</summary>
+    protected DamageInfo MakeDamage(float initial, CastRef cast, DamageType type = DamageType.Direct)
+    {
+        var d = new DamageInfo(0f, type, this, cast.kind);
+        d.castId = cast.kind == CastKind.Direct ? cast.id : 0;
         d.amount = DamageMath.Attacker(d, initial, TotalDamageBonus, 0f, SpecialFinalDamageMul);
         return d;
     }
@@ -185,6 +210,13 @@ public abstract class Skill : MonoBehaviour
     /// <summary>고정 피해 (모든 증감 무효). 참조값 계산은 호출하는 쪽에서</summary>
     protected DamageInfo FixedDamage(float amount, DamageType type, CastKind cast = CastKind.Direct) =>
         new DamageInfo(amount, type, this, cast, isFixed: true);
+
+    // ---------- 발동 식별 ----------
+    static int castCounter;
+    /// <summary>가장 최근 직접 발동의 번호. 그 발동에서 나온 피해(지연·지속 포함)가 같은 번호를 가짐</summary>
+    public int CastId { get; private set; }
+    /// <summary>직접 발동 시작 (쿨타임 자동 발동 · 키 입력) 시 호출</summary>
+    protected void BeginCast() => CastId = ++castCounter;
 
     // ---------- 쿨타임 ----------
     /// <summary>스킬 기본 강화 쿨타임 감소 → 배율 1개 (기본 강화끼리 합연산)</summary>
@@ -285,6 +317,7 @@ public abstract class ActiveSkill : Skill
     {
         if (cdLeft > 0 || P.IsBusy || CheatDisabled) return false;
         cdLeft = CooldownSeconds;
+        BeginCast();
         Activate();
         return true;
     }
@@ -311,6 +344,7 @@ public abstract class AutoSkill : Skill
         timer -= dt;
         if (timer > 0) return;
         // 발동할 대상이 없으면 쿨타임을 소모하지 않고 다음 프레임에 다시 확인
+        BeginCast();
         if (!Fire()) { timer = 0f; return; }
         timer = CooldownSeconds + CastDuration;
     }
@@ -328,7 +362,7 @@ public abstract class AutoSkill : Skill
 
     /// <summary>
     /// 남은 쿨타임 감소. 공격 진행 중(Casting)에는 쿨타임이 아직 시작 전이라 무시.
-    /// [임시] 지속형(CastDuration)은 지속 시간까지 포함한 대기 시간에 적용 — 타오름 + 남은 쿨타임 감소 조합은 옥염 구현 때 확인
+    /// 지속형 공격(타오름)도 Casting 으로 처리 → 지속 중에는 줄지 않고, 끝난 뒤 쿨타임에만 적용
     /// </summary>
     public override void ReduceRemainingCooldown(float ratio)
     {

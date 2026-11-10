@@ -154,6 +154,9 @@ public class GameManager : MonoBehaviour
     public bool UltimateReady => ultimateGauge >= Tuning.Skills.gaugeMax;
     /// <summary>[임시] 사용 시 0으로 초기화 (기획 미정)</summary>
     public void ConsumeUltimateGauge() => ultimateGauge = 0f;
+    /// <summary>궁극기 게이지를 최대치의 fraction 만큼 충전 (화염 공명: 0.01 = +1%)</summary>
+    public void AddUltimateGauge(float fraction) =>
+        ultimateGauge = Mathf.Min(Tuning.Skills.gaugeMax, ultimateGauge + Tuning.Skills.gaugeMax * fraction);
 
     // ---------- 테스트용 (DebugCheats 패널에서 호출) ----------
     /// <summary>테스트: 레벨 올리기 (선택지도 레벨 수만큼 열림)</summary>

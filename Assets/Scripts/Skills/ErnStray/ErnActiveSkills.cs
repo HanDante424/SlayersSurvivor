@@ -29,6 +29,7 @@ public class TripleSlash : ActiveSkill
     IEnumerator Run()
     {
         string[] clips = { Player.SlashH, Player.SlashV, Player.Thrust };
+        var cast = DirectCast;   // 3타 모두 이번 발동 번호
         float r0 = RangeOf(Hit.radius);
         // 트리플 슬래시 시트는 3타를 한 번에 그린 10프레임 → 첫 타에 한 번만 띄움
         var frames = ErnSkillFx.TripleSlash;
@@ -42,7 +43,7 @@ public class TripleSlash : ActiveSkill
             P.PlayAttack(clips[i], dir, baseFx: frames == null);
             float r = RangeOf(Hit.radius);
             if (frames == null) Fx.Arc(from, dir, r, i == Hits - 1 ? Fx.FireBright : Fx.Fire, 0.15f);
-            SkillHits.Directed(Hit, from, dir, RangeScale, MakeDamage(DamagePerHit));   // 모양은 SkillTuning.tripleSlash
+            SkillHits.Directed(Hit, from, dir, RangeScale, MakeDamage(DamagePerHit, cast));   // 모양은 SkillTuning.tripleSlash
             if (i < Hits - 1) yield return new WaitForSeconds(T.tripleSlashInterval);
         }
     }
@@ -195,6 +196,12 @@ public class FireStream : Skill
     /// <summary>다음 스택 회복 진행도 (HUD)</summary>
     public float RechargeFraction => stacks >= MaxStacks ? 0f : Mathf.Clamp01(recharge / Mathf.Max(0.01f, StackCooldown));
 
+    /// <summary>남은 쿨타임 감소 (불길의 순환): 지금 충전 중인 스택 기준</summary>
+    public override void ReduceRemainingCooldown(float ratio)
+    {
+        if (stacks < MaxStacks && recharge > 0f) recharge *= Mathf.Clamp01(1f - ratio);
+    }
+
     public override void Tick(float dt)
     {
         if (stacks >= MaxStacks) { recharge = 0f; return; }
@@ -209,6 +216,7 @@ public class FireStream : Skill
         if (stacks <= 0 || P.IsBusy) return false;
         if (stacks == MaxStacks) recharge = StackCooldown;
         stacks--;
+        BeginCast();
 
         hit.Clear();
         DamageInfo dmg = PowerDamage(Power.Low);
@@ -246,6 +254,7 @@ public class BlazingStorm : Skill
         if (CheatDisabled) return false;   // 치트: 스킬별 사용 금지
         if (running || P.IsBusy || !GameManager.I.UltimateReady) return false;
         GameManager.I.ConsumeUltimateGauge();
+        BeginCast();
         StartCoroutine(Run());
         return true;
     }

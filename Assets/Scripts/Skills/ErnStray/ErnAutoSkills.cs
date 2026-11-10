@@ -123,8 +123,9 @@ public class FireSlash : AutoSkill
         var frames = ErnSkillFx.FireSlash;
         P.PlayAttack(Player.SlashH, dirs[0], baseFx: frames == null);
 
-        foreach (var d in dirs) Strike(from, d, CastKind.Direct);
-        if (HasSpecial(TripleShot)) StartCoroutine(TripleAfter(from, dirs));
+        var cast = DirectCast;   // 지연 공격도 이번 발동 번호로
+        foreach (var d in dirs) Strike(from, d, cast);
+        if (HasSpecial(TripleShot)) StartCoroutine(TripleAfter(from, dirs, cast));
         return true;
     }
 
@@ -149,14 +150,14 @@ public class FireSlash : AutoSkill
     }
 
     /// <summary>삼연발: 원래 공격 이후 각 방향의 좌우 60°</summary>
-    IEnumerator TripleAfter(Vector2 from, List<Vector2> dirs)
+    IEnumerator TripleAfter(Vector2 from, List<Vector2> dirs, CastRef cast)
     {
         if (T.fireTripleDelay > 0) yield return new WaitForSeconds(T.fireTripleDelay);
         if (Blocked) yield break;   // 지연 중에 F7 / 스킬 사용 금지 → 예약된 추가 공격도 취소
         foreach (var d in dirs)
         {
-            Strike(from, Rotate(d, TripleAngle), CastKind.Direct);
-            Strike(from, Rotate(d, -TripleAngle), CastKind.Direct);
+            Strike(from, Rotate(d, TripleAngle), cast);
+            Strike(from, Rotate(d, -TripleAngle), cast);
         }
     }
 
@@ -164,7 +165,7 @@ public class FireSlash : AutoSkill
     /// 발동 단계의 참격 1회 + Lv.10 추가 공격. 추가 참격(SlashOnce)은 더 이상 증식하지 않음.
     /// cast: 쿨타임 발동 = 직접 발동, 죽음의 메아리 = 간접 발동 (검기·연속 공격도 같은 구분을 이어받음)
     /// </summary>
-    void Strike(Vector2 from, Vector2 dir, CastKind cast)
+    void Strike(Vector2 from, Vector2 dir, CastRef cast)
     {
         SlashOnce(from, dir, cast);
         if (HasSpecial(Wave)) StartCoroutine(WaveAfter(from, dir, cast));
@@ -172,7 +173,7 @@ public class FireSlash : AutoSkill
     }
 
     /// <summary>참격 1개 (이펙트 + 판정). 추가 공격 없음</summary>
-    void SlashOnce(Vector2 from, Vector2 dir, CastKind cast)
+    void SlashOnce(Vector2 from, Vector2 dir, CastRef cast)
     {
         var frames = ErnSkillFx.FireSlash;
         if (frames != null)
@@ -182,7 +183,7 @@ public class FireSlash : AutoSkill
         SkillHits.Directed(Hit, from, dir, RangeScale, MakeDamage(BaseDamage, cast));   // 모양은 SkillTuning.fireSlash
     }
 
-    IEnumerator WaveAfter(Vector2 from, Vector2 dir, CastKind cast)
+    IEnumerator WaveAfter(Vector2 from, Vector2 dir, CastRef cast)
     {
         if (T.fireWaveDelay > 0) yield return new WaitForSeconds(T.fireWaveDelay);
         if (Blocked) yield break;
@@ -191,7 +192,7 @@ public class FireSlash : AutoSkill
                        Enemy.KnockSpeed(Hit.knockback), ErnSkillFx.FireSlash, Radius * FxWidth);
     }
 
-    IEnumerator ChainAfter(Vector2 at, Vector2 dir, CastKind cast)
+    IEnumerator ChainAfter(Vector2 at, Vector2 dir, CastRef cast)
     {
         if (T.fireChainDelay > 0) yield return new WaitForSeconds(T.fireChainDelay);
         if (Blocked) yield break;
@@ -235,7 +236,7 @@ public class FireSlash : AutoSkill
             if (next.frame >= Time.frameCount || next.readyAt > Time.time) break;   // 예약 순서 = 발동 순서
             echoQueue.Dequeue();
             if (Blocked || !HasSpecial(DeathEcho)) continue;   // 발동 직전에 다시 확인 → 금지된 뒤에는 버림
-            foreach (var d in EchoDirections(next.at)) Strike(next.at, d, CastKind.Indirect);   // 참격 + 검기 / 연속 공격 생성 (간접 발동)
+            foreach (var d in EchoDirections(next.at)) Strike(next.at, d, CastRef.Indirect);   // 참격 + 검기 / 연속 공격 생성 (간접 발동)
             budget--;
         }
         base.Tick(dt);
@@ -417,8 +418,7 @@ public class SolarSlash : AutoSkill
         * (HasSpecial(Supernova) ? 1f + SupernovaCooldown : 1f);
 
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
-    /// <summary>타오름: 지속 공격이 끝난 뒤부터 쿨타임</summary>
-    protected override float CastDuration => Burning ? BurnDuration : 0f;
+    // 타오름: 지속 공격이 끝난 뒤부터 쿨타임 → BurnRoutine 이 Casting 으로 처리 (CastDuration 미사용)
 
     // ---------- 특수 강화 목록 (선택 불가 · 경고 포함) ----------
     public override SpecialUpgradeOption[] SpecialOptions(int lv)
@@ -491,7 +491,7 @@ public class SolarSlash : AutoSkill
         else Fx.Circle(from, slashR, Fx.FireBright, 0.3f, P.transform);
 
         // 1) 베기
-        var cast = isEcho ? CastKind.Indirect : CastKind.Direct;   // 메아리 재발동 = 간접 발동
+        var cast = isEcho ? CastRef.Indirect : DirectCast;   // 메아리 재발동 = 간접 발동
         SkillHits.Circle(from, slashR, MakeDamage(SlashDamage, cast), Enemy.KnockSpeed(T.solarSlash.knockback), OnDamaged);
         HitDebug.Circle(from, slashR, HitDebug.SlashColor);
 
@@ -516,7 +516,7 @@ public class SolarSlash : AutoSkill
     }
 
     /// <summary>후속 폭발: 피해 원 안 = 피해 + 넉백, 넉백 범위(더 큰 원) 안 = 넉백만</summary>
-    void Explode(bool drawShape, Sprite[] blastFx, CastKind cast)
+    void Explode(bool drawShape, Sprite[] blastFx, CastRef cast)
     {
         Vector2 at = P.transform.position;   // 이펙트가 플레이어를 따라가므로 폭발도 현재 위치
         float r = RangeOf(T.solarExplosion.radius);
@@ -551,6 +551,9 @@ public class SolarSlash : AutoSkill
     /// <summary>타오름: 5초간 매초 (베기+폭발 총 피해) · 실제 넉백 범위는 기본값 고정 · 끝난 뒤 쿨타임</summary>
     IEnumerator BurnRoutine()
     {
+        // 지속 중에는 쿨타임이 돌지 않음 (남은 쿨타임 감소로 지속이 겹치지 않게) → 끝난 뒤부터 쿨타임
+        Casting = true;
+        var cast = DirectCast;
         var frames = ErnSkillFx.SolarSlash;
         float r0 = RangeOf(T.solarBurn.radius);
         if (frames != null) SpriteEffect.Spawn(frames, FxFps, P.transform, Vector2.zero, 0f, false, 11, r0 * FxWidth);
@@ -570,7 +573,7 @@ public class SolarSlash : AutoSkill
             else if (i > 0) SpawnBlastFx(frames, r);
 
             // 타오름 = '지속 피해' (결정 기록 v1.0). 예외로 화염의 검 화상은 부여 (canBurn)
-            var burnDmg = MakeDamage(SlashDamage + ExplosionDamage, CastKind.Direct, DamageType.DoT);
+            var burnDmg = MakeDamage(SlashDamage + ExplosionDamage, cast, DamageType.DoT);
             burnDmg.canBurn = true;
             SkillHits.Circle(at, r, burnDmg, 0f, e =>
             {
@@ -585,6 +588,7 @@ public class SolarSlash : AutoSkill
             yield return new WaitForSeconds(BurnTick);
         }
         if (ring != null) Destroy(ring.gameObject);
+        Casting = false;
     }
 
     void SpawnBlastFx(Sprite[] frames, float r)
