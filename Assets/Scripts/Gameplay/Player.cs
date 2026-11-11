@@ -131,12 +131,22 @@ public class Player : MonoBehaviour
         public float cell, pivotY;
         public int idleCols, runCols;
         public float idleFps, runFps;
+        /// <summary>공격 모션 {id}_Slash: 프레임 수 (0 = 없음), 칸 월드 크기 · 피벗 (무기 때문에 칸이 더 큼)</summary>
+        public int attackCols;
+        public float attackCell, attackPivotY;
     }
 
-    /// <summary>에른 스트레이: Run · Idle 4×8, 공격 모션 3종 + 화염 이펙트</summary>
+    /// <summary>
+    /// 에른 스트레이 (2026-11-11 새 리소스 ErnStray_Complete_v2): 정지 4방향 · 달리기 4×8 (10fps) · 대각 내려베기 4×8.
+    /// Tools/normalize_character_sheets.py --cell 256 --height 200 --baseline 16 --action-cell 320 로 정렬
+    /// (화면 키 약 1.62유닛 · transform = 발 위 0.64유닛 — 이전 에른 · 레니아와 같음).
+    ///   정지·달리기: cell 2.07, pivotY = 16/256 + 0.64/2.07 ≈ 0.372
+    ///   베기: 칸 320px (검이 칸 밖으로 나가지 않게) → cell 2.07 × 320/256 = 2.5875, pivotY = 16/320 + 0.64/2.5875 ≈ 0.297
+    /// </summary>
     public static readonly CharacterVisual ErnStrayVisual = new CharacterVisual
     {
-        id = "ErnStray", cell = 1.9f, pivotY = 0.4f, idleCols = 8, runCols = 8, idleFps = 8f, runFps = 12f,
+        id = "ErnStray", cell = 2.07f, pivotY = 0.372f, idleCols = 1, runCols = 8, idleFps = 1f, runFps = 10f,
+        attackCols = 8, attackCell = 2.5875f, attackPivotY = 0.297f,
     };
 
     /// <summary>
@@ -153,27 +163,24 @@ public class Player : MonoBehaviour
     /// <summary>다음 게임에서 쓸 외형 (타이틀 화면에서 선택). 스킬은 아직 모두 에른 스트레이 것</summary>
     public static CharacterVisual Visual = ErnStrayVisual;
     static string CharacterId => Visual.id;
-    public const string SlashH = "SlashH";   // 수평베기
-    public const string SlashV = "SlashV";   // 수직베기
-    public const string Thrust = "Thrust";   // 찌르기
-    static readonly string[] AttackClips = { SlashH, SlashV, Thrust };
+    /// <summary>공격 모션 (베기 1종). 예전 수평베기 · 수직베기 · 찌르기 3종을 하나로 통합 (2026-11-11)</summary>
+    public const string Slash = "Slash";
 
-    // 기본 공격(수평베기) 화염 이펙트: ErnStray_FireSlash 2행 x 8열 (16프레임)
+    // 기본 공격 화염 이펙트: ErnStray_FireSlash 2행 x 8열 (16프레임)
     // 치명타여도 같은 이펙트 (치명타 전용 이펙트 교체는 취소됨)
     // 타이밍·거리·크기·속도는 설정 파일에서 조정
     Sprite[] fxSlash;
     float fxTimer = -1f;
 
     /// <summary>
-    /// 공격 모션 재생 (애니메이션만, 판정 없음). dir 이 0이면 현재 바라보는 방향.
-    /// 이전 공격 모션이 끝나기 전에는 무시되고 false 를 돌려줍니다.
-    /// 수평베기는 화염 이펙트를 함께 출력합니다.
-    /// 스킬이 자기 이펙트를 직접 띄울 때는 baseFx = false 로 기본 공격 이펙트를 끕니다.
+    /// 공격 모션(베기) 재생 (애니메이션만, 판정 없음). dir 이 0이면 현재 바라보는 방향.
+    /// 이전 공격 모션이 끝나기 전에는 무시되고 false 를 돌려줍니다 (연타 스킬은 첫 타에만 모션).
+    /// baseFx = true 면 기본 공격 화염 이펙트를 함께 출력 (스킬 전용 이펙트가 없을 때만 켬).
     /// </summary>
-    public bool PlayAttack(string clip, Vector2 dir = default, bool baseFx = true)
+    public bool PlayAttack(Vector2 dir = default, bool baseFx = false)
     {
-        if (anim == null || !anim.Play(clip, dir)) return false;
-        if (clip == SlashH && baseFx) fxTimer = Cfg.fxDelay;
+        if (anim == null || !anim.Play(Slash, dir)) return false;
+        if (baseFx) fxTimer = Cfg.fxDelay;
         return true;
     }
 
@@ -214,8 +221,8 @@ public class Player : MonoBehaviour
         {
             anim.LoadClip(SpriteSheetAnimator.Idle, CharacterId + "_Idle", 4, v.idleCols, cell, pivotY, v.idleFps, true);
             // 공격 모션 · 기본 공격 이펙트는 시트가 있는 캐릭터만 (없으면 LoadClip/LoadFrames 가 건너뜀)
-            foreach (var key in AttackClips)
-                anim.LoadClip(key, CharacterId + "_" + key, 4, 8, cell, pivotY, Cfg.attackFps, false);
+            if (v.attackCols > 0)
+                anim.LoadClip(Slash, CharacterId + "_" + Slash, 4, v.attackCols, v.attackCell, v.attackPivotY, Cfg.attackFps, false);
             // 크기는 Spawn 때 설정 값으로 맞추므로 1유닛 기준으로 자름
             fxSlash = SpriteEffect.LoadFrames(CharacterId + "_FireSlash", 2, 8, 1f);
             transform.localScale = Vector3.one;
@@ -244,7 +251,7 @@ public class Player : MonoBehaviour
         if (GameManager.I.State != GameState.Playing) return;
 
         if (anim != null)
-            foreach (var key in AttackClips) anim.SetClipFps(key, Cfg.attackFps);
+            anim.SetClipFps(Slash, Cfg.attackFps);
 
         float dt = Time.deltaTime;
         if (skillInvuln > 0) skillInvuln -= dt;

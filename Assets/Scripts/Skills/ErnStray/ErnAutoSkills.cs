@@ -36,19 +36,20 @@ public static class ErnSkillFx
 }
 
 /// <summary>
-/// A01 파이어 슬래시 (기획 v0.2 + 특수 강화 기획 v1.0): 에른 기본 무장 · 자동 · 피해 10 · 바라보는 방향.
+/// A01 파이어 슬래시 (2026-11-11 스킬 설명 중간본 = 최신): 에른 기본 무장 · 자동 · 초기 피해량 10 · 쿨타임 2초 · 바라보는 방향.
 /// 대상이 없어도 쿨타임마다 휘두름. 판정 크기는 SkillTuning.fireSlash 에서 플레이 테스트로 조정.
 ///
-/// 한 번 발동 = "참격 생성 단계" 1회 (조건 없는 추가 공격은 모두 여기서 끝남):
+/// 한 번 사용 = "참격 생성 단계" 1회 (조건 없는 추가 공격은 모두 여기서 끝남):
 ///   ① Lv.5 방향 (추적 1 / 난사 3 / 양방향 2) → ② Lv.15 삼연발 (방향마다 좌우 60°, ×3)
-///   → ③ 참격마다 Lv.10 검기 1발 또는 연속 공격 3회 (추가 참격은 다시 추가 공격을 만들지 않음)
-///   예) 난사 + 연속 공격 생성 + 삼연발 = 3 × 3 × (1 + 3) = 36 참격
+///   → ③ 참격마다 Lv.10 검기 1발 또는 연속 공격 2회 (추가 참격은 다시 추가 공격을 만들지 않음)
+///   예) 난사 + 연속 공격 생성 + 삼연발 = 3 × 3 × (1 + 2) = 27 참격
+/// 직접 사용 = 첫 방향 참격 1개. 난사 · 양방향의 나머지 방향, 검기, 연속 공격, 삼연발, 죽음의 메아리 = 간접 사용
 /// 죽음의 메아리만 "새 처치"라는 조건으로 새 참격을 만들며, 처치가 이어지는 동안 연쇄를 허용.
 /// </summary>
 public class FireSlash : AutoSkill
 {
-    // 기본 수치 (기획 확정 — 임의 변경 금지. 쿨타임은 사용자 조정값)
-    const float BaseCooldown = 1.5f;
+    // 기본 수치 (2026-11-11 스킬 설명 중간본: 초기 피해량 10 · 쿨타임 2초)
+    const float BaseCooldown = 2f;
     const float BaseDamage = 10f;
 
     const float FxFps = 24f;            // [임시] 시트 재생 속도 (7프레임 → 약 0.3초)
@@ -63,11 +64,11 @@ public class FireSlash : AutoSkill
     // 특수 강화 확정 수치 (기획 v1.0)
     const int ScatterCount = 3;
     const float TripleAngle = 60f;
-    const float ChainAngle = 120f;      // 연속 공격 생성 · 죽음의 메아리: 120° 간격 3방향
-    const float QuickMul = 0.5f;        // 빠른 공격: 남은 쿨타임 50% 추가 감소
-    const float HeavyDamage = 1.0f;     // 묵직한 일격: 공격력 +100%
+    const float ChainAngle = 120f;      // 연속 공격 생성: 공격 방향 이외 120° 간격 2방향 · 죽음의 메아리: 120° 간격 3방향
+    const float QuickMul = 0.5f;        // 빠른 공격: 사용 후 남은 쿨타임 절반 감소
+    const float HeavyFinal = 1.0f;      // 묵직한 일격: 최종 피해량 +100%
     const float HeavyRange = 0.5f;      //               공격 범위 +50%
-    const float HeavyPerReduction = 2f; //               무효화된 감소율 1%당 공격력 +2%
+    const float HeavyPerReduction = 2f; //               무효화된 쿨타임 감소 1%당 최종 피해량 +2% (+100% 와 합쳐 최종 배율 1개)
 
     static SkillHitbox Hit => T.fireSlash;
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
@@ -80,38 +81,54 @@ public class FireSlash : AutoSkill
         {
             case 5: return new[]
             {
-                new SpecialUpgradeOption { id = Track, title = "대상 추적", desc = "바라보는 방향 대신 가장 가까운 적을 향해 공격" },
-                new SpecialUpgradeOption { id = Scatter, title = "난사", desc = "무작위 방향으로 3회 공격 (방향 조절 불가)" },
-                new SpecialUpgradeOption { id = BothWays, title = "양방향 공격", desc = "바라보는 방향 + 정반대 방향 동시 공격" },
+                new SpecialUpgradeOption { id = Track, title = "대상 추적", desc = "가장 가까운 대상을 향해 공격합니다." },
+                new SpecialUpgradeOption { id = Scatter, title = "난사", keywords = new[] { "간접 사용", "직접 피해" }, desc = "무작위 3방향으로 공격합니다." },
+                new SpecialUpgradeOption { id = BothWays, title = "양방향 공격", keywords = new[] { "간접 사용", "직접 피해" }, desc = "바라보는 곳 반대편도 공격합니다." },
             };
             case 10: return new[]
             {
-                new SpecialUpgradeOption { id = Wave, title = "검기 발사", desc = "참격 후 같은 위력의 검기를 공격 방향으로 발사" },
-                new SpecialUpgradeOption { id = Chain, title = "연속 공격 생성", desc = "참격 위치에서 120° 간격 3방향 추가 참격" },
-                new SpecialUpgradeOption { id = Quick, title = "빠른 공격", desc = "다른 감소 적용 후 남은 쿨타임을 50% 추가 감소 (최대 90%)" },
+                new SpecialUpgradeOption { id = Wave, title = "검기 발사", keywords = new[] { "간접 사용", "직접 피해", "원거리" }, desc = "같은 피해의 검기가 추가로 날아가 피해를 입힙니다." },
+                new SpecialUpgradeOption { id = Chain, title = "연속 공격 생성", keywords = new[] { "간접 사용", "직접 피해" }, desc = "공격 방향 이외에 2개의 공격이 추가 발생합니다." },
+                new SpecialUpgradeOption { id = Quick, title = "빠른 공격", desc = "사용 후 남은 쿨타임이 절반 감소합니다." },
             };
             case 15: return new[]
             {
-                new SpecialUpgradeOption { id = TripleShot, title = "삼연발", desc = "공격마다 좌우 60° 방향으로 추가 공격 2회" },
-                new SpecialUpgradeOption { id = Heavy, title = "묵직한 일격", desc = "범위 +50% · 공격력 +100% · 쿨타임 감소 무효화 → 감소율 1%당 공격력 +2%" },
-                new SpecialUpgradeOption { id = DeathEcho, title = "죽음의 메아리", desc = "적이 죽은 자리에서 120° 간격 3방향 참격 (처치 연쇄 가능)" },
+                new SpecialUpgradeOption { id = TripleShot, title = "삼연발", keywords = new[] { "간접 사용", "직접 피해" }, desc = "공격 방향 양쪽에 2회의 추가 공격이 발생합니다." },
+                new SpecialUpgradeOption
+                {
+                    id = Heavy, title = "묵직한 일격",
+                    specs = new[] { "'공격 범위' +50%", "'최종 피해량' +100%", "'쿨타임 감소' '무효화'", "'쿨타임 감소' +1% 당 '최종 피해량' +2%" },
+                },
+                new SpecialUpgradeOption { id = DeathEcho, title = "죽음의 메아리", keywords = new[] { "간접 사용", "직접 피해" }, desc = "적 사망시 해당 위치에서 같은 피해의 공격이 3회 발생합니다." },
             };
         }
         return base.SpecialOptions(lv);
     }
 
-    // ---------- 쿨타임 · 피해 (일반 규칙(빠른 공격 = 독립 배율 ×0.5 포함) → 묵직한 일격) ----------
-    protected override float SpecialCooldownMul => HasSpecial(Quick) ? QuickMul : 1f;
+    // ---------- 쿨타임 · 피해 ----------
+    // 빠른 공격 = 사용 직후 남은 쿨타임 ×0.5 (남은 쿨타임 감소 → 90% 상한과 무관, AfterFire)
+    // 묵직한 일격 = 쿨타임 감소 전부 무효화 (빠른 공격 포함) → 무효화된 최종 감소율 1%당 최종 피해량 +2%
 
-    /// <summary>묵직한 일격 전 최종 쿨타임 배율 = 기본 강화 × 빠른 공격 × 전역 배율 (곱연산), 최소 10%</summary>
-    float CooldownMulBeforeHeavy => GeneralCooldownMultiplier;
+    /// <summary>묵직한 일격이 무효화한 최종 쿨타임 감소율 (0.75 = 75%, 기본 강화 · 패시브 · 빠른 공격 포함, 실시간)</summary>
+    public float HeavyConvertedReduction
+    {
+        get
+        {
+            float m = GeneralCooldownMultiplier * (HasSpecial(Quick) ? QuickMul : 1f);
+            return Mathf.Round(Mathf.Max(0f, 1f - m) * 10000f) / 10000f;
+        }
+    }
 
-    /// <summary>묵직한 일격이 무효화한 최종 쿨타임 감소율 (0.75 = 75%, 빠른 공격·패시브 포함, 실시간)</summary>
-    public float HeavyConvertedReduction => Mathf.Round(Mathf.Max(0f, 1f - CooldownMulBeforeHeavy) * 10000f) / 10000f;
-
-    protected override float CooldownMultiplier => HasSpecial(Heavy) ? 1f : CooldownMulBeforeHeavy;
-    protected override float SpecialDamageBonus => HasSpecial(Heavy) ? HeavyDamage + HeavyConvertedReduction * HeavyPerReduction : 0f;
+    protected override float CooldownMultiplier => HasSpecial(Heavy) ? 1f : GeneralCooldownMultiplier;
+    /// <summary>묵직한 일격: '최종 피해량' +100% 와 전환분(1%당 +2%)을 묵직한 일격 안에서 합쳐 최종 배율 1개 (예: 75% → 1 + 1 + 1.5 = ×3.5)</summary>
+    protected override float SpecialFinalDamageMul => HasSpecial(Heavy) ? 1f + HeavyFinal + HeavyConvertedReduction * HeavyPerReduction : 1f;
     protected override float SpecialRangeBonus => HasSpecial(Heavy) ? HeavyRange : 0f;
+
+    /// <summary>빠른 공격: 사용 후 남은 쿨타임 절반 (묵직한 일격이면 쿨타임 감소 무효화)</summary>
+    protected override void AfterFire()
+    {
+        if (HasSpecial(Quick) && !HasSpecial(Heavy)) ReduceRemainingCooldown(1f - QuickMul);
+    }
 
     // ---------- 발동 ----------
     protected override bool Fire()
@@ -121,11 +138,12 @@ public class FireSlash : AutoSkill
 
         // 수평베기 모션은 첫 방향으로 1번만 (시트가 없으면 모션의 기본 이펙트가 대신)
         var frames = ErnSkillFx.FireSlash;
-        P.PlayAttack(Player.SlashH, dirs[0], baseFx: frames == null);
+        P.PlayAttack(dirs[0], baseFx: frames == null);
 
-        var cast = DirectCast;   // 지연 공격도 이번 발동 번호로
-        foreach (var d in dirs) Strike(from, d, cast);
-        if (HasSpecial(TripleShot)) StartCoroutine(TripleAfter(from, dirs, cast));
+        // 첫 방향 = 직접 사용, 난사 · 양방향의 나머지 방향 = 간접 사용 (같은 사용 번호)
+        var use = DirectCast;
+        for (int i = 0; i < dirs.Count; i++) Strike(from, dirs[i], i == 0 ? use : use.AsIndirect);
+        if (HasSpecial(TripleShot)) StartCoroutine(TripleAfter(from, dirs, use));
         return true;
     }
 
@@ -150,26 +168,26 @@ public class FireSlash : AutoSkill
     }
 
     /// <summary>삼연발: 원래 공격 이후 각 방향의 좌우 60°</summary>
-    IEnumerator TripleAfter(Vector2 from, List<Vector2> dirs, CastRef cast)
+    IEnumerator TripleAfter(Vector2 from, List<Vector2> dirs, CastRef use)
     {
         if (T.fireTripleDelay > 0) yield return new WaitForSeconds(T.fireTripleDelay);
         if (Blocked) yield break;   // 지연 중에 F7 / 스킬 사용 금지 → 예약된 추가 공격도 취소
-        foreach (var d in dirs)
+        foreach (var d in dirs)   // 삼연발 = 간접 사용 (같은 사용 번호)
         {
-            Strike(from, Rotate(d, TripleAngle), cast);
-            Strike(from, Rotate(d, -TripleAngle), cast);
+            Strike(from, Rotate(d, TripleAngle), use.AsIndirect);
+            Strike(from, Rotate(d, -TripleAngle), use.AsIndirect);
         }
     }
 
     /// <summary>
     /// 발동 단계의 참격 1회 + Lv.10 추가 공격. 추가 참격(SlashOnce)은 더 이상 증식하지 않음.
-    /// cast: 쿨타임 발동 = 직접 발동, 죽음의 메아리 = 간접 발동 (검기·연속 공격도 같은 구분을 이어받음)
+    /// cast: 이 참격의 사용 구분 (직접 · 간접). 검기 · 연속 공격 = 항상 간접 사용 (사용 번호는 이어받음 — 메아리면 0)
     /// </summary>
     void Strike(Vector2 from, Vector2 dir, CastRef cast)
     {
         SlashOnce(from, dir, cast);
-        if (HasSpecial(Wave)) StartCoroutine(WaveAfter(from, dir, cast));
-        if (HasSpecial(Chain)) StartCoroutine(ChainAfter(from + dir * (Hit.forward * RangeScale * T.fireChainOffset), dir, cast));
+        if (HasSpecial(Wave)) StartCoroutine(WaveAfter(from, dir, cast.AsIndirect));
+        if (HasSpecial(Chain)) StartCoroutine(ChainAfter(from + dir * (Hit.forward * RangeScale * T.fireChainOffset), dir, cast.AsIndirect));
     }
 
     /// <summary>참격 1개 (이펙트 + 판정). 추가 공격 없음</summary>
@@ -196,7 +214,7 @@ public class FireSlash : AutoSkill
     {
         if (T.fireChainDelay > 0) yield return new WaitForSeconds(T.fireChainDelay);
         if (Blocked) yield break;
-        for (int k = 0; k < 3; k++) SlashOnce(at, Rotate(dir, ChainAngle * k), cast);
+        for (int k = 1; k <= 2; k++) SlashOnce(at, Rotate(dir, ChainAngle * k), cast);   // 공격 방향 이외 2방향 (120° 간격)
     }
 
     // ---------- 죽음의 메아리 (처치 조건 연쇄) ----------
@@ -361,8 +379,8 @@ public class FireWave : MonoBehaviour
 /// </summary>
 public class SolarSlash : AutoSkill
 {
-    // 기본 수치 (기획 확정 — 임의 변경 금지. 쿨타임은 사용자 조정값)
-    const float BaseCooldown = 4f;
+    // 기본 수치 (2026-11-11 스킬 설명 중간본: 베기 5 · 폭발 12 · 쿨타임 5초)
+    const float BaseCooldown = 5f;
     const float SlashDamage = 5f;
     const float ExplosionDamage = 12f;
 
@@ -461,7 +479,7 @@ public class SolarSlash : AutoSkill
     // ---------- 발동 ----------
     protected override bool Fire()
     {
-        P.PlayAttack(Player.SlashV);
+        P.PlayAttack();
         StartCoroutine(Burning ? BurnRoutine() : CastWhole());
         return true;
     }
@@ -510,7 +528,7 @@ public class SolarSlash : AutoSkill
         if (!isEcho && HasSpecial(Echo))
         {
             yield return new WaitForSeconds(T.solarEchoGap);
-            P.PlayAttack(Player.SlashV);
+            P.PlayAttack();
             yield return Sequence(true);
         }
     }
@@ -614,13 +632,14 @@ public class SolarSlash : AutoSkill
     }
 }
 
-/// <summary>A03 파이어 볼: 투사체 · 사거리 김 · 범위 좁음 · 쿨 짧음 · 피해 낮음</summary>
+/// <summary>A03 파이어 볼: 가까운 적에게 투사체 발사 · 초기 피해량 7 · 쿨타임 3초</summary>
 public class FireBall : AutoSkill
 {
     const float Speed = 10f;            // [임시] 투사체 속도
     const int Pierce = 1;               // [임시] 관통 수 (기획 미정 → 1)
+    const float BaseDamage = 7f, BaseCooldown = 3f;
 
-    protected override float CooldownSeconds => Cooldown(Tier.Short);
+    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
     float MaxRange => Reach(Tier.Long);
 
     protected override bool Fire()
@@ -631,18 +650,19 @@ public class FireBall : AutoSkill
         Vector2 dir = ((Vector2)target.transform.position - from).normalized;
         // 크기 = 범위 좁음의 일부, 수명 = 사거리 / 속도
         float size = Mathf.Max(0.3f, Range(Tier.Short) * 0.3f);
-        Projectile.Spawn(from, dir, Speed, PowerDamage(Power.Low), Pierce, MaxRange / Speed,
+        Projectile.Spawn(from, dir, Speed, MakeDamage(BaseDamage), Pierce, MaxRange / Speed,
                          "FireBall", new Color(1f, 0.55f, 0.15f), size);
         return true;
     }
 }
 
-/// <summary>A04 파이어 버스터: 범위 중간 · 쿨 중간 · 피해 중간 · 주변 적 밀치기</summary>
+/// <summary>A04 파이어 버스터: 거대한 폭발로 주변 적 밀치기 · 초기 피해량 20 · 쿨타임 10초</summary>
 public class FireBuster : AutoSkill
 {
     const float Knock = 9f;             // [임시] 밀치기 세기
+    const float BaseDamage = 20f, BaseCooldown = 10f;
 
-    protected override float CooldownSeconds => Cooldown(Tier.Mid);
+    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
     float Radius => Range(Tier.Mid);
 
     protected override bool Fire()
@@ -650,7 +670,7 @@ public class FireBuster : AutoSkill
         Vector2 from = P.transform.position;
         if (Nearest(from, Radius) == null) return false;
         Fx.Disc(from, Radius, Fx.FireDeep, 0.25f);
-        SkillHits.Circle(from, Radius, PowerDamage(Power.Mid), Knock);
+        SkillHits.Circle(from, Radius, MakeDamage(BaseDamage), Knock);
         CameraFollow.Shake(0.08f, 0.08f);
         return true;
     }
@@ -663,12 +683,12 @@ public class FireBuster : AutoSkill
 public class FireBlade : AutoSkill
 {
     const int MaxTargets = 8;           // [임시] 타겟 수 제한 (기획 미정)
-    const int SlashCount = 3;           // [임시] 참격 횟수 (기획 미정)
+    const int SlashCount = 5;           // 베기 공격 횟수 5
+    const float SlashDamage = 3f, ExplosionDamage = 20f, BaseCooldown = 15f;
     const float SlashInterval = 0.12f;  // [임시]
-    const float SlashShare = 0.6f;      // [임시] 총 피해 중 참격 비중 (나머지는 폭발)
     const float ExplosionRatio = 0.35f; // [임시] 폭발 반경 = 범위 좁음 × 비율 (기획 미정)
 
-    protected override float CooldownSeconds => Cooldown(Tier.Long);
+    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
     float Radius => Range(Tier.Mid);
 
     readonly List<Enemy> found = new List<Enemy>();
@@ -689,9 +709,10 @@ public class FireBlade : AutoSkill
 
     IEnumerator Run(List<Enemy> targets)
     {
-        // 베기 = 등급 피해 × 베기 비중 ÷ 횟수, 폭발 = 나머지 (각각 피해 이벤트마다 내림)
-        DamageInfo perSlash = PowerDamage(Power.High, SlashShare / SlashCount);
-        DamageInfo explosion = PowerDamage(Power.High, 1f - SlashShare);
+        // 베기 초기 피해량 3 × 5회, 폭발 초기 피해량 20 (각각 피해 이벤트마다 내림)
+        var cast = DirectCast;
+        DamageInfo perSlash = MakeDamage(SlashDamage, cast);
+        DamageInfo explosion = MakeDamage(ExplosionDamage, cast);
         float expR = Range(Tier.Short) * ExplosionRatio;
 
         var lastPos = new Vector2[targets.Count];
@@ -721,18 +742,17 @@ public class FireBlade : AutoSkill
 }
 
 /// <summary>
-/// A06 파이어 스톰: 쿨 중간 · 피해 중간 · 최초 범위 좁음 · 최종 밀치기 범위 중간
-/// 주변 지속 피해 + 슬로우 → 일정 시간 뒤 폭발하며 밀치기
+/// A06 파이어 스톰: 플레이어 중심 화염 소용돌이 (간접 사용 · 지속 피해 2, 3초, 적 느려짐) → 폭발 (직접 피해 15) 하며 밀치기 · 쿨타임 14초
 /// </summary>
 public class FireStorm : AutoSkill
 {
-    const float Duration = 3f;          // [임시] 지속시간 (기획 미정)
-    const float TickInterval = 0.5f;    // [임시] 피해 간격 (기획 미정)
+    const float Duration = 3f;          // 화염 소용돌이 지속 시간 3초
+    const float TickInterval = 1f;      // [해석] 지속 피해 기본 피해 간격 1초 (결정 기록)
     const float SlowMul = 0.5f;         // [임시] 슬로우 비율 (기획 미정)
-    const float DotShare = 0.5f;        // [임시] 총 피해 중 지속 피해 비중
+    const float DotDamage = 2f, ExplosionDamage = 15f, BaseCooldown = 14f;
     const float Knock = 9f;             // [임시]
 
-    protected override float CooldownSeconds => Cooldown(Tier.Mid);
+    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
 
     protected override bool Fire()
     {
@@ -744,9 +764,9 @@ public class FireStorm : AutoSkill
 
     IEnumerator Run()
     {
-        // 지속 구간 = 지속 피해 (틱마다 내림), 마지막 폭발 = 직접 피해
-        int ticks = Mathf.Max(1, Mathf.RoundToInt(Duration / TickInterval));
-        DamageInfo perTick = PowerDamage(Power.Mid, DotShare / ticks, DamageType.DoT);
+        // 화염 소용돌이 = 간접 사용 · 지속 피해 (틱마다 내림), 마지막 폭발 = 직접 사용 · 직접 피해
+        var cast = DirectCast;
+        DamageInfo perTick = MakeDamage(DotDamage, cast.AsIndirect, DamageType.DoT);
         float rSmall = Range(Tier.Short);
 
         // [임시 해석] '주변' = 플레이어를 따라다니는 범위
@@ -765,7 +785,7 @@ public class FireStorm : AutoSkill
         Vector2 at = P.transform.position;
         float rBig = Range(Tier.Mid);
         Fx.Disc(at, rBig, Fx.Fire, 0.3f);
-        SkillHits.Circle(at, rBig, PowerDamage(Power.Mid, 1f - DotShare), Knock);
+        SkillHits.Circle(at, rBig, MakeDamage(ExplosionDamage, cast), Knock);
         CameraFollow.Shake(0.1f, 0.1f);
     }
 }

@@ -2,18 +2,19 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
-// 에른 스트레이 수동 5종 · 이동 1종 · 궁극기 1종 (기획서 5~7장)
+// 에른 스트레이 수동 5종 · 이동 1종 · 궁극기 1종 (기획서 5~7장, 수치 = 2026-11-11 스킬 설명 중간본)
 // 방향은 플레이어가 마지막으로 이동한 방향(Facing) 기준.
 // 기획서에 없는 값은 각 클래스 맨 위 "[임시]" 상수.
 
-/// <summary>M02 파이어 차지: 이동기 · 범위 중간 · 피해 매우 낮음 · 쿨 중간 · 무적 · 주변 적 밀치기</summary>
+/// <summary>M02 파이어 차지: 주변 적을 밀치며 돌진 · 사용 중 무적 · 초기 피해량 4 · 쿨타임 15초</summary>
 public class FireCharge : ActiveSkill
 {
+    const float BaseDamage = 4f, BaseCooldown = 15f;
     const float Distance = 2.67f;       // [임시] 돌진 거리 (기획 미정). 카메라 시야 7 복귀에 맞춰 4 × 2/3
     const float DashTime = 0.25f;       // [임시]
     const float Knock = 8f;             // [임시]
 
-    protected override float CooldownSeconds => Cooldown(Tier.Mid);
+    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
     readonly HashSet<Enemy> hit = new HashSet<Enemy>();
     readonly List<Enemy> found = new List<Enemy>();
 
@@ -21,7 +22,7 @@ public class FireCharge : ActiveSkill
     {
         hit.Clear();
         float r = Range(Tier.Mid) * 0.5f;   // [임시] 돌진 중 판정은 범위 중간의 절반
-        DamageInfo dmg = PowerDamage(Power.VeryLow);
+        DamageInfo dmg = MakeDamage(BaseDamage);
         Fx.Circle(P.transform.position, r, Fx.Fire, DashTime + 0.1f, P.transform, 0f);
         P.Dash(P.Facing, Distance, DashTime, true,
             onStep: () =>
@@ -46,25 +47,40 @@ public class FireCharge : ActiveSkill
     }
 }
 
-/// <summary>M03 오버 플레임 슬래시: 사거리 김 · 공격 폭 짧음 · 피해 매우 높음 · 쿨 김 · 적 기절</summary>
+/// <summary>
+/// M03 오버 드라이브 플레임 슬래시 (구 오버 플레임 슬래시): 화염의 검을 내려쳐 기절 → 1초 뒤 같은 자리 폭발.
+/// 화염의 검 초기 피해량 20 · 기절 2초, 폭발 딜레이 1초 · 초기 피해량 50, 쿨타임 20초
+/// </summary>
 public class OverFlameSlash : ActiveSkill
 {
-    const float StunSeconds = 1.5f;     // [임시] 기절 시간 (기획 미정)
-    const float WidthRatio = 0.5f;      // [임시] 폭 = 범위 좁음 × 비율
+    const float BladeDamage = 20f, StunSeconds = 2f;
+    const float ExplosionDelay = 1f, ExplosionDamage = 50f;
+    const float BaseCooldown = 20f;
+    const float WidthRatio = 0.5f;      // [임시] 검 판정 폭 = 범위 좁음 × 비율
+    const float ExplosionWidthMul = 2.2f;   // [임시] 폭발 판정 폭 = 검 판정 폭 × 이 값 (같은 길이)
 
-    protected override float CooldownSeconds => Cooldown(Tier.Long);
+    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
 
-    protected override void Activate()
+    protected override void Activate() => StartCoroutine(Run());
+
+    IEnumerator Run()
     {
         Vector2 from = P.transform.position;
         Vector2 dir = P.Facing;
         float len = Reach(Tier.Long);
         float width = Range(Tier.Short) * WidthRatio;
-        P.PlayAttack(Player.Thrust, dir);
+        var cast = DirectCast;
+        P.PlayAttack(dir);
         Fx.Box(from, dir, len, width, Fx.FireBright, 0.3f);
-        Fx.Box(from, dir, len, width * 2.2f, Fx.FireDeep, 0.2f);
-        SkillHits.Box(from, dir, len, width, PowerDamage(Power.VeryHigh), 2f, e => e.Stun(StunSeconds));
-        CameraFollow.Shake(0.12f, 0.12f);
+        SkillHits.Box(from, dir, len, width, MakeDamage(BladeDamage, cast), 2f, e => e.Stun(StunSeconds));
+        CameraFollow.Shake(0.08f, 0.08f);
+
+        // [임시] 폭발 위치 = 검을 내려친 자리 (넓은 직사각형)
+        Fx.Box(from, dir, len, width * ExplosionWidthMul, Fx.FireDeep, ExplosionDelay);
+        yield return new WaitForSeconds(ExplosionDelay);
+        Fx.Box(from, dir, len, width * ExplosionWidthMul, Fx.FireBright, 0.3f);
+        SkillHits.Box(from, dir, len, width * ExplosionWidthMul, MakeDamage(ExplosionDamage, cast), 3f);
+        CameraFollow.Shake(0.15f, 0.15f);
     }
 }
 
@@ -75,9 +91,10 @@ public class OverFlameSlash : ActiveSkill
 public class FireBreaker : ActiveSkill
 {
     const float StunSeconds = 1f;       // 기획서 확정
-    const float RecastDelay = 2f;       // 기획서 확정
+    const float RecastDelay = 2f;       // 기획서 확정 (폭발 딜레이 2초)
+    const float BaseDamage = 10f, BaseCooldown = 10f;   // [해석] 두 번째 폭발도 초기 피해량 10
 
-    protected override float CooldownSeconds => Cooldown(Tier.Mid);
+    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
 
     protected override void Activate() => StartCoroutine(Run());
 
@@ -85,42 +102,44 @@ public class FireBreaker : ActiveSkill
     {
         Vector2 at = P.transform.position;   // 같은 위치에서 재발동
         float r = Range(Tier.Mid);
-        P.PlayAttack(Player.SlashV);
-        Burst(at, r);
+        var cast = DirectCast;
+        P.PlayAttack();
+        Burst(at, r, cast);
         var mark = Fx.Circle(at, r, Fx.FireDeep, RecastDelay, null, 0f);
         yield return new WaitForSeconds(RecastDelay);
         if (mark != null) Destroy(mark.gameObject);
-        Burst(at, r);
+        Burst(at, r, cast);
     }
 
-    void Burst(Vector2 at, float r)
+    void Burst(Vector2 at, float r, CastRef cast)
     {
         Fx.Disc(at, r, Fx.Fire, 0.3f);
-        SkillHits.Circle(at, r, PowerDamage(Power.Mid), 1f, e => e.Stun(StunSeconds));
+        SkillHits.Circle(at, r, MakeDamage(BaseDamage, cast), 1f, e => e.Stun(StunSeconds));
         CameraFollow.Shake(0.1f, 0.1f);
     }
 }
 
-/// <summary>M05 파이어 엑스큐션: 피해 · 범위 중간 · 전방위 · 피해 매우 높음 · 쿨 김 · 발동 중 이동 불가</summary>
+/// <summary>M05 파이어 엑스큐션: 빠른 속도로 주변을 베어냄 · 초기 피해량 5 × 공격 횟수 30 · 쿨타임 30초 · 발동 중 이동 불가</summary>
 public class FireExecution : ActiveSkill
 {
-    const float Duration = 1.5f;        // [임시] 공격 지속시간 (기획 미정)
-    const int Hits = 5;                 // [임시] 타격 횟수 (기획 미정)
+    const float Duration = 1.5f;        // [임시] 공격 지속시간 (기획 미정) → 30회면 0.05초 간격
+    const int Hits = 30;
+    const float BaseDamage = 5f, BaseCooldown = 30f;
 
-    protected override float CooldownSeconds => Cooldown(Tier.Long);
+    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
 
     protected override void Activate() => StartCoroutine(Run());
 
     IEnumerator Run()
     {
         P.Root(Duration);
-        DamageInfo per = PowerDamage(Power.VeryHigh, 1f / Hits);
-        string[] clips = { Player.SlashH, Player.SlashV, Player.Thrust };
+        // [해석] 키워드 '고정' '피해' 의 의미 미확정 → 일반 직접 피해로 처리
+        DamageInfo per = MakeDamage(BaseDamage, DirectCast);
         for (int i = 0; i < Hits; i++)
         {
             Vector2 at = P.transform.position;
             float r = Range(Tier.Mid);
-            P.PlayAttack(clips[i % clips.Length]);
+            P.PlayAttack();
             Fx.Circle(at, r, i == Hits - 1 ? Fx.FireBright : Fx.Fire, 0.25f);
             SkillHits.Circle(at, r, per, i == Hits - 1 ? 6f : 1f);
             if (i == Hits - 1) CameraFollow.Shake(0.15f, 0.15f);
@@ -130,7 +149,7 @@ public class FireExecution : ActiveSkill
 }
 
 /// <summary>
-/// D01 파이어 스트림: 이동 · 3스택 · 쿨 중간(스택마다) · 거리 짧음 · 속도 매우 빠름 · 피해 낮음 · 무적
+/// D01 파이어 스트림: 빠른 돌진 · 이동 경로 피해 · 무적 · 초기 피해량 3 · 스택 3 · 스택마다 쿨타임 15초
 /// </summary>
 public class FireStream : Skill
 {
@@ -143,7 +162,8 @@ public class FireStream : Skill
     readonly HashSet<Enemy> hit = new HashSet<Enemy>();
     readonly List<Enemy> found = new List<Enemy>();
 
-    float StackCooldown => Cooldown(Tier.Mid);
+    const float BaseDamage = 3f, BaseCooldown = 15f;   // 스택마다 쿨타임 15초
+    float StackCooldown => CooldownOf(BaseCooldown);
     float Distance => Reach(Tier.Short);
 
     public override string Badge => stacks.ToString();
@@ -176,7 +196,7 @@ public class FireStream : Skill
         BeginCast();
 
         hit.Clear();
-        DamageInfo dmg = PowerDamage(Power.Low);
+        DamageInfo dmg = MakeDamage(BaseDamage);
         float r = 0.4f;                 // [임시] 이동 경로 판정 반경 (카메라 시야 7 복귀에 맞춰 0.6 × 2/3)
         Fx.Circle(P.transform.position, r, Fx.FireBright, 0.2f);
         P.Dash(P.Facing, Distance, DashTime, true, onStep: () =>
@@ -197,7 +217,8 @@ public class FireStream : Skill
 public class BlazingStorm : Skill
 {
     const float Duration = 1.5f;        // [임시] 연출 시간 (기획 미정)
-    const int Hits = 3;                 // [임시] 타격 횟수 (기획 미정)
+    const int Hits = 1;                 // 초기 피해량 500 을 한 번에
+    const float BaseDamage = 500f;
     const float StunSeconds = 2f;       // [임시] 기절 시간 (기획 미정, 보스 규칙 미정 → 동일 적용)
 
     readonly List<Enemy> targets = new List<Enemy>();
@@ -220,7 +241,7 @@ public class BlazingStorm : Skill
     {
         running = true;
         P.SetInvulnerable(Duration + 0.1f);
-        DamageInfo per = PowerDamage(Power.VeryHigh, 1f / Hits);
+        DamageInfo per = MakeDamage(BaseDamage);
         Fx.ScreenFlash(new Color(1f, 0.45f, 0.1f, 0.45f), Duration);
         for (int i = 0; i < Hits; i++)
         {
@@ -230,10 +251,10 @@ public class BlazingStorm : Skill
                 Fx.Disc(e.transform.position, 0.4f, Fx.Fire, 0.25f);   // 카메라 시야 7 복귀에 맞춰 0.6 × 2/3
                 e.Hit(per, (Vector2)(e.transform.position - P.transform.position), 0.5f);
             }
+            // 마지막 피해 직후 모든 적 기절 (연출 시간이 끝날 때까지 기다리지 않음)
+            if (i == Hits - 1) foreach (var e in SkillHits.OnScreen(targets)) e.Stun(StunSeconds);
             yield return new WaitForSeconds(Duration / Hits);
         }
-        // 피해 이후 기절
-        foreach (var e in SkillHits.OnScreen(targets)) e.Stun(StunSeconds);
         running = false;
     }
 }

@@ -241,22 +241,26 @@ public class GameManager : MonoBehaviour
         string cdCap = cdNext <= cdNow ? "  <color=#FF8080>(최대 90% 도달 — 더 줄지 않음)</color>" : "";
         var list = new List<Upgrade>
         {
+            // 표기: 제목 → 세부 스펙 → 누적 (SkillCatalog.BasicUpgrades)
             new Upgrade
             {
-                title = $"공격력 강화  <size=16>피해량 +{Pct(T.upgradeDamage)}</size>",
-                desc = $"누적 +{Pct(s.DamageBonus)} → +{Pct(s.DamageBonus + T.upgradeDamage)}",
+                title = SkillCatalog.BasicUpgrades[0].title,
+                desc = SkillText.Highlight($"'피해량' +{Pct(T.upgradeDamage)}")
+                     + $"\n<size=15><color=#AAAAAA>누적 +{Pct(s.DamageBonus)} → +{Pct(s.DamageBonus + T.upgradeDamage)}</color></size>",
                 apply = () => FinishBasic(s, BasicUpgrade.Damage),
             },
             new Upgrade
             {
-                title = $"범위 강화  <size=16>공격 범위 +{Pct(T.upgradeRange)}</size>",
-                desc = $"누적 +{Pct(s.RangeBonus)} → +{Pct(s.RangeBonus + T.upgradeRange)}",
+                title = SkillCatalog.BasicUpgrades[1].title,
+                desc = SkillText.Highlight($"'범위' +{Pct(T.upgradeRange)}")
+                     + $"\n<size=15><color=#AAAAAA>누적 +{Pct(s.RangeBonus)} → +{Pct(s.RangeBonus + T.upgradeRange)}</color></size>",
                 apply = () => FinishBasic(s, BasicUpgrade.Range),
             },
             new Upgrade
             {
-                title = $"쿨타임 강화  <size=16>쿨타임 -{Pct(T.upgradeCooldown)}</size>",
-                desc = $"누적 -{Pct(cdNow)} → -{Pct(cdNext)}{cdCap}",
+                title = SkillCatalog.BasicUpgrades[2].title,
+                desc = SkillText.Highlight($"'쿨타임 감소' +{Pct(T.upgradeCooldown)}")
+                     + $"\n<size=15><color=#AAAAAA>누적 -{Pct(cdNow)} → -{Pct(cdNext)}</color>{cdCap}</size>",
                 apply = () => FinishBasic(s, BasicUpgrade.Cooldown),
             },
         };
@@ -303,11 +307,11 @@ public class GameManager : MonoBehaviour
                 list.Add(new Upgrade
                 {
                     title = $"{o.title}  <size=14><color=#FF9A50>[경고]</color></size>",
-                    desc = o.desc,
+                    desc = o.Text.Body(),
                     apply = () => ShowSpecialWarning(s, lv, idx, o),
                 });
-            else
-                list.Add(new Upgrade { title = o.title, desc = o.desc, apply = () => s.ApplySpecial(lv, idx) });
+            else   // 제목 → 키워드 → 설명 → 세부 스펙
+                list.Add(new Upgrade { title = o.title, desc = o.Text.Body(), apply = () => s.ApplySpecial(lv, idx) });
         }
         if (list.Count == 0)
             list.Add(new Upgrade
@@ -325,7 +329,7 @@ public class GameManager : MonoBehaviour
     {
         var list = new List<Upgrade>
         {
-            new Upgrade { title = $"그래도 {o.title} 선택", desc = o.desc, apply = () => s.ApplySpecial(lv, idx) },
+            new Upgrade { title = $"그래도 {o.title} 선택", desc = o.Text.Body(), apply = () => s.ApplySpecial(lv, idx) },
             new Upgrade { title = "취소", desc = "다른 특수 강화를 고릅니다", apply = () => ShowSpecialUpgrade(s) },
         };
         ShowMenu("경고", $"<color=#FF9A50>{o.warning}</color>", list);
@@ -373,7 +377,7 @@ public class GameManager : MonoBehaviour
                         title = $"{entry.name}  Lv.{owned.level} → {next}  <size=14>[{kind}]</size>",
                         desc = (owned.PassiveBasicOptions() is { } po
                                    ? "고유 강화 선택: " + string.Join(" / ", System.Array.ConvertAll(po, o => o.title))
-                                   : "기본 강화 선택: 공격력 / 범위 / 쿨타임") + extra,
+                                   : "기본 강화 선택: 공격력 증가 / 범위 증가 / 쿨타임 감소") + extra,
                         apply = () => ShowBasicUpgrade(owned),
                     });
                 }
@@ -395,7 +399,7 @@ public class GameManager : MonoBehaviour
                 pool.Add(new Upgrade
                 {
                     title = $"{entry.name}  <size=16>(신규)</size>  <size=14>[{kind}]</size>",
-                    desc = entry.summary + KeyHint(p, entry.kind),
+                    desc = entry.text.Body() + KeyHint(p, entry.kind),   // 제목 → 키워드 → 설명 → 세부 스펙
                     apply = () => p.AddOrLevelSkill(entry),
                 });
             }

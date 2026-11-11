@@ -5,7 +5,8 @@ Unity 6 (6000.3.22f1) 2D 뱀서라이크 액션. 기획 기준: [Docs/Design/GDD
 → [Combat_Unified_v1.0.md](Docs/Design/Combat_Unified_v1.0.md) (통합 기획서 원문) → [Combat_SkillGrowth_v0.2.md](Docs/Design/Combat_SkillGrowth_v0.2.md) 순
 
 ## 실행
-Unity Hub → Add → 이 폴더 → Play (타이틀부터 시작).
+Unity Hub → Add → 이 폴더 → Play (타이틀부터 시작). 타이틀 "플레이" → 캐릭터 선택 (에른 스트레이 · 레니아(외형 테스트) · 스티움 카터렉/멜 발렌티나(준비 중)).
+캐릭터 목록: `Assets/Scripts/Gameplay/CharacterRoster.cs`
 
 ## 조작 (임시 키 — `Assets/Resources/Config/SkillTuning.asset` 에서 변경)
 - 이동: WASD / 방향키
@@ -18,7 +19,7 @@ Unity Hub → Add → 이 폴더 → Play (타이틀부터 시작).
 
 ## 현재 구현 (에른 스트레이)
 - 자동 6종: 파이어 슬래시, 솔라 슬래시, 파이어 볼, 파이어 버스터, 파이어 블레이드, 파이어 스톰
-- 수동 5종: 트리플 슬래시, 파이어 차지, 오버 플레임 슬래시, 파이어 브레이커, 파이어 엑스큐션
+- 수동 5종: 트리플 슬래시, 파이어 차지, 오버 드라이브 플레임 슬래시, 파이어 브레이커, 파이어 엑스큐션
 - 이동 1종: 파이어 스트림 (3스택)
 - 궁극기 1종: 블레이징 스톰 (캐릭터 Lv.45 획득 / Lv.60 강화, 적 처치로 게이지 충전)
 - 기본 수치 확정 (v0.2): 파이어 슬래시(기본 무장, 3초 · 10), 트리플 슬래시(8초 · 8×3), 솔라 슬래시(5초 · 베기 5 → 폭발 12).

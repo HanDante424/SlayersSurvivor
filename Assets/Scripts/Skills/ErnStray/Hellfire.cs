@@ -131,7 +131,7 @@ public class Hellfire : Skill
             {
                 new SpecialUpgradeOption { id = Incinerate, title = "소각", desc = "지속 피해가 적용될 때마다 대상 최대 체력의 1% (보스 0.4%) 고정 피해 (특수 피해)" },
                 new SpecialUpgradeOption { id = Overburn, title = "극한 연소", desc = "최종 피해량 +75%" },
-                new SpecialUpgradeOption { id = Resonance, title = "화염 공명", desc = "직접 발동한 스킬이 적중하면 궁극기 게이지 +1% (발동 1번당 1회)" },
+                new SpecialUpgradeOption { id = Resonance, title = "화염 공명", desc = "'직접 사용'한 스킬이 적중 시 궁극기 게이지 +1% (사용 1번당 1회)" },
             };
         }
         return base.SpecialOptions(lv);
@@ -178,8 +178,10 @@ public class Hellfire : Skill
                   Vector2.zero, Enemy.NoKnock);
         }
 
-        // 화염 공명: 직접 발동 1번당 1회, '직접 피해'가 맞았을 때만 (지속 피해 · 고정 피해 · 궁극기 제외)
-        if (HasSpecial(Resonance) && d.type == DamageType.Direct && d.cast == CastKind.Direct && d.castId != 0 && !d.isFixed
+        // 화염 공명: '직접 사용'한 스킬이 적중 시, 사용 1번당 1회 (2026-11-11 결정).
+        // 그 사용에서 나온 공격이면 간접 사용(난사 나머지 방향 · 검기 · 연속 공격 …)이 맞아도 충전.
+        // 사용 번호가 없는 공격(죽음의 메아리 · 솔라 메아리 재발동 · 화상 틱)은 제외. 직접 피해만 · 고정 피해 · 궁극기 제외
+        if (HasSpecial(Resonance) && d.type == DamageType.Direct && d.castId != 0 && !d.isFixed
             && (d.source == null || d.source.Entry == null || d.source.Entry.kind != SkillKind.Ultimate)
             && resonated.Add(d.castId))
         {

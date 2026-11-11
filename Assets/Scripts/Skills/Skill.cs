@@ -18,6 +18,9 @@ public class SpecialUpgradeOption
     public string lockReason;
     /// <summary>선택 시 확인 창을 띄울 경고문 (null = 바로 적용)</summary>
     public string warning;
+    /// <summary>스킬 선택창 표기: 키워드 · 세부 스펙 (제목 → 키워드 → 설명(desc) → 세부 스펙 순)</summary>
+    public string[] keywords, specs;
+    public SkillText Text => new SkillText(keywords, desc, specs);
 }
 
 /// <summary>패시브 고유 기본 강화 선택지 1개</summary>
@@ -192,7 +195,10 @@ public abstract class Skill : MonoBehaviour
         public readonly CastKind kind;
         public readonly int id;
         public CastRef(CastKind kind, int id) { this.kind = kind; this.id = id; }
+        /// <summary>어떤 사용에도 속하지 않는 간접 사용 (죽음의 메아리 · 솔라 메아리 재발동처럼 새 조건으로 생긴 공격)</summary>
         public static CastRef Indirect => new CastRef(CastKind.Indirect, 0);
+        /// <summary>같은 사용에서 나온 추가 공격 (난사 나머지 방향 · 검기 · 연속 공격 · 삼연발 · 츠바메가에시 …): 간접 사용이지만 사용 번호는 유지</summary>
+        public CastRef AsIndirect => new CastRef(CastKind.Indirect, id);
     }
 
     /// <summary>지금 진행 중인 직접 발동</summary>
@@ -202,7 +208,7 @@ public abstract class Skill : MonoBehaviour
     protected DamageInfo MakeDamage(float initial, CastRef cast, DamageType type = DamageType.Direct)
     {
         var d = new DamageInfo(0f, type, this, cast.kind);
-        d.castId = cast.kind == CastKind.Direct ? cast.id : 0;
+        d.castId = cast.id;   // 간접 사용이어도 같은 사용에서 나온 공격이면 그 사용 번호
         d.amount = DamageMath.Attacker(d, initial, TotalDamageBonus, 0f, SpecialFinalDamageMul);
         return d;
     }
@@ -347,7 +353,11 @@ public abstract class AutoSkill : Skill
         BeginCast();
         if (!Fire()) { timer = 0f; return; }
         timer = CooldownSeconds + CastDuration;
+        AfterFire();
     }
+
+    /// <summary>발동 · 쿨타임 설정 직후 (예: 빠른 공격 = 남은 쿨타임 절반)</summary>
+    protected virtual void AfterFire() { }
 
     /// <summary>발동. 대상이 없어 발동하지 않았으면 false</summary>
     protected abstract bool Fire();

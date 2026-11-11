@@ -121,7 +121,7 @@ public class TripleSlash : ActiveSkill
                 if (TsubameGap > 0) yield return new WaitForSeconds(TsubameGap);
                 if (CheatDisabled) break;
             }
-            yield return CastOnce(c == 0 ? first : CastRef.Indirect, use);   // 츠바메가에시 추가분 = 간접 발동
+            yield return CastOnce(c == 0 ? first : first.AsIndirect, use);   // 츠바메가에시 추가분 = 간접 사용 (같은 사용 번호)
         }
         if (HasSpecial(Embers) && !CheatDisabled) SpawnEmbers(use);
     }
@@ -129,7 +129,6 @@ public class TripleSlash : ActiveSkill
     /// <summary>스킬 1회 발동 = 내부 공격 AttackCount 회 (난개면 공격마다 3방향)</summary>
     IEnumerator CastOnce(CastRef cast, UseState use)
     {
-        string[] clips = { Player.SlashH, Player.SlashV, Player.Thrust };
         int hits = AttackCount;
         // [임시] 난도질로 공격이 늘어도 한 번 사용 시간은 기본(3타)과 비슷하게: 간격 = 기본 간격 × 2 / (횟수 − 1)
         float interval = hits > BaseHits ? T.tripleSlashInterval * (BaseHits - 1) / (hits - 1) : T.tripleSlashInterval;
@@ -142,7 +141,7 @@ public class TripleSlash : ActiveSkill
             Vector2 from = P.transform.position;
             Vector2 facing = P.Facing;
             float r = RangeOf(Hit.radius);
-            P.PlayAttack(clips[i % clips.Length], facing, baseFx: sheet == null && ilseomFrames == null);
+            P.PlayAttack(facing, baseFx: sheet == null && ilseomFrames == null);   // 첫 타에만 모션 (재생 중이면 무시)
 
             foreach (var dir in Directions(facing))
             {
