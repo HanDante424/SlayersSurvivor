@@ -99,6 +99,50 @@ public static class SkillCatalog
             "'초기 피해량' 500")),
     };
 
+    /// <summary>
+    /// 레니아 스킬 (2026-11-11 사용자 전달 스킬 구성). 스패너 투척 = 기본 지급.
+    /// 터렛 강화 · 터렛 과부화는 연출만 (수치 강화 기획 대기). 수동 스킬 쿨타임은 기획에 없어 [임시] 값 (LeniaSkills.cs)
+    /// </summary>
+    public static readonly List<SkillEntry> Lenia = new List<SkillEntry>
+    {
+        E("LA01", "스패너 투척", "Spanner Throw", SkillKind.Auto, typeof(SpannerThrow), new SkillText(
+            new[] { "자동", "직접 사용", "직접 피해", "원거리", "투사체" },
+            "가장 가까운 대상에게 스패너를 던집니다.",
+            "'초기 피해량' 10", "'쿨타임' 1.5초")),
+        E("LA02", "망치 투척", "Hammer Throw", SkillKind.Auto, typeof(HammerThrow), new SkillText(
+            new[] { "자동", "직접 사용", "직접 피해", "원거리", "투사체", "기절" },
+            "가장 가까운 대상에게 망치를 던집니다.\n적중한 적을 기절시킵니다.",
+            "'초기 피해량' 15", "'기절' '지속 시간' 1초", "'쿨타임' 4초")),
+        E("LA03", "표준 터렛 소환", "Standard Turret", SkillKind.Auto, typeof(StandardTurretSummon), new SkillText(
+            new[] { "자동", "직접 사용", "간접 사용", "직접 피해", "원거리", "소환" },
+            "총알을 발사하는 터렛을 설치합니다.\n설치와 동시에 쿨타임이 돌기 시작합니다.",
+            "'초기 피해량' 5", "공격 '쿨타임' 1초", "'지속 시간' 5초", "설치 '쿨타임' 8초")),
+        E("LA04", "미사일 터렛 소환", "Missile Turret", SkillKind.Auto, typeof(MissileTurretSummon), new SkillText(
+            new[] { "자동", "직접 사용", "간접 사용", "직접 피해", "원거리", "범위 피해", "소환" },
+            "미사일을 발사하는 터렛을 설치합니다.\n미사일은 폭발하며 주변에 피해를 입힙니다.",
+            "'초기 피해량' 12", "공격 '쿨타임' 1.5초", "'지속 시간' 8초", "설치 '쿨타임' 15초")),
+        E("LA05", "테슬라 터렛 소환", "Tesla Turret", SkillKind.Auto, typeof(TeslaTurretSummon), new SkillText(
+            new[] { "자동", "직접 사용", "간접 사용", "직접 피해", "원거리", "기절", "도탄", "소환" },
+            "번개를 방출하는 터렛을 설치합니다.\n번개는 주변 적에게 튕기며 적중한 적을 기절시킵니다.",
+            "'초기 피해량' 10", "공격 '쿨타임' 2초", "'기절' '지속 시간' 1초", "'도탄' 3회", "'지속 시간' 10초", "설치 '쿨타임' 12초")),
+        E("LM01", "터렛 강화", "Turret Tune-up", SkillKind.Manual, typeof(TurretBoost), new SkillText(
+            new[] { "수동", "직접 사용", "강화" },
+            "설치된 모든 터렛을 10초간 강화합니다.\n스패너로 터렛의 나사를 조입니다.",
+            "'지속 시간' 10초", "<color=#888888>강화 효과는 기획 중 (연출만)</color>")),
+        E("LM02", "지면 강타", "Ground Slam", SkillKind.Manual, typeof(GroundSlam), new SkillText(
+            new[] { "수동", "직접 사용", "근거리", "기절", "군중제어" },
+            "큰 망치로 내려쳐 주변 적을 기절시킵니다.",
+            "'기절' '지속 시간' 3초")),
+        E("LM03", "포격 실시", "Bombardment", SkillKind.Manual, typeof(Bombardment), new SkillText(
+            new[] { "수동", "직접 사용", "간접 사용", "직접 피해", "범위 피해" },
+            "하늘에서 미사일 10개가 무작위 위치에 떨어집니다.",
+            "미사일 '초기 피해량' 10", "미사일 개수 10")),
+        E("LM04", "터렛 과부화", "Turret Overload", SkillKind.Manual, typeof(TurretOverload), new SkillText(
+            new[] { "수동", "직접 사용", "강화" },
+            "설치된 모든 터렛을 10초간 강화합니다.\n망치로 터렛을 두드립니다.",
+            "'지속 시간' 10초", "<color=#888888>강화 효과는 기획 중 (연출만)</color>")),
+    };
+
     /// <summary>공통 기본 강화 3종 표기 (제목 · 세부 스펙)</summary>
     public static readonly (string title, string spec)[] BasicUpgrades =
     {
@@ -111,7 +155,12 @@ public static class SkillCatalog
     /// [임시] 레벨업 후보에 나오는 스킬 (이미지 리소스가 있는 것만): 파이어 슬래시 · 솔라 슬래시 · 트리플 슬래시 + 화염의 검 · 옥염 · 흡수 가열(패시브).
     /// 나머지 스킬은 코드는 남아 있지만 후보에 나오지 않음. 리소스가 추가되면 여기에 id 를 더하면 됨.
     /// </summary>
-    public static readonly HashSet<string> LevelUpPool = new HashSet<string> { "A01", "A02", "M01", "P01", "P02", "P03" };
+    public static readonly HashSet<string> LevelUpPool = new HashSet<string>
+    {
+        "A01", "A02", "M01", "P01", "P02", "P03",
+        // 레니아 (리소스 있음 — 9종 전부)
+        "LA01", "LA02", "LA03", "LA04", "LA05", "LM01", "LM02", "LM03", "LM04",
+    };
 
     static SkillEntry E(string id, string name, string en, SkillKind kind, Type type, SkillText text)
         => new SkillEntry { id = id, name = name, nameEn = en, kind = kind, type = type, text = text };

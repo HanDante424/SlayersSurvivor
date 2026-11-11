@@ -57,8 +57,9 @@ public class GameManager : MonoBehaviour
 
         var pgo = new GameObject("Player");
         var player = pgo.AddComponent<Player>();
-        // 파이어 슬래시 = 에른 스트레이 기본 무장 (기획 v0.2: 게임 시작 시 보유)
-        player.AddOrLevelSkill(SkillCatalog.Find(player.Catalog, "A01"));
+        // 캐릭터 기본 지급 스킬 (에른 = 파이어 슬래시, 레니아 = 스패너 투척)
+        var start = SkillCatalog.Find(player.Catalog, CharacterRoster.Selected?.startSkill ?? "A01");
+        if (start != null) player.AddOrLevelSkill(start);
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         gameObject.AddComponent<DebugCheats>();   // 테스트용 치트 패널 (F2)

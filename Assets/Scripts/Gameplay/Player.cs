@@ -31,7 +31,8 @@ public class Player : MonoBehaviour
     public bool RollCrit() => Random.value < critChance;
 
     /// <summary>캐릭터 스킬 목록 (기획서 기준). 캐릭터가 늘면 선택된 캐릭터의 목록으로 바뀜</summary>
-    public List<SkillEntry> Catalog => SkillCatalog.ErnStray;
+    /// <summary>고른 캐릭터의 스킬 목록 (캐릭터 선택 화면 → CharacterRoster.Selected)</summary>
+    public List<SkillEntry> Catalog => CharacterRoster.Selected?.catalog ?? SkillCatalog.ErnStray;
     /// <summary>보유 스킬 (획득 순서). 수동 스킬은 획득 순서대로 J/K/L 에 배정</summary>
     public readonly List<Skill> skills = new List<Skill>();
     public Vector2 Facing { get; private set; } = Vector2.right;

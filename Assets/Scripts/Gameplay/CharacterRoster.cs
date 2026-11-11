@@ -22,6 +22,9 @@ public class CharacterInfo
     public string note;             // 상태 안내 (선택 화면 하단)
     public CharacterAvailability availability;
     public Player.CharacterVisual visual;
+    /// <summary>이 캐릭터의 스킬 목록 · 시작 시 지급 스킬 id</summary>
+    public List<SkillEntry> catalog;
+    public string startSkill;
 }
 
 /// <summary>
@@ -38,13 +41,15 @@ public static class CharacterRoster
             element = "화염", style = "검술", range = "중간", speed = "빠름", feature = "고속 검술 중심 · 연속 검격",
             note = "스킬 · 패시브 구현 완료",
             availability = CharacterAvailability.Playable, visual = Player.ErnStrayVisual,
+            catalog = SkillCatalog.ErnStray, startSkill = "A01",
         },
         new CharacterInfo
         {
             id = "Lenia", name = "레니아", nameEn = "Lenia",
-            element = "기획 중", style = "기획 중", range = "-", speed = "-", feature = "신규 캐릭터",
-            note = "외형만 확인 가능 — 스킬은 에른 스트레이 것으로 임시 플레이, 공격 모션 없음",
-            availability = CharacterAvailability.VisualOnly, visual = Player.LeniaVisual,
+            element = "기획 중", style = "터렛 · 공구 투척", range = "-", speed = "-", feature = "터렛 설치 · 스패너 / 망치 투척 · 포격",
+            note = "스킬 9종 구현 (터렛 강화 · 과부화는 연출만, 공격 모션 없음)",
+            availability = CharacterAvailability.Playable, visual = Player.LeniaVisual,
+            catalog = SkillCatalog.Lenia, startSkill = "LA01",
         },
         new CharacterInfo
         {
