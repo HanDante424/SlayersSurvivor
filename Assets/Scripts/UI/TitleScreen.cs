@@ -26,14 +26,21 @@ public class TitleScreen : MonoBehaviour
     void Awake()
     {
         Time.timeScale = 1f;
-        items.Add(new MenuItem { label = "플레이", enabled = true, action = () => { Player.Visual = Player.ErnStrayVisual; SceneLoader.Load(SceneLoader.Game); } });
-        // [임시] 신규 캐릭터 외형 확인용 — 스킬은 에른 스트레이 그대로
-        items.Add(new MenuItem { label = "레니아 외형 테스트", enabled = true, action = () => { Player.Visual = Player.LeniaVisual; SceneLoader.Load(SceneLoader.Game); } });
+        items.Add(new MenuItem { label = "플레이", enabled = true, action = OpenCharacterSelect });
         items.Add(new MenuItem { label = "설정", enabled = false, action = () => ShowToast("설정은 준비 중입니다.") });
         items.Add(new MenuItem { label = "게임 종료", enabled = true, action = SceneLoader.Quit });
 
         SetupCamera();
         SpawnDecoration();
+    }
+
+    /// <summary>열려 있는 캐릭터 선택 화면 (없으면 null). 열려 있는 동안 타이틀 메뉴는 입력 · 표시 안 함</summary>
+    CharacterSelect select;
+
+    void OpenCharacterSelect()
+    {
+        if (select != null) return;
+        select = CharacterSelect.Open(gameObject, onBack: () => select = null);
     }
 
     void SetupCamera()
@@ -90,6 +97,7 @@ public class TitleScreen : MonoBehaviour
             if (p.y < -9) p.y = 9; else if (p.y > 9) p.y = -9;
             deco[i].position = p;
         }
+        if (select != null) return;   // 캐릭터 선택 화면이 입력 처리
 
         if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W)) Move(-1);
         if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S)) Move(1);
@@ -112,6 +120,7 @@ public class TitleScreen : MonoBehaviour
 
     void OnGUI()
     {
+        if (select != null) return;   // 캐릭터 선택 화면이 그림
         UIStyles.Init();
         float W = Screen.width, H = Screen.height;
 
