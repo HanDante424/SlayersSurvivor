@@ -27,11 +27,22 @@ public abstract class ThrowSkill : AutoSkill
     /// <summary>난사: 무작위 방향</summary>
     protected virtual bool Scatter => false;
 
-    protected float ThrowRange => Reach(Tier.Long);
+    /// <summary>투척 사거리 (공구 벨트 '투사체 사거리' 증가 포함)</summary>
+    protected float ThrowRange => Reach(Tier.Long) * (ToolBelt.I != null ? ToolBelt.I.ProjectileRangeMul : 1f);
     protected bool Blocked => DebugCheats.NoAutoSkills || CheatDisabled;
 
     /// <summary>투사체 1발의 강화 (관통 · 도탄 · 부메랑 · 적중 시)</summary>
     protected abstract ShotMods Mods();
+
+    /// <summary>스킬 자체 강화 + 공구 벨트 (관통 · 도탄 +1)</summary>
+    protected ShotMods BuildMods()
+    {
+        var m = Mods();
+        var belt = ToolBelt.I;
+        if (belt != null) { m.pierce += belt.ExtraPierce; m.bounces += belt.ExtraBounces; }
+        if (m.bounces > 0) m.bounceRange = LeniaShots.BounceRadius * RangeScale;
+        return m;
+    }
 
     /// <summary>투사체 1발의 피해 (조건부 피해 증가 = perTarget 은 여기서)</summary>
     protected virtual DamageInfo ShotDamage(CastRef cast) => MakeDamage(BaseDamage, cast);
@@ -42,7 +53,9 @@ public abstract class ThrowSkill : AutoSkill
         if (t == null) return false;
         P.PlayAttack((Vector2)t.transform.position - (Vector2)P.transform.position);
         Casting = true;   // 마지막 투사체까지 쿨타임 대기
-        StartCoroutine(Throw(t, DirectCast, 1 + ExtraShots));
+        // 공구 벨트: 예비 공구 '투사체 증가' +1, 과잉 장전 (직접 사용 3회마다 다음 사용 +5)
+        int extra = ExtraShots + (ToolBelt.I != null ? ToolBelt.I.ExtraThrows + ToolBelt.I.OnThrowUse() : 0);
+        StartCoroutine(Throw(t, DirectCast, 1 + extra));
         return true;
     }
 
@@ -66,7 +79,7 @@ public abstract class ThrowSkill : AutoSkill
             if (dir.sqrMagnitude < 0.0001f) dir = lastDir;
             lastDir = dir;
             // 첫 발 = 직접 사용, '투사체 증가'분 = 간접 사용 (같은 사용 번호)
-            Shoot(hand, dir, ShotDamage(i == 0 ? use : use.AsIndirect), Mods());
+            Shoot(hand, dir, ShotDamage(i == 0 ? use : use.AsIndirect), BuildMods());
         }
         Casting = false;
     }
@@ -143,7 +156,7 @@ public class SpannerThrow : ThrowSkill
     {
         if (e == null || e.hp <= 0) return;
         if (HasSpecial(BruiseId)) Bruise.Apply(e);
-        if (HasSpecial(HeadBash)) e.Stun(1f);
+        if (HasSpecial(HeadBash)) e.Stun(1f, d.cast == CastKind.Indirect);
     }
 
     // ---------- 죽음의 메아리 (처치 조건 연쇄) ----------
@@ -168,7 +181,7 @@ public class SpannerThrow : ThrowSkill
             if (Blocked || !HasSpecial(Echo)) continue;
             // 간접 사용 · 직접 피해 · 고정 피해 (관통 · 도탄 · 적중 시 효과는 유지, 부메랑은 제외)
             var dmg = FixedDamage(MakeDamage(BaseDamage, CastRef.Indirect).amount * EchoRatio, DamageType.Direct, CastKind.Indirect);
-            var m = Mods();
+            var m = BuildMods();
             m.boomerang = false;
             for (int i = 0; i < EchoCount; i++) Shoot(next.at, Random.insideUnitCircle.normalized, dmg, m);
             budget--;
@@ -267,7 +280,7 @@ public class HammerThrow : ThrowSkill
             LeniaFx.Spark(at);
             HitDebug.Circle(at, r, HitDebug.BlastColor);
             CameraFollow.Shake(0.08f, 0.08f);
-            SkillHits.Circle(at, r, LeniaShots.SameAsFixed(d, ShockwaveRatio, DamageType.Special), 1.5f, x => x.Stun(1f));
+            SkillHits.Circle(at, r, LeniaShots.SameAsFixed(d, ShockwaveRatio, DamageType.Special), 1.5f, x => x.Stun(1f, indirect: true));
         }
 
         // 연속 강타: 같은 대상에게 망치 2개 (단일 · 특수 피해)
@@ -277,11 +290,11 @@ public class HammerThrow : ThrowSkill
         if (e.hp > 0)
         {
             if (HasSpecial(BruiseId)) Bruise.Apply(e);
-            e.Stun(StunSeconds);
+            e.Stun(StunSeconds, d.cast == CastKind.Indirect);
         }
         if (HasSpecial(ChainShock))
             foreach (var o in SkillHits.InCircle(at, ChainShockRadius * RangeScale, new List<Enemy>()))
-                if (o != e) o.Stun(1f);
+                if (o != e) o.Stun(1f, d.cast == CastKind.Indirect);
     }
 
     IEnumerator Smash(Enemy e, DamageInfo dmg)
@@ -352,18 +365,25 @@ public abstract class TurretSkill : AutoSkill
     protected override bool Fire()
     {
         Vector2 from = P.transform.position;
-        if (LeniaFx.Nearest(from, Turret.Range * RangeScale) == null) return false;
+        var auto = AutomationLine.I;   // 자동화 공정 (패시브)
+        // 터렛 '사거리' = 1 + (자동화 공정 '사거리' % + 공구 벨트 '투사체 사거리' %) — 같은 '사거리' 증가끼리 합연산
+        float rangeMul = 1f + (auto != null ? auto.TurretRangePct : 0f) + (ToolBelt.I != null ? ToolBelt.I.ProjectileRangePct : 0f);
+        if (LeniaFx.Nearest(from, Turret.Range * RangeScale * rangeMul) == null) return false;
         P.PlayAttack();
         var use = DirectCast;
         // 기본 강화 '범위' = 터렛 사거리 · 미사일 폭발 반경 · 도탄 거리에 적용 (설치 시점 값)
+        // 자동화 공정: '지속 시간' · '사거리' · '투사체 증가' · '발동 횟수' (설치 시점 값), 공격 간격 · 피해량은 터렛에서 실시간
         var spec = new TurretSpec
         {
-            kind = Kind, duration = Duration, fireCooldown = BaseFireCooldown * FireCooldownMul, baseFireCooldown = BaseFireCooldown,
-            rangeScale = RangeScale,
+            kind = Kind, duration = Duration * (auto != null ? auto.DurationMul : 1f),
+            fireCooldown = BaseFireCooldown * FireCooldownMul, baseFireCooldown = BaseFireCooldown,
+            rangeScale = RangeScale, attackRangeMul = rangeMul, source = this,
             shot = (pct, fin) => MakeDamage(BaseShotDamage, use.AsIndirect, pct, fin),
-            shots = 1 + ExtraShots, scatter = Scatter, pierce = Pierce, bounces = Orbital ? 0 : Bounces, stun = Stun, orbital = Orbital,
+            shots = 1 + ExtraShots + (auto != null ? auto.ExtraShots : 0),
+            scatter = Scatter, pierce = Pierce, bounces = Orbital ? 0 : Bounces, stun = Stun, orbital = Orbital,
         };
-        for (int i = 0; i < 1 + ExtraInstalls; i++)
+        int installs = 1 + ExtraInstalls + (auto != null ? auto.ExtraInstalls : 0);
+        for (int i = 0; i < installs; i++)
             Turret.Spawn(spec, from + Random.insideUnitCircle * PlaceArea);
         return true;
     }

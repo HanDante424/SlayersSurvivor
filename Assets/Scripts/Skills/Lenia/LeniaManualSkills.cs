@@ -427,6 +427,8 @@ public class Bombardment : ActiveSkill
     void Drop(Vector2 target, Enemy follow, DamageInfo dmg)
     {
         float r = Blast;
+        bool indirect = dmg.cast == CastKind.Indirect;
+        System.Action<Enemy> onBlast = e => OnBlastHit(e, indirect);   // 철갑탄 기절: 기본 미사일 = 직접 사용, 늘어난 미사일 = 간접 사용
         if (HasSpecial(ClusterId))
         {
             // 집속탄: 운반체가 분리 높이까지 떨어진 뒤 3발로 나뉨
@@ -439,21 +441,21 @@ public class Bombardment : ActiveSkill
                     {
                         Vector2 p = c + Random.insideUnitCircle * ClusterSpread;
                         LeniaFx.TargetMarker(p, r, ClusterSplitHeight / DropSpeed);
-                        MissileProjectile.Spawn(at, null, p, DropSpeed, r, dmg, fromAbove: true, onHit: OnBlastHit, onLand: OnLand);
+                        MissileProjectile.Spawn(at, null, p, DropSpeed, r, dmg, fromAbove: true, onHit: onBlast, onLand: OnLand);
                     }
                 });
             return;
         }
         LeniaFx.TargetMarker(target, r, DropHeight / DropSpeed);   // 낙하 지점 표시
         MissileProjectile.Spawn(target + Vector2.up * DropHeight, follow, target, DropSpeed, r, dmg, fromAbove: true,
-                                onHit: OnBlastHit, onLand: OnLand);
+                                onHit: onBlast, onLand: OnLand);
     }
 
     /// <summary>폭발 적중 1회 뒤: 상태이상 부여 (철갑탄 기절)</summary>
-    void OnBlastHit(Enemy e)
+    void OnBlastHit(Enemy e, bool indirect)
     {
         if (e == null || e.hp <= 0) return;
-        if (HasSpecial(ArmorPiercing)) e.Stun(1f);
+        if (HasSpecial(ArmorPiercing)) e.Stun(1f, indirect);
     }
 
     void OnLand(Vector2 at)

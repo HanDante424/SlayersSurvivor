@@ -141,6 +141,20 @@ public static class SkillCatalog
             new[] { "수동", "직접 사용", "강화" },
             "설치된 모든 '터렛'을 강화합니다.\n효과를 받은 '터렛'은 '지속 시간'이 감소합니다.",
             "'지속 시간' 10초", "'최종 피해량' +50% 부여", "'공격 간격' -30% 부여", "'터렛' 남은 '지속 시간' -50%", "'쿨타임' 30초")),
+
+        // 패시브 3종 (2026-11-12 사용자 전달) — LeniaPassives.cs
+        E("LP01", "공구 벨트", "Tool Belt", SkillKind.Passive, typeof(ToolBelt), new SkillText(
+            new[] { "패시브" },
+            "모든 '투척' 스킬이 강화됩니다.",
+            "모든 '투척' 스킬 '피해량' +10%")),
+        E("LP02", "자동화 공정", "Automation Line", SkillKind.Passive, typeof(AutomationLine), new SkillText(
+            new[] { "패시브" },
+            "'터렛'들을 강화합니다.",
+            "모든 '터렛' '지속 시간' +20%", "모든 '터렛' '사거리' +10%")),
+        E("LP03", "충격 역학", "Impact Dynamics", SkillKind.Passive, typeof(ImpactDynamics), new SkillText(
+            new[] { "패시브" },
+            "'기절'을 강화합니다.",
+            "'기절' '지속 시간' +10%")),
     };
 
     /// <summary>공통 기본 강화 3종 표기 (제목 · 세부 스펙)</summary>
@@ -160,6 +174,7 @@ public static class SkillCatalog
         "A01", "A02", "M01", "P01", "P02", "P03",
         // 레니아 (리소스 있음 — 9종 전부)
         "LA01", "LA02", "LA03", "LA04", "LA05", "LM01", "LM02", "LM03", "LM04",
+        "LP01", "LP02", "LP03",   // 레니아 패시브 (아이콘 리소스 없이 텍스트만)
     };
 
     static SkillEntry E(string id, string name, string en, SkillKind kind, Type type, SkillText text)

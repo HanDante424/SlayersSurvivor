@@ -84,6 +84,12 @@ public abstract class CombatModifier
     public virtual float DotIntervalReduce() => 0f;
     /// <summary>궁극기 게이지 획득량 % (합연산, 에너지 흡수)</summary>
     public virtual float UltimateGaugePct() => 0f;
+    /// <summary>'기절' '지속 시간' % (합연산, 충격 역학)</summary>
+    public virtual float StunDurationPct() => 0f;
+    /// <summary>이미 기절 상태인 적에게 기절을 걸 때 추가 지속 시간(초) (재기절)</summary>
+    public virtual float StunReapplyAdd() => 0f;
+    /// <summary>스킬 '범위' % (스킬 자체 범위 증가와 합연산, 투척 마스터)</summary>
+    public virtual float RangePct(Skill s) => 0f;
 }
 
 /// <summary>현재 적용 중인 전투 수정자 모음 (패시브 획득 시 등록)</summary>
@@ -102,6 +108,9 @@ public static class CombatMods
     public static float ReceivedMul(Enemy e, in DamageInfo d) { float p = 1f; foreach (var m in mods) p *= m.ReceivedMul(e, d); return p; }
     public static float CooldownMul(Skill s) { float p = 1f; foreach (var m in mods) p *= m.CooldownMul(s); return p; }
     public static float UltimateGaugeMul() { float s = 0f; foreach (var m in mods) s += m.UltimateGaugePct(); return 1f + s; }
+    public static float StunDurationMul() { float s = 0f; foreach (var m in mods) s += m.StunDurationPct(); return Mathf.Max(0f, 1f + s); }
+    public static float StunReapplyAdd() { float s = 0f; foreach (var m in mods) s += m.StunReapplyAdd(); return s; }
+    public static float RangePct(Skill sk) { float s = 0f; foreach (var m in mods) s += m.RangePct(sk); return s; }
 
     /// <summary>지속 피해 최소 피해 간격 (가속 연소 하한, 결정 2026-11-10)</summary>
     public const float MinDotInterval = 0.1f;

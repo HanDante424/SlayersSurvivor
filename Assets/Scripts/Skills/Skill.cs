@@ -259,7 +259,7 @@ public abstract class Skill : MonoBehaviour
         DebugCheats.NoCooldown ? 0f : baseSeconds * CooldownMultiplier;   // 치트 F6: 쿨타임 0
 
     /// <summary>최종 범위 = 기본 × (1 + 범위 증가율 합계(기본+특수)). 정수화 규칙은 미정 → 그대로</summary>
-    protected float RangeOf(float baseRange) => baseRange * (1f + TotalRangeBonus) * P.areaMul;
+    protected float RangeOf(float baseRange) => baseRange * (1f + TotalRangeBonus + CombatMods.RangePct(this)) * P.areaMul;
     /// <summary>범위 배율 (판정 도형 전체에 곱함)</summary>
     protected float RangeScale => RangeOf(1f);
 

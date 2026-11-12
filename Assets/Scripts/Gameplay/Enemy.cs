@@ -44,11 +44,26 @@ public class Enemy : MonoBehaviour
     /// <summary>
     /// 기절: 이동·접촉 공격 중지. 스택이 없는 상태이상 → 지속 시간 누적 (2026-11-12 사용자 규칙)
     /// </summary>
-    public void Stun(float seconds)
+    /// <param name="indirect">'간접 사용'에서 나온 기절 (터렛 공격 · 추가 투사체 · 충격파 · 범위 충격). 범위 충격 연쇄 방지용</param>
+    public void Stun(float seconds, bool indirect = false)
     {
         if (seconds <= 0f) return;
+        bool was = IsStunned;
+        seconds *= CombatMods.StunDurationMul();               // 충격 역학 '기절' '지속 시간' +%
+        if (was) seconds += CombatMods.StunReapplyAdd();       // 재기절
+        if (!was) StunTotal = 0f;
         stunLeft = Mathf.Max(0f, stunLeft) + seconds;
+        StunTotal += seconds;
+        Stunned?.Invoke(this, seconds, was, indirect);
     }
+
+    /// <summary>이번 기절의 총 지속 시간 (기절이 시작된 뒤 누적된 값, 남은 시간 아님)</summary>
+    public float StunTotal { get; private set; }
+
+    /// <summary>기절 부여 직후: 적 · 실제 부여 시간 · 이미 기절 중이었는지 · 간접 사용 여부</summary>
+    public static event Action<Enemy, float, bool, bool> Stunned;
+    /// <summary>기절이 끝남 (살아 있는 적만)</summary>
+    public static event Action<Enemy> StunEnded;
 
     /// <summary>화상 표시 (파티클만 — 화상 피해 규칙은 기획 미정)</summary>
     public void ShowBurn(float seconds) => BurnFx.Show(transform, () => radius, seconds);
@@ -153,7 +168,11 @@ public class Enemy : MonoBehaviour
 
         if (slowLeft > 0) { slowLeft -= Time.deltaTime; if (slowLeft <= 0) slowMul = 1f; }
         bool stunned = stunLeft > 0;
-        if (stunned) stunLeft -= Time.deltaTime;
+        if (stunned)
+        {
+            stunLeft -= Time.deltaTime;
+            if (stunLeft <= 0f) StunEnded?.Invoke(this);
+        }
 
         if (concussLeft > 0) CheckConcussion(pos);
 

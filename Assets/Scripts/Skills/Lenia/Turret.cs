@@ -27,6 +27,10 @@ public class TurretSpec
     public float stun;
     /// <summary>미사일 궤도 폭격 / 테슬라 낙뢰 발생: 플레이어 주변 무작위 위치로 떨어짐 (도탄 없음)</summary>
     public bool orbital;
+    /// <summary>공격 '사거리'만 늘리는 배율 (자동화 공정). rangeScale 과 달리 폭발 반경 · 도탄 거리에는 영향 없음</summary>
+    public float attackRangeMul = 1f;
+    /// <summary>설치한 스킬 (빠른 재구성: 소멸 시 그 스킬의 남은 쿨타임 감소)</summary>
+    public TurretSkill source;
 }
 
 /// <summary>
@@ -61,6 +65,7 @@ public class Turret : MonoBehaviour
     public TurretKind kind;
     TurretSpec spec;
     float life, fireTimer;
+    float alive;   // 설치 후 지난 시간 (Playing 상태만) — 자동화 공정 신속 가동 · 요새화
     float rangeScale = 1f;
     Vector2 lastAim = Vector2.down;
 
@@ -80,7 +85,7 @@ public class Turret : MonoBehaviour
         var t = go.AddComponent<Turret>();
         t.kind = kind; t.spec = spec; t.life = spec.duration; t.rangeScale = spec.rangeScale;
         if (spec.baseFireCooldown <= 0f) spec.baseFireCooldown = spec.fireCooldown;
-        t.fireTimer = 0.25f;   // [임시] 설치 직후 첫 발사까지
+        t.fireTimer = AutomationLine.I != null && AutomationLine.I.InstantFire ? 0f : 0.25f;   // [임시] 설치 직후 첫 발사까지 (신속 가동 = 즉시)
         t.sr = go.AddComponent<SpriteRenderer>();
         t.sr.sortingOrder = 8;   // 적(5·6) 위, 플레이어(10) 아래
         switch (kind)
@@ -135,14 +140,16 @@ public class Turret : MonoBehaviour
     /// <summary>터렛 과부화 적용 중</summary>
     public bool Overloaded => overLeft > 0f;
 
-    float AttackRange => Range * rangeScale * (Boosted ? boostRangeMul : 1f);
+    float AttackRange => Range * rangeScale * spec.attackRangeMul * (Boosted ? boostRangeMul : 1f);
+    public float Alive => alive;
     int Shots => Mathf.Max(1, spec.shots + (Boosted ? boostShots : 0) + (Overloaded ? overShots : 0));
 
     float FireInterval
     {
         get
         {
-            float v = spec.fireCooldown * (Boosted ? boostIntervalMul : 1f) * (Overloaded ? overIntervalMul : 1f);
+            float v = spec.fireCooldown * (Boosted ? boostIntervalMul : 1f) * (Overloaded ? overIntervalMul : 1f)
+                    * (AutomationLine.I != null ? AutomationLine.I.IntervalMul(this) : 1f);
             return Mathf.Max(spec.baseFireCooldown * (1f - MaxIntervalCut), v);
         }
     }
@@ -150,7 +157,7 @@ public class Turret : MonoBehaviour
     /// <summary>공격 1발의 피해 (강화 · 과부화 몫 포함)</summary>
     DamageInfo Shot()
     {
-        float pct = Boosted ? boostDmgMul - 1f : 0f;
+        float pct = (Boosted ? boostDmgMul - 1f : 0f) + (AutomationLine.I != null ? AutomationLine.I.DamagePct(this) : 0f);
         float fin = 1f;
         if (Overloaded) fin *= overFinalMul;
         if (Boosted && boostSrc != null && boostSrc.Parallel) fin *= 1f + TurretBoost.ParallelPerTurret * BoostedCount();
@@ -219,6 +226,7 @@ public class Turret : MonoBehaviour
         if (boostLeft > 0f) boostLeft -= dt;
         if (overLeft > 0f) overLeft -= dt;
         life -= dt;
+        alive += dt;
         if (life <= 0f) { Expire(); return; }
 
         // 공격 동작 재생 (8프레임 1회)
@@ -256,6 +264,8 @@ public class Turret : MonoBehaviour
                 CameraFollow.Shake(0.1f, 0.12f);
             }
         }
+        // 자동화 공정 빠른 재구성: 같은 스킬의 남은 쿨타임 감소
+        if (AutomationLine.I != null && spec.source != null) AutomationLine.I.OnTurretExpired(spec.source);
         // 소멸: 분해 연기 · 부품 조각 (터렛 높이 중간에서)
         var despawn = LeniaFx.TurretDespawn;
         if (despawn != null) SpriteEffect.Spawn(despawn, 10f, null, at + Vector2.up * (height * 0.35f), 0f, false, 9, LeniaFx.TurretFxSize);
@@ -325,7 +335,7 @@ public class Turret : MonoBehaviour
         if (this != null && Overloaded && overSrc != null && overSrc.MeltOn) Melt.Apply(e);   // 융해
         if (spec.stun > 0f)
         {
-            e.Stun(spec.stun);
+            e.Stun(spec.stun, indirect: true);   // 터렛 공격 = 간접 사용
             if (kind == TurretKind.Tesla) LeniaFx.ShowShocked(e, spec.stun);
         }
     }
