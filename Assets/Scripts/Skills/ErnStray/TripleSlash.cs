@@ -182,7 +182,7 @@ public class TripleSlash : ActiveSkill
 
     // ---------- 피해 적용 트리거 ----------
     void OnEnable() { Enemy.Damaging += OnDamaging; Enemy.AfterDamaged += OnAfterDamaged; }
-    protected void OnDisable() { Enemy.Damaging -= OnDamaging; Enemy.AfterDamaged -= OnAfterDamaged; }
+    protected override void OnDisable() { base.OnDisable(); Enemy.Damaging -= OnDamaging; Enemy.AfterDamaged -= OnAfterDamaged; }
 
     /// <summary>
     /// 강제 발화: 이번 타격의 화상이 쌓이기 **전** 스택 기준 (Damaging = Damaged 보다 먼저, 결정 2026-11-10).

@@ -4,7 +4,7 @@ using UnityEngine;
 /// <summary>스킬 종류 (기획서 2.1)</summary>
 public enum SkillKind { Auto, Manual, Movement, Passive, Ultimate }
 
-/// <summary>기본 강화 3종 (기획 v0.2 4장). 1회 선택 효과는 SkillTuning (공격력 +10% / 범위 +10% / 쿨타임 -5%)</summary>
+/// <summary>기본 강화 3종 (기획 v0.2 4장). 1회 선택 효과는 SkillTuning (공격력 +10% / 범위 +10% / 쿨타임 -2.5%)</summary>
 public enum BasicUpgrade { Damage, Range, Cooldown }
 
 /// <summary>특수 강화 선택지 1개. 스킬별 SpecialOptions 가 만들어 줌</summary>
@@ -205,13 +205,23 @@ public abstract class Skill : MonoBehaviour
     protected CastRef DirectCast => new CastRef(CastKind.Direct, CastId);
 
     /// <summary>발동 시점에 잡아 둔 cast 로 피해 1건 (지연 공격용)</summary>
-    protected DamageInfo MakeDamage(float initial, CastRef cast, DamageType type = DamageType.Direct)
+    protected DamageInfo MakeDamage(float initial, CastRef cast, DamageType type = DamageType.Direct) =>
+        MakeDamage(initial, cast, 0f, 1f, type);
+
+    /// <summary>
+    /// 외부에서 부여된 몫까지 더한 피해 1건 (터렛 강화 '피해량' +% → extraPct, 과부화 '최종 피해량' → extraFinal).
+    /// extraPct 는 이 스킬의 피해량 % 와 합연산, extraFinal 은 곱연산
+    /// </summary>
+    protected DamageInfo MakeDamage(float initial, CastRef cast, float extraPct, float extraFinal, DamageType type = DamageType.Direct)
     {
         var d = new DamageInfo(0f, type, this, cast.kind);
         d.castId = cast.id;   // 간접 사용이어도 같은 사용에서 나온 공격이면 그 사용 번호
-        d.amount = DamageMath.Attacker(d, initial, TotalDamageBonus, 0f, SpecialFinalDamageMul);
+        d.amount = DamageMath.Attacker(d, initial, TotalDamageBonus + extraPct, 0f, SpecialFinalDamageMul * extraFinal);
         return d;
     }
+
+    /// <summary>"스킬의 '최종 피해량'의 x%" 계산용: 이 스킬 초기 피해량 initial 의 최종 피해량 (적중 전 · 대상 무관)</summary>
+    protected float FinalDamageOf(float initial) => MakeDamage(initial, DirectCast).amount;
 
     /// <summary>고정 피해 (모든 증감 무효). 참조값 계산은 호출하는 쪽에서</summary>
     protected DamageInfo FixedDamage(float amount, DamageType type, CastKind cast = CastKind.Direct) =>
@@ -311,17 +321,32 @@ public abstract class ActiveSkill : Skill
     protected abstract float CooldownSeconds { get; }
 
     public override float CooldownFraction => cdLeft <= 0 ? 0f : Mathf.Clamp01(cdLeft / Mathf.Max(0.01f, CooldownSeconds));
-    public override float CooldownRemaining => Mathf.Max(0f, cdLeft);
+
+    /// <summary>
+    /// true 동안은 시전 중 = 쿨타임이 아직 시작 전 (모든 스킬은 시전 이후 쿨타임, 2026-11-12 사용자 규칙).
+    /// 시전이 끝나면 false 로 → 그때 쿨타임을 처음부터 다시 잡음
+    /// </summary>
+    protected bool Casting
+    {
+        get => casting;
+        set { if (casting && !value) cdLeft = CooldownSeconds; casting = value; }
+    }
+    bool casting;
+
+    protected virtual void OnDisable() => casting = false;
+
+    public override float CooldownRemaining => casting ? Mathf.Max(0f, CooldownSeconds) : Mathf.Max(0f, cdLeft);
 
     public override void Tick(float dt)
     {
+        if (casting) return;
         if (DebugCheats.NoCooldown) cdLeft = 0f;   // 이미 돌고 있던 쿨타임도 즉시 해제
         if (cdLeft > 0) cdLeft -= dt;
     }
 
     public override bool TryActivate()
     {
-        if (cdLeft > 0 || P.IsBusy || CheatDisabled) return false;
+        if (casting || cdLeft > 0 || P.IsBusy || CheatDisabled) return false;
         cdLeft = CooldownSeconds;
         BeginCast();
         Activate();
@@ -332,7 +357,7 @@ public abstract class ActiveSkill : Skill
 
     public override void ReduceRemainingCooldown(float ratio)
     {
-        if (cdLeft > 0f) cdLeft *= Mathf.Clamp01(1f - ratio);
+        if (!casting && cdLeft > 0f) cdLeft *= Mathf.Clamp01(1f - ratio);
     }
 }
 

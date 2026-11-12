@@ -31,7 +31,7 @@ public class SkillTuning : ScriptableObject
     [Header("기본 강화 1회 효과 (기획 v0.2 확정 · 종류별 합연산)")]
     [Tooltip("공격력 강화 1회: 피해량 +10%")] public float upgradeDamage = 0.10f;
     [Tooltip("범위 강화 1회: 공격 범위 +10% (11/09 5% → 10% 상향)")] public float upgradeRange = 0.10f;
-    [Tooltip("쿨타임 강화 1회: 쿨타임 -5%")] public float upgradeCooldown = 0.05f;
+    [Tooltip("쿨타임 강화 1회: 쿨타임 -2.5% (2026-11-12 하향, 이전 5%)")] public float upgradeCooldown = 0.025f;
     [Tooltip("쿨타임 감소율 합계 최대치 (0.9 = 90%, 최소 쿨타임 = 기본의 10%)")] public float cooldownReductionCap = 0.9f;
 
     [Header("[임시] 타격 판정 — 플레이 테스트로 조정 (Play 중 수정 즉시 반영)")]

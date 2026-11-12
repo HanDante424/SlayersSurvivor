@@ -9,6 +9,27 @@ public static class Fx
     public static readonly Color FireBright = new Color(1f, 0.8f, 0.3f, 0.85f);
     public static readonly Color FireDeep = new Color(0.9f, 0.2f, 0.05f, 0.7f);
 
+    /// <summary>기본 이펙트 레이어 (적 · 터렛 · 플레이어 위)</summary>
+    public const int DefaultOrder = 15;
+    /// <summary>장판 레이어: 바닥(-100) 바로 위, 경험치 보석(2) · 적(5) · 터렛(8) · 플레이어(10) 아래</summary>
+    public const int GroundOrder = 1;
+
+    /// <summary>장판용 원형 테두리 (바닥 레이어)</summary>
+    public static FxShape GroundCircle(Vector2 pos, float radius, Color c, float duration, Transform follow = null, float grow = 0f)
+    {
+        var f = Circle(pos, radius, c, duration, follow, grow);
+        f.GetComponent<SpriteRenderer>().sortingOrder = GroundOrder;
+        return f;
+    }
+
+    /// <summary>장판용 꽉 찬 원 (바닥 레이어)</summary>
+    public static FxShape GroundDisc(Vector2 pos, float radius, Color c, float duration, float grow = 0f)
+    {
+        var f = Disc(pos, radius, c, duration, grow);
+        f.GetComponent<SpriteRenderer>().sortingOrder = GroundOrder;
+        return f;
+    }
+
     /// <summary>원형 범위 표시. follow 가 있으면 따라다님</summary>
     public static FxShape Circle(Vector2 pos, float radius, Color c, float duration, Transform follow = null, float grow = 0.15f)
         => Make("FxCircle", SpriteFactory.Shape.Ring, pos, new Vector2(radius * 2f, radius * 2f), 0f, c, duration, follow, grow);
@@ -43,7 +64,7 @@ public static class Fx
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = SpriteFactory.Get("Fx_" + shape, shape);
         sr.color = c;
-        sr.sortingOrder = 15;
+        sr.sortingOrder = DefaultOrder;
         var f = go.AddComponent<FxShape>();
         f.Setup(sr, duration, follow, grow);
         return f;

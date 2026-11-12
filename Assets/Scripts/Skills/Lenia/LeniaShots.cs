@@ -166,33 +166,38 @@ public class LeniaProjectile : MonoBehaviour
 }
 
 /// <summary>
-/// '타박상' 상태이상 (스택형): 적중 시 1스택, 스택당 받는 최종 피해량 +5%, 지속 시간 5초 (스택이 쌓이면 갱신), 최대 10스택.
-/// 스패너 · 망치 타박상은 같은 상태이상 (스택 공유)
+/// 스택형 '받는 최종 피해량' 증가 상태이상: 적중 시 1스택, 스택당 +perStack, 스택이 쌓이면 지속 시간 갱신, 최대 maxStacks.
+/// 같은 인스턴스끼리 스택 공유 (스패너 · 망치 타박상 = Bruise 하나)
 /// </summary>
-public static class Bruise
+public class StackedVulnerability
 {
-    public const float PerStack = 0.05f, Duration = 5f;
-    public const int MaxStacks = 10;
+    public readonly float perStack, duration;
+    public readonly int maxStacks;
 
     class State { public int stacks; public float until; }
-    static readonly Dictionary<Enemy, State> map = new Dictionary<Enemy, State>();
-    static Mod mod;
+    readonly Dictionary<Enemy, State> map = new Dictionary<Enemy, State>();
+    Mod mod;
 
-    public static void Apply(Enemy e)
+    public StackedVulnerability(float perStack, float duration, int maxStacks)
+    {
+        this.perStack = perStack; this.duration = duration; this.maxStacks = maxStacks;
+    }
+
+    public void Apply(Enemy e)
     {
         if (e == null || e.hp <= 0) return;
-        if (mod == null) mod = new Mod();
+        if (mod == null) mod = new Mod(this);
         CombatMods.Add(mod);   // 새 판에서 CombatMods.Clear 된 뒤에도 다시 등록 (중복 등록 없음)
         if (map.Count > 256) Prune();
         if (!map.TryGetValue(e, out var s) || s.until <= Time.time) map[e] = s = new State();
-        s.stacks = Mathf.Min(MaxStacks, s.stacks + 1);
-        s.until = Time.time + Duration;   // 스택형 = 지속 시간 갱신
+        s.stacks = Mathf.Min(maxStacks, s.stacks + 1);
+        s.until = Time.time + duration;   // 스택형 = 지속 시간 갱신
     }
 
-    public static int Stacks(Enemy e) => e != null && map.TryGetValue(e, out var s) && s.until > Time.time ? s.stacks : 0;
+    public int Stacks(Enemy e) => e != null && map.TryGetValue(e, out var s) && s.until > Time.time ? s.stacks : 0;
 
-    static readonly List<Enemy> dead = new List<Enemy>();
-    static void Prune()
+    readonly List<Enemy> dead = new List<Enemy>();
+    void Prune()
     {
         dead.Clear();
         foreach (var kv in map) if (kv.Key == null || kv.Value.until <= Time.time) dead.Add(kv.Key);
@@ -201,6 +206,82 @@ public static class Bruise
 
     class Mod : CombatModifier
     {
-        public override float ReceivedMul(Enemy target, in DamageInfo d) => 1f + PerStack * Stacks(target);
+        readonly StackedVulnerability v;
+        public Mod(StackedVulnerability v) { this.v = v; }
+        public override float ReceivedMul(Enemy target, in DamageInfo d) => 1f + v.perStack * v.Stacks(target);
     }
+}
+
+/// <summary>
+/// 스택이 없는 계수형 '받는 최종 피해량' 증가 상태이상 (방어구 파괴):
+/// 피해 없는 계수형 → 계수는 곱연산, 지속 시간은 합연산 (2026-11-12 사용자 규칙)
+/// </summary>
+public class CoefVulnerability
+{
+    class State { public float mul = 1f, until; public int stacks; }
+    readonly Dictionary<Enemy, State> map = new Dictionary<Enemy, State>();
+    readonly int maxStacks;
+    Mod mod;
+
+    /// <param name="maxStacks">0 = 스택 없음 (계수 곱 · 지속 시간 합). 1 이상 = 스택형 (계수 곱은 최대 maxStacks 번까지 · 지속 시간 갱신)</param>
+    public CoefVulnerability(int maxStacks = 0) { this.maxStacks = maxStacks; }
+
+    public void Apply(Enemy e, float mul, float seconds)
+    {
+        if (e == null || e.hp <= 0 || seconds <= 0f) return;
+        if (mod == null) mod = new Mod(this);
+        CombatMods.Add(mod);
+        if (map.Count > 256) Prune();
+        if (map.TryGetValue(e, out var s) && s.until > Time.time)
+        {
+            if (maxStacks <= 0) { s.mul *= mul; s.until += seconds; }
+            else
+            {
+                if (s.stacks < maxStacks) { s.mul *= mul; s.stacks++; }
+                s.until = Time.time + seconds;   // 스택형 = 지속 시간 갱신
+            }
+        }
+        else map[e] = new State { mul = mul, until = Time.time + seconds, stacks = 1 };
+    }
+
+    public float Mul(Enemy e) => e != null && map.TryGetValue(e, out var s) && s.until > Time.time ? s.mul : 1f;
+
+    readonly List<Enemy> dead = new List<Enemy>();
+    void Prune()
+    {
+        dead.Clear();
+        foreach (var kv in map) if (kv.Key == null || kv.Value.until <= Time.time) dead.Add(kv.Key);
+        foreach (var k in dead) map.Remove(k);
+    }
+
+    class Mod : CombatModifier
+    {
+        readonly CoefVulnerability v;
+        public Mod(CoefVulnerability v) { this.v = v; }
+        public override float ReceivedMul(Enemy target, in DamageInfo d) => v.Mul(target);
+    }
+}
+
+/// <summary>'타박상': 스택당 받는 최종 피해량 +5%, 5초, 최대 10 (스패너 · 망치 공유)</summary>
+public static class Bruise
+{
+    static readonly StackedVulnerability s = new StackedVulnerability(0.05f, 5f, 10);
+    public static void Apply(Enemy e) => s.Apply(e);
+    public static int Stacks(Enemy e) => s.Stacks(e);
+}
+
+/// <summary>'융해' (터렛 과부화 Lv10): 스택당 받는 최종 피해량 +5%, 3초, 최대 10</summary>
+public static class Melt
+{
+    static readonly StackedVulnerability s = new StackedVulnerability(0.05f, 3f, 10);
+    public static void Apply(Enemy e) => s.Apply(e);
+}
+
+/// <summary>'방어구 파괴' (지면 강타 Lv10): 받는 최종 피해량 ×1.2, 5초, '스택' 최대 5 (계수 곱 · 스택형이라 지속 시간 갱신)</summary>
+public static class ArmorBreak
+{
+    public const float Mul = 1.2f, Duration = 5f;
+    public const int MaxStacks = 5;
+    static readonly CoefVulnerability s = new CoefVulnerability(MaxStacks);
+    public static void Apply(Enemy e) => s.Apply(e, Mul, Duration);
 }

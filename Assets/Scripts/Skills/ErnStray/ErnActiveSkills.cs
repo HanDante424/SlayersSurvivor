@@ -105,7 +105,7 @@ public class FireBreaker : ActiveSkill
         var cast = DirectCast;
         P.PlayAttack();
         Burst(at, r, cast);
-        var mark = Fx.Circle(at, r, Fx.FireDeep, RecastDelay, null, 0f);
+        var mark = Fx.GroundCircle(at, r, Fx.FireDeep, RecastDelay);   // 재발동 위치 표시 = 바닥 레이어
         yield return new WaitForSeconds(RecastDelay);
         if (mark != null) Destroy(mark.gameObject);
         Burst(at, r, cast);

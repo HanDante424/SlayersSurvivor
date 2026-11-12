@@ -575,7 +575,7 @@ public class SolarSlash : AutoSkill
         var frames = ErnSkillFx.SolarSlash;
         float r0 = RangeOf(T.solarBurn.radius);
         if (frames != null) SpriteEffect.Spawn(frames, FxFps, P.transform, Vector2.zero, 0f, false, 11, r0 * FxWidth);
-        var ring = Fx.Circle(P.transform.position, r0, Fx.FireDeep, BurnDuration, P.transform, 0f);
+        var ring = Fx.GroundCircle(P.transform.position, r0, Fx.FireDeep, BurnDuration, P.transform);   // 장판 = 바닥 레이어
 
         // 0초부터 피해 간격마다 (기본 1초 → 0·1·2·3·4초 5회). 가속 연소면 간격이 줄어 더 자주
         float elapsed = 0f;
@@ -770,13 +770,13 @@ public class FireStorm : AutoSkill
         float rSmall = Range(Tier.Short);
 
         // [임시 해석] '주변' = 플레이어를 따라다니는 범위
-        var ring = Fx.Circle(P.transform.position, rSmall, Fx.FireDeep, Duration, P.transform, 0f);
+        var ring = Fx.GroundCircle(P.transform.position, rSmall, Fx.FireDeep, Duration, P.transform);   // 장판 = 바닥 레이어
         // 틱 피해는 기본 간격 기준으로 정하고, 가속 연소면 같은 피해가 더 자주
         for (float elapsed = 0f; elapsed < Duration - 1e-4f;)
         {
             float iv = CombatMods.DotInterval(TickInterval);
             SkillHits.Circle(P.transform.position, rSmall, perTick, 0.3f,
-                             e => e.Slow(SlowMul, iv + 0.1f));
+                             e => e.SustainSlow(SlowMul, iv + 0.1f));   // 범위 안에 있는 동안 유지 (누적 없음)
             yield return new WaitForSeconds(iv);
             elapsed += iv;
         }

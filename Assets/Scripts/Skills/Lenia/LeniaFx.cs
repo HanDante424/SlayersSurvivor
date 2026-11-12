@@ -250,19 +250,26 @@ public class MissileProjectile : MonoBehaviour
     Enemy follow;
     float speed, radius, smokeTimer, maxLife;
     DamageInfo dmg;
-    bool fromAbove;
+    bool fromAbove, noBlast;
     Action<Enemy> onHit;
+    Action<Vector2> onLand;
+    Vector2 followOffset;
 
     const float SmokeInterval = 0.05f;   // [임시] 연기 간격
 
+    /// <param name="follow">살아 있으면 그 위치를 따라감 (위에서 떨어지는 미사일은 처음 잡은 높이 차이를 유지한 채 따라감 — 호밍 미사일)</param>
     /// <param name="onHit">폭발에 맞은 적마다 피해 뒤 호출 (상태이상 부여 — 철갑탄 기절 등)</param>
+    /// <param name="onLand">도착(폭발) 지점에서 호출 (자기장 · 작열 지대 · 집속탄 분리)</param>
+    /// <param name="noBlast">폭발 · 피해 없이 도착만 (집속탄 분리 전 운반체)</param>
     public static void Spawn(Vector2 from, Enemy follow, Vector2 target, float speed, float radius, DamageInfo dmg, bool fromAbove = false,
-                             Action<Enemy> onHit = null)
+                             Action<Enemy> onHit = null, Action<Vector2> onLand = null, bool noBlast = false)
     {
         var go = new GameObject("Missile");
         go.transform.position = from;
         var m = go.AddComponent<MissileProjectile>();
         m.follow = follow; m.target = target; m.speed = speed; m.radius = radius; m.dmg = dmg; m.fromAbove = fromAbove; m.onHit = onHit;
+        m.onLand = onLand; m.noBlast = noBlast;
+        if (follow != null) m.followOffset = target - (Vector2)follow.transform.position;
         m.maxLife = 4f;
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = LeniaFx.Missile;
@@ -280,7 +287,7 @@ public class MissileProjectile : MonoBehaviour
     {
         if (GameManager.I.State != GameState.Playing) return;
         maxLife -= Time.deltaTime;
-        if (!fromAbove && follow != null && follow.hp > 0) target = follow.transform.position;
+        if (follow != null && follow.hp > 0) target = (Vector2)follow.transform.position + (fromAbove ? followOffset : Vector2.zero);
         Vector2 pos = transform.position;
         Vector2 to = target - pos;
         float step = speed * Time.deltaTime;
@@ -307,9 +314,13 @@ public class MissileProjectile : MonoBehaviour
         if (arrive || maxLife <= 0f)
         {
             Vector2 at = arrive && to.magnitude <= step ? target : pos;
-            LeniaFx.Explode(at, radius);
-            SkillHits.Circle(at, radius, dmg, 1.5f, onHit);
-            CameraFollow.Shake(0.05f, 0.06f);
+            if (!noBlast)
+            {
+                LeniaFx.Explode(at, radius);
+                SkillHits.Circle(at, radius, dmg, 1.5f, onHit);
+                CameraFollow.Shake(0.05f, 0.06f);
+            }
+            onLand?.Invoke(at);
             Destroy(gameObject);
             return;
         }

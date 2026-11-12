@@ -356,8 +356,9 @@ public abstract class TurretSkill : AutoSkill
         // 기본 강화 '범위' = 터렛 사거리 · 미사일 폭발 반경 · 도탄 거리에 적용 (설치 시점 값)
         var spec = new TurretSpec
         {
-            kind = Kind, duration = Duration, fireCooldown = BaseFireCooldown * FireCooldownMul, rangeScale = RangeScale,
-            shot = () => MakeDamage(BaseShotDamage, use.AsIndirect),
+            kind = Kind, duration = Duration, fireCooldown = BaseFireCooldown * FireCooldownMul, baseFireCooldown = BaseFireCooldown,
+            rangeScale = RangeScale,
+            shot = (pct, fin) => MakeDamage(BaseShotDamage, use.AsIndirect, pct, fin),
             shots = 1 + ExtraShots, scatter = Scatter, pierce = Pierce, bounces = Orbital ? 0 : Bounces, stun = Stun, orbital = Orbital,
         };
         for (int i = 0; i < 1 + ExtraInstalls; i++)
@@ -482,19 +483,19 @@ public class TeslaTurretSummon : TurretSkill
             case 5: return new[]
             {
                 new SpecialUpgradeOption { id = Chain, title = "연쇄 작용", specs = new[] { "'도탄' +2" } },
-                new SpecialUpgradeOption { id = No2, title = "2번", keywords = new[] { "상태이상" }, specs = new[] { "'피해량' +25%", "'기절' +1초" } },
+                new SpecialUpgradeOption { id = No2, title = "고압 전류", keywords = new[] { "상태이상" }, specs = new[] { "'피해량' +25%", "'기절' +1초" } },
                 new SpecialUpgradeOption { id = ExtraCurrent, title = "추가 전류", specs = new[] { "'투사체 증가' +2" } },
             };
             case 10: return new[]
             {
                 ExtraInstallOption, RapidDeployOption,
-                new SpecialUpgradeOption { id = No3, title = "3번", specs = new[] { "'투사체 증가' +2" } },
+                new SpecialUpgradeOption { id = No3, title = "전류 증폭", specs = new[] { "'투사체 증가' +2" } },
             };
             case 15: return new[]
             {
                 AsManyOption,
-                new SpecialUpgradeOption { id = No2Plus, title = "2번", specs = new[] { "'투사체 증가' +2", "'공격 간격' -20%" } },
-                new SpecialUpgradeOption { id = No3Sky, title = "3번", desc = "전류를 위로 발사합니다.\n플레이어 주변에 번개가 떨어져 주변 적에게 피해를 입힙니다.\n더 이상 '도탄' 되지 않습니다.",
+                new SpecialUpgradeOption { id = No2Plus, title = "고속 방전", specs = new[] { "'투사체 증가' +2", "'공격 간격' -20%" } },
+                new SpecialUpgradeOption { id = No3Sky, title = "낙뢰 발생", desc = "전류를 위로 발사합니다.\n플레이어 주변에 번개가 떨어져 주변 적에게 피해를 입힙니다.\n더 이상 '도탄' 되지 않습니다.",
                     specs = new[] { "'피해량' +25%", "'범위' +25%", "'도탄' 1당 '최종 피해량', '범위' +25%" } },
             };
         }
@@ -512,113 +513,4 @@ public class TeslaTurretSummon : TurretSkill
     protected override float SpecialDamageBonus => (HasSpecial(No2) ? 0.25f : 0f) + (HasSpecial(No3Sky) ? 0.25f : 0f);
     protected override float SpecialRangeBonus => HasSpecial(No3Sky) ? 0.25f + 0.25f * BounceCount : 0f;
     protected override float SpecialFinalDamageMul => HasSpecial(No3Sky) ? 1f + 0.25f * BounceCount : 1f;
-}
-
-/// <summary>LM01 터렛 강화: 수동 · 설치된 모든 터렛 10초간 강화 (스패너가 나사를 조이듯 돌아감). 이펙트만 구현</summary>
-public class TurretBoost : ActiveSkill
-{
-    const float Duration = 10f;
-    const float BaseCooldown = 0f;    // 2026-11-11 사용자: 수동 스킬 일단 쿨타임 0초
-
-    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
-
-    protected override void Activate()
-    {
-        foreach (var t in Turret.All.ToArray()) if (t != null) t.Boost(Duration);
-        Fx.Circle(P.transform.position, 0.8f, Fx.FireBright, 0.3f, P.transform);
-    }
-}
-
-/// <summary>LM04 터렛 과부화: 수동 · 설치된 모든 터렛 10초간 강화 (망치로 내려침). 이펙트만 구현</summary>
-public class TurretOverload : ActiveSkill
-{
-    const float Duration = 10f;
-    const float BaseCooldown = 0f;    // 2026-11-11 사용자: 수동 스킬 일단 쿨타임 0초
-
-    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
-
-    protected override void Activate()
-    {
-        foreach (var t in Turret.All.ToArray()) if (t != null) t.Overload(Duration);
-        Fx.Circle(P.transform.position, 0.8f, Fx.FireDeep, 0.3f, P.transform);
-    }
-}
-
-/// <summary>LM02 지면 강타: 수동 · 큰 망치로 내려쳐 주변 적 기절 3초</summary>
-public class GroundSlam : ActiveSkill
-{
-    const float StunSeconds = 3f;
-    const float BaseCooldown = 0f;    // 2026-11-11 사용자: 수동 스킬 일단 쿨타임 0초
-    const float SwingTime = 0.22f;    // [임시] 내려치는 시간
-    // [해석] 기획에 피해량이 없어 기절만 (피해 0)
-
-    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
-    float Radius => Range(Tier.Mid) * 1.4f;   // [임시] 주변 범위
-
-    protected override void Activate() => StartCoroutine(Run());
-
-    IEnumerator Run()
-    {
-        Vector2 at = P.transform.position;
-        Vector2 side = P.Facing.x < 0 ? Vector2.left : Vector2.right;
-        // 큰 망치: 손잡이 끝을 축으로 위에서 앞으로 내려침
-        var go = new GameObject("GroundSlamHammer");
-        go.transform.position = at + side * 0.2f;
-        var s = go.AddComponent<SpriteRenderer>();
-        s.sprite = LeniaFx.Hammer(LeniaFx.BigHammerLength, grip: true);
-        s.sortingOrder = 12;
-        s.flipX = side.x < 0;
-        float from = side.x < 0 ? 20f : -20f, to = side.x < 0 ? 95f : -95f;
-        for (float t = 0f; t < SwingTime; t += Time.deltaTime)
-        {
-            float k = t / SwingTime;
-            go.transform.rotation = Quaternion.Euler(0, 0, Mathf.Lerp(from, to, k * k));
-            yield return null;
-        }
-        go.transform.rotation = Quaternion.Euler(0, 0, to);
-
-        // 망치가 닿은 자리에서 충격파가 퍼지고, 기절 범위는 플레이어 '주변' (플레이어 중심 원)
-        Vector2 impact = at + side * (LeniaFx.BigHammerLength * 0.85f);
-        LeniaFx.Spark(impact);
-        Fx.Disc(at, Radius, new Color(0.9f, 0.75f, 0.45f, 0.45f), 0.35f);
-        Fx.Circle(at, Radius, Fx.FireBright, 0.4f);
-        HitDebug.Circle(at, Radius, HitDebug.BlastColor);
-        CameraFollow.Shake(0.2f, 0.18f);
-        foreach (var e in SkillHits.InCircle(at, Radius, new List<Enemy>()))
-        {
-            e.Stun(StunSeconds);
-            e.Push((Vector2)e.transform.position - at, 4f);   // [임시] 약한 밀치기
-        }
-        yield return new WaitForSeconds(0.25f);
-        Destroy(go);
-    }
-}
-
-/// <summary>LM03 포격 실시: 수동 · 위에서 미사일 10개가 무작위 위치에 낙하 · 범위 피해 · 미사일당 초기 피해량 10</summary>
-public class Bombardment : ActiveSkill
-{
-    const int Count = 10;
-    const float BaseDamage = 10f;
-    const float BaseCooldown = 0f;    // 2026-11-11 사용자: 수동 스킬 일단 쿨타임 0초
-    const float Area = 5f;             // [임시] 낙하 위치 = 플레이어 주변 반경
-    const float Radius = 1.2f;         // [임시] 미사일 1발 범위
-    const float Interval = 0.1f;       // [임시] 발사 간격
-    const float DropHeight = 7f, DropSpeed = 14f;   // [임시] 낙하 시작 높이 · 속도
-
-    protected override float CooldownSeconds => CooldownOf(BaseCooldown);
-
-    protected override void Activate() => StartCoroutine(Run());
-
-    IEnumerator Run()
-    {
-        var use = DirectCast;
-        for (int i = 0; i < Count; i++)
-        {
-            Vector2 target = (Vector2)P.transform.position + Random.insideUnitCircle * Area;
-            Fx.Circle(target, Radius * RangeScale, new Color(1f, 0.3f, 0.2f, 0.5f), DropHeight / DropSpeed);   // 낙하 지점 표시
-            MissileProjectile.Spawn(target + Vector2.up * DropHeight, null, target, DropSpeed, Radius * RangeScale,
-                                    MakeDamage(BaseDamage, i == 0 ? use : use.AsIndirect), fromAbove: true);
-            yield return new WaitForSeconds(Interval);
-        }
-    }
 }

@@ -53,10 +53,24 @@ public class Enemy : MonoBehaviour
     /// <summary>화상 표시 (파티클만 — 화상 피해 규칙은 기획 미정)</summary>
     public void ShowBurn(float seconds) => BurnFx.Show(transform, () => radius, seconds);
 
-    /// <summary>슬로우: 이동 속도 배율 (더 강한 쪽 유지)</summary>
+    /// <summary>
+    /// '이동 속도 감소' 부여: 피해 없는 계수형 상태이상 → 계수는 곱연산, 지속 시간은 합연산 (2026-11-12 사용자 규칙).
+    /// 예: 20% · 3초 두 번 = 이동 속도 ×0.8×0.8, 지속 6초
+    /// </summary>
     public void Slow(float mul, float seconds)
     {
-        if (slowLeft <= 0 || mul < slowMul) slowMul = mul;
+        if (seconds <= 0f) return;
+        if (slowLeft > 0) { slowMul *= mul; slowLeft += seconds; }
+        else { slowMul = mul; slowLeft = seconds; }
+    }
+
+    /// <summary>
+    /// 장판 안에 있는 동안 유지되는 감속 (매 틱 다시 걸어도 쌓이지 않음 — 더 강한 쪽 · 더 긴 쪽 유지).
+    /// 부여형(Slow)과 달리 '범위 안에 있는 동안' 효과용
+    /// </summary>
+    public void SustainSlow(float mul, float seconds)
+    {
+        if (slowLeft <= 0 || mul < slowMul) slowMul = Mathf.Min(slowLeft > 0 ? slowMul : 1f, mul);
         slowLeft = Mathf.Max(slowLeft, seconds);
     }
 

@@ -336,7 +336,7 @@ public class GameManager : MonoBehaviour
         ShowMenu("경고", $"<color=#FF9A50>{o.warning}</color>", list);
     }
 
-    static string Pct(float v) => $"{Mathf.RoundToInt(v * 100f)}%";
+    static string Pct(float v) => $"{Mathf.Round(v * 1000f) / 10f:0.#}%";   // 소수 첫째 자리까지 (2.5%)
 
     /// <summary>테스트: 보유 스킬 강화 화면 바로 열기 (치트 패널 → 스킬별 Lv +1)</summary>
     public void DebugUpgradeSkill(Skill s)
