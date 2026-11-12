@@ -8,13 +8,13 @@ using UnityEngine;
 public class EnemyConfig : ScriptableObject
 {
     [Header("판정 크기 (빨간 원) = 적 크기 x 비율")]
-    // 사람형 그림은 긴 변(키)보다 몸 폭이 좁아 0.4 (그림이 들어오면 F1 판정 표시로 다시 맞출 것)
-    [Range(0.1f, 1.5f)] public float goblinHitbox = 0.4f;
-    [Range(0.1f, 1.5f)] public float archerHitbox = 0.4f;
-    [Range(0.1f, 1.5f)] public float hobgoblinHitbox = 0.4f;
-    [Range(0.1f, 1.5f)] public float riderHitbox = 0.4f;
-    [Range(0.1f, 1.5f)] public float elderHitbox = 0.4f;
-    [Range(0.1f, 1.5f)] public float knightHitbox = 0.4f;
+    // 2026-11-12 고블린 그림 6종 기준: 그림 가운데의 몸통을 덮는 원 (무기 · 지팡이 · 늑대 꼬리 끝은 제외)
+    [Range(0.1f, 1.5f)] public float goblinHitbox = 0.3f;
+    [Range(0.1f, 1.5f)] public float archerHitbox = 0.3f;
+    [Range(0.1f, 1.5f)] public float hobgoblinHitbox = 0.33f;
+    [Range(0.1f, 1.5f)] public float riderHitbox = 0.3f;
+    [Range(0.1f, 1.5f)] public float elderHitbox = 0.28f;
+    [Range(0.1f, 1.5f)] public float knightHitbox = 0.32f;
     [Range(0.1f, 1.5f)] public float bossHitbox = 0.5f;
 
     public float HitboxRatio(EnemyKind kind)

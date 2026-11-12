@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9d289162de69401f9f4c9b57f7fcd02c, type: 3}
   m_Name: EnemyConfig
   m_EditorClassIdentifier: 
-  goblinHitbox: 0.4
-  archerHitbox: 0.4
-  hobgoblinHitbox: 0.4
-  riderHitbox: 0.4
-  elderHitbox: 0.4
-  knightHitbox: 0.4
+  goblinHitbox: 0.3
+  archerHitbox: 0.3
+  hobgoblinHitbox: 0.33
+  riderHitbox: 0.3
+  elderHitbox: 0.28
+  knightHitbox: 0.32
   bossHitbox: 0.5
