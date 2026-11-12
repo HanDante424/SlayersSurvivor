@@ -139,6 +139,18 @@ public static class LeniaFx
         return best;
     }
 
+    /// <summary>위로 쏘아 올리는 연출 (궤도 폭격 미사일 · 위로 방출하는 전류). 피해 없음</summary>
+    public static void LaunchUp(Vector2 from, Sprite sprite, float seconds = 0.35f, float height = 4f)
+    {
+        var go = new GameObject("LaunchUp");
+        go.transform.position = from;
+        go.transform.rotation = Quaternion.Euler(0, 0, 90f);
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = sprite;
+        sr.sortingOrder = 13;
+        go.AddComponent<LaunchUpFx>().Init(height / seconds, seconds);
+    }
+
     // ---------- 번개 줄기 (띠 텍스처를 길이에 맞춰 반복) ----------
     static Material[] boltMats;
 
@@ -177,6 +189,23 @@ public static class LeniaFx
     }
 }
 
+/// <summary>LeniaFx.LaunchUp: 위로 날아가며 사라짐</summary>
+public class LaunchUpFx : MonoBehaviour
+{
+    float speed, life, t;
+    SpriteRenderer sr;
+
+    public void Init(float speed, float life) { this.speed = speed; this.life = life; sr = GetComponent<SpriteRenderer>(); }
+
+    void Update()
+    {
+        t += Time.deltaTime;
+        if (t >= life) { Destroy(gameObject); return; }
+        transform.position += Vector3.up * (speed * Time.deltaTime);
+        if (sr != null) { var c = sr.color; c.a = 1f - t / life; sr.color = c; }
+    }
+}
+
 /// <summary>대상에 붙어 반복 재생되는 시트 이펙트 (감전 표시 · 테슬라 충전 · 강화 연출 등)</summary>
 public class LoopFx : MonoBehaviour
 {
@@ -209,91 +238,7 @@ public class LoopFx : MonoBehaviour
     }
 }
 
-/// <summary>
-/// 회전하며 날아가는 투척물 (스패너 · 망치). 첫 적중 대상에 피해 + onHit, 관통 없음. 사거리 끝에서 사라짐
-/// </summary>
-public class ThrownProjectile : MonoBehaviour
-{
-    Vector2 dir;
-    float speed, spin, distLeft, hitRadius, knock;
-    DamageInfo dmg;
-    Action<Enemy> onHit;
-
-    public static ThrownProjectile Spawn(Sprite sprite, Vector2 from, Vector2 dir, float speed, float spinDeg, float range,
-                                         float hitRadius, DamageInfo dmg, float knock, Action<Enemy> onHit = null)
-    {
-        var go = new GameObject("Thrown");
-        go.transform.position = from;
-        var p = go.AddComponent<ThrownProjectile>();
-        p.dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.right;
-        p.speed = speed; p.spin = spinDeg; p.distLeft = range; p.hitRadius = hitRadius;
-        p.dmg = dmg; p.knock = knock; p.onHit = onHit;
-        var sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = sprite;
-        sr.sortingOrder = 11;
-        return p;
-    }
-
-    void Update()
-    {
-        if (GameManager.I.State != GameState.Playing) return;
-        float step = speed * Time.deltaTime;
-        transform.position += (Vector3)(dir * step);
-        transform.Rotate(0, 0, spin * Time.deltaTime);
-        distLeft -= step;
-        Vector2 pos = transform.position;
-        foreach (var e in Enemy.All)
-        {
-            if (e == null || e.hp <= 0) continue;
-            float rr = hitRadius + e.radius;
-            if (((Vector2)e.transform.position - pos).sqrMagnitude > rr * rr) continue;
-            e.Hit(dmg, dir, knock);
-            onHit?.Invoke(e);
-            Destroy(gameObject);
-            return;
-        }
-        if (distLeft <= 0f) Destroy(gameObject);
-    }
-}
-
-/// <summary>탄환: 오른쪽을 향한 그림을 진행 방향으로 돌려 직진, 첫 적중에 피해</summary>
-public class BulletProjectile : MonoBehaviour
-{
-    Vector2 dir;
-    float speed, distLeft, hitRadius;
-    DamageInfo dmg;
-
-    public static void Spawn(Vector2 from, Vector2 dir, float speed, float range, DamageInfo dmg)
-    {
-        var go = new GameObject("Bullet");
-        go.transform.position = from;
-        var b = go.AddComponent<BulletProjectile>();
-        b.dir = dir.normalized; b.speed = speed; b.distLeft = range; b.dmg = dmg; b.hitRadius = 0.12f;
-        go.transform.rotation = Quaternion.Euler(0, 0, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
-        var sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = LeniaFx.Bullet;
-        sr.sortingOrder = 11;
-    }
-
-    void Update()
-    {
-        if (GameManager.I.State != GameState.Playing) return;
-        float step = speed * Time.deltaTime;
-        transform.position += (Vector3)(dir * step);
-        distLeft -= step;
-        Vector2 pos = transform.position;
-        foreach (var e in Enemy.All)
-        {
-            if (e == null || e.hp <= 0) continue;
-            float rr = hitRadius + e.radius;
-            if (((Vector2)e.transform.position - pos).sqrMagnitude > rr * rr) continue;
-            e.Hit(dmg, dir, 0.5f);
-            Destroy(gameObject);
-            return;
-        }
-        if (distLeft <= 0f) Destroy(gameObject);
-    }
-}
+// 스패너 · 망치 · 총알 = LeniaProjectile (LeniaShots.cs — 관통 · 도탄 · 부메랑)
 
 /// <summary>
 /// 미사일: 목표 지점으로 날아가 범위 폭발. 꼬리(노즐)에서 추진 연기를 일정 간격으로 남김.
@@ -306,15 +251,18 @@ public class MissileProjectile : MonoBehaviour
     float speed, radius, smokeTimer, maxLife;
     DamageInfo dmg;
     bool fromAbove;
+    Action<Enemy> onHit;
 
     const float SmokeInterval = 0.05f;   // [임시] 연기 간격
 
-    public static void Spawn(Vector2 from, Enemy follow, Vector2 target, float speed, float radius, DamageInfo dmg, bool fromAbove = false)
+    /// <param name="onHit">폭발에 맞은 적마다 피해 뒤 호출 (상태이상 부여 — 철갑탄 기절 등)</param>
+    public static void Spawn(Vector2 from, Enemy follow, Vector2 target, float speed, float radius, DamageInfo dmg, bool fromAbove = false,
+                             Action<Enemy> onHit = null)
     {
         var go = new GameObject("Missile");
         go.transform.position = from;
         var m = go.AddComponent<MissileProjectile>();
-        m.follow = follow; m.target = target; m.speed = speed; m.radius = radius; m.dmg = dmg; m.fromAbove = fromAbove;
+        m.follow = follow; m.target = target; m.speed = speed; m.radius = radius; m.dmg = dmg; m.fromAbove = fromAbove; m.onHit = onHit;
         m.maxLife = 4f;
         var sr = go.AddComponent<SpriteRenderer>();
         sr.sprite = LeniaFx.Missile;
@@ -360,7 +308,7 @@ public class MissileProjectile : MonoBehaviour
         {
             Vector2 at = arrive && to.magnitude <= step ? target : pos;
             LeniaFx.Explode(at, radius);
-            SkillHits.Circle(at, radius, dmg, 1.5f);
+            SkillHits.Circle(at, radius, dmg, 1.5f, onHit);
             CameraFollow.Shake(0.05f, 0.06f);
             Destroy(gameObject);
             return;

@@ -5,10 +5,30 @@ using UnityEngine;
 
 public enum TurretKind { Standard, Missile, Tesla }
 
+/// <summary>설치 시점에 스킬이 정해 주는 터렛 성능 (특수 강화 반영 값)</summary>
+public class TurretSpec
+{
+    public TurretKind kind;
+    public float duration, fireCooldown;
+    public float rangeScale = 1f;   // 설치한 스킬의 범위 배율 (기본 · 특수 강화 '범위')
+    /// <summary>공격 1발의 피해 (설치 = 직접 사용의 간접 사용)</summary>
+    public Func<DamageInfo> shot;
+    /// <summary>공격 1회의 투사체 수 = 1 + '투사체 증가' (0.2초 간격, 서로 다른 대상)</summary>
+    public int shots = 1;
+    /// <summary>난사: 대상 대신 무작위 방향 (미사일은 무작위 지점)</summary>
+    public bool scatter;
+    public int pierce, bounces;
+    /// <summary>적중 시 '기절' 초 (테슬라 기본 · 철갑탄 · 2번)</summary>
+    public float stun;
+    /// <summary>미사일 궤도 폭격 / 테슬라 위로 방출: 플레이어 주변 무작위 위치로 떨어짐 (도탄 없음)</summary>
+    public bool orbital;
+}
+
 /// <summary>
 /// 레니아가 설치하는 터렛 1개 (표준 · 미사일 · 테슬라). 지속시간이 끝나면 사라짐.
-/// 공격: 사거리 안 가장 가까운 적을 향해 방향을 바꾸고 공격 쿨타임마다 발사.
-/// 피해는 설치한 스킬이 만들어 줌 (shot 델리게이트) → 그 스킬의 강화 · 전역 피해 규칙이 그대로 적용.
+/// 공격: 사거리 안 가장 가까운 적을 향해 방향을 바꾸고 발사. 공격 1회 = 투사체 shots 발 (0.2초 간격, 서로 다른 대상).
+/// 공격 간격은 마지막 투사체를 쏜 뒤부터 (사용 완료 후 쿨타임).
+/// 피해는 설치한 스킬이 만들어 줌 (spec.shot) → 그 스킬의 강화 · 전역 피해 규칙이 그대로 적용.
 /// 터렛 강화 · 터렛 과부화: 지금은 연출만 (Boost / Overload) — 실제 수치 강화는 기획 대기
 /// </summary>
 public class Turret : MonoBehaviour
@@ -21,15 +41,18 @@ public class Turret : MonoBehaviour
     const float BulletSpeed = 12f;
     const float MissileSpeed = 7f;
     public const float MissileRadius = 1.2f;     // 미사일 범위 피해 반경
-    const float TeslaBounceRange = 3f;           // 도탄 대상 탐색 거리
     const float FrameFps = 10f;                  // 반동 · 링 동작 재생 속도 (원본 권장)
+    // 수치 지정용 (화면에 표기하지 않음)
+    public const float OrbitalMissileArea = 5f;  // 궤도 폭격: 플레이어 주변 낙하 반경
+    public const float OrbitalTeslaArea = 8f;    // 테슬라 3번(Lv15): 플레이어 주변 낙뢰 반경
+    const float OrbitalStrikeRadius = 1.3f;      // [임시] 낙뢰 1발 피해 반경
+    const float DropHeight = 7f, DropSpeed = 14f;   // [임시] 궤도 폭격 낙하 (포격 실시와 같은 값)
 
     public TurretKind kind;
-    float life, fireCd, fireTimer;
-    Func<DamageInfo> shot;
-    float stun;
-    int bounces;
-    float rangeScale = 1f;   // 설치한 스킬의 범위 배율 (기본 강화 '범위')
+    TurretSpec spec;
+    float life, fireTimer;
+    float rangeScale = 1f;
+    Vector2 lastAim = Vector2.down;
 
     SpriteRenderer sr;
     Sprite[,] idle, action;
@@ -39,14 +62,13 @@ public class Turret : MonoBehaviour
 
     public float LifeLeft => life;
 
-    public static Turret Spawn(TurretKind kind, Vector2 at, float duration, float fireCooldown, Func<DamageInfo> shot,
-                               float stunSeconds = 0f, int bounces = 0, float rangeScale = 1f)
+    public static Turret Spawn(TurretSpec spec, Vector2 at)
     {
+        var kind = spec.kind;
         var go = new GameObject("Turret_" + kind);
         go.transform.position = at;
         var t = go.AddComponent<Turret>();
-        t.kind = kind; t.life = duration; t.fireCd = fireCooldown; t.shot = shot; t.stun = stunSeconds; t.bounces = bounces;
-        t.rangeScale = rangeScale;
+        t.kind = kind; t.spec = spec; t.life = spec.duration; t.rangeScale = spec.rangeScale;
         t.fireTimer = 0.25f;   // [임시] 설치 직후 첫 발사까지
         t.sr = go.AddComponent<SpriteRenderer>();
         t.sr.sortingOrder = 8;   // 적(5·6) 위, 플레이어(10) 아래
@@ -100,16 +122,51 @@ public class Turret : MonoBehaviour
         if (fireTimer > 0f) return;
         var target = LeniaFx.Nearest(transform.position, Range * rangeScale);
         if (target == null) { fireTimer = 0f; return; }   // 대상이 없으면 쿨타임을 소모하지 않음
-        fireTimer = fireCd;
-        Vector2 to = (Vector2)target.transform.position - (Vector2)transform.position;
+        int n = Mathf.Max(1, spec.shots);
+        fireTimer = spec.fireCooldown + (n - 1) * LeniaShots.Interval;   // 공격 간격 = 마지막 투사체 이후부터
+        StartCoroutine(Attack(target, n));
+    }
+
+    /// <summary>공격 1회: 투사체 n 발을 0.2초 간격으로, 같은 공격 안에서는 서로 다른 대상 (없으면 중복 허용)</summary>
+    IEnumerator Attack(Enemy first, int n)
+    {
+        var used = new HashSet<Enemy>();
+        for (int i = 0; i < n; i++)
+        {
+            if (i > 0)
+            {
+                yield return new WaitForSeconds(LeniaShots.Interval);
+                if (this == null || life <= 0f) yield break;
+            }
+            Enemy t;
+            if (i == 0 && first != null && first.hp > 0) { t = first; used.Add(t); }
+            else t = LeniaShots.NextTarget(transform.position, Range * rangeScale, used);
+            FireOne(t);
+        }
+    }
+
+    void FireOne(Enemy target)
+    {
+        Vector2 to = target != null ? (Vector2)target.transform.position - (Vector2)transform.position : lastAim;
+        if (spec.scatter) to = UnityEngine.Random.insideUnitCircle.normalized;   // 난사: 무작위 방향
+        if (to.sqrMagnitude < 0.0001f) to = lastAim;
+        lastAim = to;
         dir = LeniaFx.Dir4(to);
         ShowIdle();
         switch (kind)
         {
             case TurretKind.Standard: FireBullet(to); break;
-            case TurretKind.Missile: FireMissile(target); break;
-            case TurretKind.Tesla: StartCoroutine(FireTesla(target)); break;
+            case TurretKind.Missile: FireMissile(spec.scatter ? null : target, to); break;
+            case TurretKind.Tesla: StartCoroutine(FireTesla(spec.scatter ? null : target, to)); break;
         }
+    }
+
+    /// <summary>적중 시 상태이상 (기절) — 피해 뒤 가장 늦게</summary>
+    void ApplyOnHit(Enemy e)
+    {
+        if (e == null || e.hp <= 0 || spec.stun <= 0f) return;
+        e.Stun(spec.stun);
+        if (kind == TurretKind.Tesla) LeniaFx.ShowShocked(e, spec.stun);
     }
 
     /// <summary>포신 · 발사관 위치 (발 기준 높이 비율 + 바라보는 쪽으로 약간)</summary>
@@ -123,13 +180,40 @@ public class Turret : MonoBehaviour
     {
         actionT = 0f;   // 포신 반동
         Vector2 m = Muzzle(0.62f, 0.35f);
-        BulletProjectile.Spawn(m, to - (m - (Vector2)transform.position), BulletSpeed, Range * rangeScale * 1.2f, shot());   // 포신에서 조준
+        var mods = new ShotMods
+        {
+            pierce = spec.pierce, bounces = spec.bounces, bounceRange = LeniaShots.BounceRadius * rangeScale,
+            onHit = (e, wasStunned, d) => ApplyOnHit(e),
+        };
+        // 포신에서 조준 (to 는 발밑 기준 → 포신 높이만큼 보정)
+        Vector2 aim = spec.scatter ? to : to - (m - (Vector2)transform.position);
+        LeniaProjectile.Spawn(LeniaFx.Bullet, m, aim, BulletSpeed, 0f, Range * rangeScale * 1.2f, 0.12f, spec.shot(), 0.5f, mods);
     }
 
-    void FireMissile(Enemy target)
+    void FireMissile(Enemy target, Vector2 to)
     {
         StartCoroutine(Kick());
-        MissileProjectile.Spawn(Muzzle(0.72f, 0.3f), target, target.transform.position, MissileSpeed, MissileRadius * rangeScale, shot());
+        float r = MissileRadius * rangeScale;
+        Vector2 m = Muzzle(0.72f, 0.3f);
+        if (spec.orbital)
+        {
+            // 궤도 폭격: 위로 쏘아 올린 뒤 플레이어 주변 무작위 위치에 낙하
+            LeniaFx.LaunchUp(m, LeniaFx.Missile);
+            StartCoroutine(OrbitalDrop(r));
+            return;
+        }
+        Vector2 point = target != null ? (Vector2)target.transform.position : (Vector2)transform.position + to.normalized * (Range * rangeScale * 0.7f);
+        MissileProjectile.Spawn(m, target, point, MissileSpeed, r, spec.shot(), onHit: ApplyOnHit);
+    }
+
+    IEnumerator OrbitalDrop(float r)
+    {
+        var dmg = spec.shot();
+        yield return new WaitForSeconds(0.3f);
+        if (Player.I == null) yield break;
+        Vector2 point = (Vector2)Player.I.transform.position + UnityEngine.Random.insideUnitCircle * OrbitalMissileArea;
+        Fx.Circle(point, r, new Color(1f, 0.3f, 0.2f, 0.5f), DropHeight / DropSpeed);   // 낙하 지점 표시
+        MissileProjectile.Spawn(point + Vector2.up * DropHeight, null, point, DropSpeed, r, dmg, fromAbove: true, onHit: ApplyOnHit);
     }
 
     /// <summary>미사일 포탑은 공격 동작 시트가 없어 발사 순간 살짝 눌렸다 돌아옴 (코드 연출)</summary>
@@ -144,33 +228,54 @@ public class Turret : MonoBehaviour
         transform.localScale = Vector3.one;
     }
 
-    /// <summary>테슬라: 링이 내려가는 3번째 프레임에 방전 → 대상 + 도탄 bounces 회 (같은 적 중복 없음)</summary>
-    IEnumerator FireTesla(Enemy first)
+    /// <summary>
+    /// 테슬라: 링이 내려가는 3번째 프레임에 방전 → 대상 + 도탄 bounces 회.
+    /// 도탄은 지금 맞은 대상만 빼고 고름 (이전 대상 다시 가능 → 적 2마리면 도탄 수만큼 왕복).
+    /// 위로 방출(orbital) = 플레이어 주변 무작위 위치에 낙뢰, 도탄 없음
+    /// </summary>
+    IEnumerator FireTesla(Enemy first, Vector2 to)
     {
         actionT = 0f;
         Vector2 electrode = (Vector2)transform.position + Vector2.up * (height * 0.9f);
         // 충전 빛 고리 폭(칸의 65%) ≈ 전극 링 폭(타워 키의 약 0.3) → 칸 크기 ≈ 키 × 0.5
         LoopFx.Attach(transform, LeniaFx.TeslaCharge, 10f, Vector2.up * (height * 0.9f), height * 0.5f, 0.45f, 9);
         yield return new WaitForSeconds(2f / FrameFps);   // 링 하강 3번째 프레임
+        if (this == null) yield break;
 
-        var hit = new HashSet<Enemy>();
+        if (spec.orbital)
+        {
+            LeniaFx.Bolt(electrode, electrode + Vector2.up * 6f);   // 위로 방출
+            if (Player.I == null) yield break;
+            Vector2 p = (Vector2)Player.I.transform.position + UnityEngine.Random.insideUnitCircle * OrbitalTeslaArea;
+            float r = OrbitalStrikeRadius * rangeScale;
+            LeniaFx.Bolt(p + Vector2.up * 8f, p, 0.25f);
+            LeniaFx.Spark(p);
+            HitDebug.Circle(p, r, HitDebug.BlastColor);
+            SkillHits.Circle(p, r, spec.shot(), Enemy.NoKnock, ApplyOnHit);
+            yield break;
+        }
+
         Vector2 from = electrode;
-        Enemy cur = first != null && first.hp > 0 ? first : LeniaFx.Nearest(transform.position, Range * rangeScale);
-        for (int i = 0; i <= bounces && cur != null; i++)
+        Enemy cur = first != null && first.hp > 0 ? first : null;
+        if (cur == null)
+        {
+            // 난사 · 대상 소실: 그 방향의 가장 가까운 적 (없으면 허공 방전)
+            Vector2 probe = (Vector2)transform.position + to.normalized * (Range * rangeScale * 0.5f);
+            cur = LeniaFx.Nearest(probe, Range * rangeScale * 0.5f);
+            if (cur == null) { LeniaFx.Bolt(from, probe); yield break; }
+        }
+        var current = new Enemy[1];
+        for (int i = 0; i <= spec.bounces && cur != null; i++)
         {
             Vector2 at = cur.transform.position;
             LeniaFx.Bolt(from, at);
             LeniaFx.Spark(at);
-            hit.Add(cur);
             var e = cur;
-            e.Hit(shot(), at - from, Enemy.NoKnock);
-            if (e != null && e.hp > 0 && stun > 0f)
-            {
-                e.Stun(stun);
-                LeniaFx.ShowShocked(e, stun);
-            }
+            e.Hit(spec.shot(), at - from, Enemy.NoKnock);   // 도탄분 = 간접 사용 · 직접 피해 (shot 이 이미 간접 사용)
+            ApplyOnHit(e);
             from = at;
-            cur = LeniaFx.Nearest(at, TeslaBounceRange * rangeScale, hit);
+            current[0] = e;
+            cur = LeniaFx.Nearest(at, LeniaShots.BounceRadius * rangeScale, current);
         }
     }
 

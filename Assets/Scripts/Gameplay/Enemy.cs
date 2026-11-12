@@ -41,8 +41,14 @@ public class Enemy : MonoBehaviour
         concussLeft = window; concussStun = stun; concussStunsOther = stunOther;
     }
 
-    /// <summary>기절: 이동·접촉 공격 중지 (더 긴 쪽 유지)</summary>
-    public void Stun(float seconds) => stunLeft = Mathf.Max(stunLeft, seconds);
+    /// <summary>
+    /// 기절: 이동·접촉 공격 중지. 스택이 없는 상태이상 → 지속 시간 누적 (2026-11-12 사용자 규칙)
+    /// </summary>
+    public void Stun(float seconds)
+    {
+        if (seconds <= 0f) return;
+        stunLeft = Mathf.Max(0f, stunLeft) + seconds;
+    }
 
     /// <summary>화상 표시 (파티클만 — 화상 피해 규칙은 기획 미정)</summary>
     public void ShowBurn(float seconds) => BurnFx.Show(transform, () => radius, seconds);

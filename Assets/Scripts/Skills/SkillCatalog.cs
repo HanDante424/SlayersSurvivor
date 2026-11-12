@@ -113,15 +113,15 @@ public static class SkillCatalog
             new[] { "자동", "직접 사용", "직접 피해", "원거리", "투사체", "기절" },
             "가장 가까운 대상에게 망치를 던집니다.\n적중한 적을 기절시킵니다.",
             "'초기 피해량' 15", "'기절' '지속 시간' 1초", "'쿨타임' 4초")),
-        E("LA03", "표준 터렛 소환", "Standard Turret", SkillKind.Auto, typeof(StandardTurretSummon), new SkillText(
+        E("LA03", "표준 터렛 설치", "Standard Turret", SkillKind.Auto, typeof(StandardTurretSummon), new SkillText(
             new[] { "자동", "직접 사용", "간접 사용", "직접 피해", "원거리", "소환" },
             "총알을 발사하는 터렛을 설치합니다.\n설치와 동시에 쿨타임이 돌기 시작합니다.",
             "'초기 피해량' 5", "공격 '쿨타임' 1초", "'지속 시간' 5초", "설치 '쿨타임' 8초")),
-        E("LA04", "미사일 터렛 소환", "Missile Turret", SkillKind.Auto, typeof(MissileTurretSummon), new SkillText(
+        E("LA04", "미사일 터렛 설치", "Missile Turret", SkillKind.Auto, typeof(MissileTurretSummon), new SkillText(
             new[] { "자동", "직접 사용", "간접 사용", "직접 피해", "원거리", "범위 피해", "소환" },
             "미사일을 발사하는 터렛을 설치합니다.\n미사일은 폭발하며 주변에 피해를 입힙니다.",
             "'초기 피해량' 12", "공격 '쿨타임' 1.5초", "'지속 시간' 8초", "설치 '쿨타임' 15초")),
-        E("LA05", "테슬라 터렛 소환", "Tesla Turret", SkillKind.Auto, typeof(TeslaTurretSummon), new SkillText(
+        E("LA05", "테슬라 터렛 설치", "Tesla Turret", SkillKind.Auto, typeof(TeslaTurretSummon), new SkillText(
             new[] { "자동", "직접 사용", "간접 사용", "직접 피해", "원거리", "기절", "도탄", "소환" },
             "번개를 방출하는 터렛을 설치합니다.\n번개는 주변 적에게 튕기며 적중한 적을 기절시킵니다.",
             "'초기 피해량' 10", "공격 '쿨타임' 2초", "'기절' '지속 시간' 1초", "'도탄' 3회", "'지속 시간' 10초", "설치 '쿨타임' 12초")),
