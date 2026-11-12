@@ -22,6 +22,8 @@ public class Enemy : MonoBehaviour
     SpriteRenderer sr;
     Color baseColor;
     float flash;
+    /// <summary>[임시] 이미지 적의 피격 깜빡임 색</summary>
+    static readonly Color HitFlashTint = new Color(1f, 0.45f, 0.45f);
     Vector2 knockback;
     float baseScale = 1f;
 
@@ -194,7 +196,8 @@ public class Enemy : MonoBehaviour
         if (flash > 0)
         {
             flash -= Time.deltaTime;
-            sr.color = flash > 0 ? Color.white : baseColor;
+            // 도형(색 칠함)은 흰색으로, 이미지(원래 색 = 흰색)는 붉게 깜빡임 (곱하기라 밝게는 못 함)
+            sr.color = flash > 0 ? (baseColor == Color.white ? HitFlashTint : Color.white) : baseColor;
         }
         else
         {

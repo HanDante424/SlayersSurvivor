@@ -5,6 +5,7 @@ public class CameraFollow : MonoBehaviour
     static CameraFollow inst;
     float shakeTime, shakeAmp;
     Transform ground;
+    float tile;
 
     void Awake()
     {
@@ -37,7 +38,8 @@ public class CameraFollow : MonoBehaviour
             if (shakeTime <= 0) shakeAmp = 0;
         }
         transform.position = new Vector3(p.x, p.y, -10f) + offset;
-        // 바닥 타일을 1칸 단위로 따라오게 해서 무한 맵처럼 보이게
-        ground.position = new Vector3(Mathf.Round(p.x), Mathf.Round(p.y), 0f);
+        // 바닥 타일을 타일 한 장 단위로 따라오게 해서 무한 맵처럼 보이게 (도형 바닥 = 1유닛, 이미지 = GroundTileSize)
+        if (tile <= 0f) tile = ground.GetComponent<SpriteRenderer>().sprite.bounds.size.x;
+        ground.position = new Vector3(Mathf.Round(p.x / tile) * tile, Mathf.Round(p.y / tile) * tile, 0f);
     }
 }

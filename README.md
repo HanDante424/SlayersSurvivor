@@ -52,8 +52,11 @@ Unity Hub → Add → 이 폴더 → Play (타이틀부터 시작). 타이틀 "�
 
 ## 그래픽 교체
 `Assets/Resources/Sprites/` 에 정해진 이름으로 넣으면 자동 적용, 없으면 도형으로 대체.
-- 캐릭터: `ErnStray_Run`, `ErnStray_Idle`, `ErnStray_SlashH`, `ErnStray_SlashV`, `ErnStray_Thrust` (4행 x 8열)
+- 캐릭터: `{id}_Idle` (4행 x 1열), `{id}_Run` (4행 x 8열), `{id}_Slash` (공격 4행 x 8열). id = `ErnStray`, `Lenia`
 - 이펙트: `ErnStray_FireSlash` (기본 공격, 치명타도 동일), `FireBall`
 - 스킬 이펙트 (FireForge 제작, `ErnSkillFx` 에서 로드 · 크기/속도는 각 스킬 `[임시] Fx*` 상수):
   `ErnStray_SkillFireSlash` 2행 x 4열(7프레임) · `ErnStray_SkillTripleSlash` 2행 x 5열 · `ErnStray_SkillSolarSlash` 4행 x 3열
-- 기타: `Enemy_Bat`, `Enemy_Runner`, `Enemy_Tank`, `Enemy_Boss`, `Gem`, `Ground`
+- 적: `Enemy_Bat`, `Enemy_Runner`, `Enemy_Tank`, `Enemy_Boss` — 오른쪽을 보는 그림 1장, 여백 없이 자름 (긴 변 = 1유닛 × 적 크기)
+- 경험치 = 영혼 조각: `Soul_Small` (청백, 1~4) · `Soul_Mid` (청록, 5~19) · `Soul_Large` (붉은 주황, 20~), 256px · 떠서 흔들리는 연출은 `Gem.cs`
+- 바닥: `Ground` — 이음매 없는 반복 타일 1장 = `SpriteFactory.GroundTileSize` (6유닛). 현재 Dark_Moss_Wasteland_Tile_v1 (경계 번진 띠 보정)
+- 한 장짜리 그림(적 · 영혼 조각 · `FireBall`)은 긴 변이 1유닛이 되도록 맞춘 뒤 각 오브젝트 크기를 곱함

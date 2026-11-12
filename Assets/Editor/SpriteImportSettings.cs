@@ -9,7 +9,7 @@ public class SpriteImportSettings : AssetPostprocessor
     const string Folder = "Assets/Resources/Sprites/";
 
     // 설정을 바꾸면 숫자를 올려서 기존 이미지도 다시 임포트되게 함
-    public override uint GetVersion() => 1;
+    public override uint GetVersion() => 2;
 
     void OnPreprocessTexture()
     {
@@ -20,7 +20,9 @@ public class SpriteImportSettings : AssetPostprocessor
         ti.alphaIsTransparency = true;
         ti.mipmapEnabled = true;          // 축소해서 그릴 때 거칠어지지 않게
         ti.filterMode = UnityEngine.FilterMode.Trilinear;
-        ti.wrapMode = UnityEngine.TextureWrapMode.Clamp;
+        // 바닥은 반복 타일 (Tiled 그리기에서 이음매 없이)
+        ti.wrapMode = System.IO.Path.GetFileNameWithoutExtension(assetPath) == "Ground"
+            ? UnityEngine.TextureWrapMode.Repeat : UnityEngine.TextureWrapMode.Clamp;
         ti.textureCompression = TextureImporterCompression.Uncompressed;
         ti.maxTextureSize = 4096;
         ti.npotScale = TextureImporterNPOTScale.None;
