@@ -40,6 +40,7 @@ public abstract class ThrowSkill : AutoSkill
     {
         var t = LeniaFx.Nearest(P.transform.position, ThrowRange);
         if (t == null) return false;
+        P.PlayAttack((Vector2)t.transform.position - (Vector2)P.transform.position);
         Casting = true;   // 마지막 투사체까지 쿨타임 대기
         StartCoroutine(Throw(t, DirectCast, 1 + ExtraShots));
         return true;
@@ -262,7 +263,7 @@ public class HammerThrow : ThrowSkill
         if (HasSpecial(Reinforced))
         {
             float r = ShockwaveRadius * RangeScale;
-            Fx.Circle(at, r, new Color(0.9f, 0.75f, 0.45f, 0.8f), 0.3f);
+            if (!LeniaFx.Shockwave(at, r)) Fx.Circle(at, r, new Color(0.9f, 0.75f, 0.45f, 0.8f), 0.3f);
             LeniaFx.Spark(at);
             HitDebug.Circle(at, r, HitDebug.BlastColor);
             CameraFollow.Shake(0.08f, 0.08f);
@@ -352,6 +353,7 @@ public abstract class TurretSkill : AutoSkill
     {
         Vector2 from = P.transform.position;
         if (LeniaFx.Nearest(from, Turret.Range * RangeScale) == null) return false;
+        P.PlayAttack();
         var use = DirectCast;
         // 기본 강화 '범위' = 터렛 사거리 · 미사일 폭발 반경 · 도탄 거리에 적용 (설치 시점 값)
         var spec = new TurretSpec

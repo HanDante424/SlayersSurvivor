@@ -66,8 +66,10 @@ public class TurretBoost : ActiveSkill
 
     protected override void Activate()
     {
+        P.PlayAttack();
         foreach (var t in Turret.All.ToArray()) if (t != null) t.Boost(this);
-        Fx.Circle(P.transform.position, 0.8f, Fx.FireBright, 0.3f, P.transform);
+        if (!LeniaFx.CastRing(LeniaFx.BoostCast, P.transform, LeniaFx.BoostCastRadius, 10f, 0.89f))
+            Fx.Circle(P.transform.position, 0.8f, Fx.FireBright, 0.3f, P.transform);
     }
 }
 
@@ -142,8 +144,10 @@ public class TurretOverload : ActiveSkill
 
     protected override void Activate()
     {
+        P.PlayAttack();
         foreach (var t in Turret.All.ToArray()) if (t != null) t.Overload(this);
-        Fx.Circle(P.transform.position, 0.8f, Fx.FireDeep, 0.3f, P.transform);
+        if (!LeniaFx.CastRing(LeniaFx.OverloadCast, P.transform, LeniaFx.OverloadCastRadius))
+            Fx.Circle(P.transform.position, 0.8f, Fx.FireDeep, 0.3f, P.transform);
     }
 }
 
@@ -225,6 +229,7 @@ public class GroundSlam : ActiveSkill
     {
         Vector2 at = P.transform.position;
         Vector2 side = P.Facing.x < 0 ? Vector2.left : Vector2.right;
+        P.PlayAttack(side);
         // 큰 망치: 손잡이 끝을 축으로 위에서 앞으로 내려침
         var go = new GameObject("GroundSlamHammer");
         go.transform.position = at + side * 0.2f;
@@ -245,8 +250,11 @@ public class GroundSlam : ActiveSkill
         Vector2 impact = at + side * (LeniaFx.BigHammerLength * 0.85f);
         float r = Radius;
         LeniaFx.Spark(impact);
-        Fx.Disc(at, r, new Color(0.9f, 0.75f, 0.45f, 0.45f), 0.35f);
-        Fx.Circle(at, r, Fx.FireBright, 0.4f);
+        if (!LeniaFx.Shockwave(at, r))
+        {
+            Fx.Disc(at, r, new Color(0.9f, 0.75f, 0.45f, 0.45f), 0.35f);
+            Fx.Circle(at, r, Fx.FireBright, 0.4f);
+        }
         HitDebug.Circle(at, r, HitDebug.BlastColor);
         CameraFollow.Shake(0.2f, 0.18f);
 
@@ -282,7 +290,7 @@ public class GroundSlam : ActiveSkill
             yield return new WaitForSeconds(QuakeInterval);
             Vector2 p = center + Random.insideUnitCircle * QuakeArea;
             float r = QuakeRadius * RangeScale;
-            Fx.Disc(p, r, new Color(0.7f, 0.55f, 0.35f, 0.4f), 0.3f);
+            if (!LeniaFx.Shockwave(p, r)) Fx.Disc(p, r, new Color(0.7f, 0.55f, 0.35f, 0.4f), 0.3f);
             HitDebug.Circle(p, r, HitDebug.BlastColor);
             CameraFollow.Shake(0.08f, 0.08f);
             SkillHits.Circle(p, r, SpecialFixed(amount), Enemy.NoKnock, e => { if (e.hp > 0) e.Slow(QuakeSlowMul, QuakeSlowSeconds); });
@@ -300,7 +308,7 @@ public class GroundSlam : ActiveSkill
         }
         if (e != null && e.hp > 0) last = e.transform.position;
         float r = MarkRadius * RangeScale;
-        Fx.Disc(last, r, new Color(0.85f, 0.6f, 0.3f, 0.45f), 0.3f);
+        if (!LeniaFx.Shockwave(last, r)) Fx.Disc(last, r, new Color(0.85f, 0.6f, 0.3f, 0.45f), 0.3f);
         HitDebug.Circle(last, r, HitDebug.BlastColor);
         SkillHits.Circle(last, r, SpecialFixed(amount), Enemy.NoKnock);
     }
@@ -314,7 +322,7 @@ public class GroundSlam : ActiveSkill
             Vector2 p = center + Random.insideUnitCircle * (ChainArea * RangeScale);
             float r = ChainRadius * RangeScale;
             LeniaFx.Spark(p);
-            Fx.Disc(p, r, new Color(0.9f, 0.75f, 0.45f, 0.4f), 0.3f);
+            if (!LeniaFx.Shockwave(p, r)) Fx.Disc(p, r, new Color(0.9f, 0.75f, 0.45f, 0.4f), 0.3f);
             HitDebug.Circle(p, r, HitDebug.BlastColor);
             CameraFollow.Shake(0.1f, 0.1f);
             SkillHits.Circle(p, r, SpecialFixed(amount), 2f);
@@ -393,6 +401,7 @@ public class Bombardment : ActiveSkill
 
     protected override void Activate()
     {
+        P.PlayAttack();
         Casting = true;   // 마지막 미사일까지 쿨타임 대기
         StartCoroutine(Run(DirectCast));
     }
@@ -429,13 +438,13 @@ public class Bombardment : ActiveSkill
                     for (int k = 0; k < ClusterSplit; k++)
                     {
                         Vector2 p = c + Random.insideUnitCircle * ClusterSpread;
-                        Fx.Circle(p, r, new Color(1f, 0.3f, 0.2f, 0.5f), ClusterSplitHeight / DropSpeed);
+                        LeniaFx.TargetMarker(p, r, ClusterSplitHeight / DropSpeed);
                         MissileProjectile.Spawn(at, null, p, DropSpeed, r, dmg, fromAbove: true, onHit: OnBlastHit, onLand: OnLand);
                     }
                 });
             return;
         }
-        Fx.Circle(target, r, new Color(1f, 0.3f, 0.2f, 0.5f), DropHeight / DropSpeed);   // 낙하 지점 표시
+        LeniaFx.TargetMarker(target, r, DropHeight / DropSpeed);   // 낙하 지점 표시
         MissileProjectile.Spawn(target + Vector2.up * DropHeight, follow, target, DropSpeed, r, dmg, fromAbove: true,
                                 onHit: OnBlastHit, onLand: OnLand);
     }

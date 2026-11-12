@@ -47,7 +47,7 @@ public static class CharacterRoster
         {
             id = "Lenia", name = "레니아", nameEn = "Lenia",
             element = "기획 중", style = "터렛 · 공구 투척", range = "-", speed = "-", feature = "터렛 설치 · 스패너 / 망치 투척 · 포격",
-            note = "스킬 9종 구현 (터렛 강화 · 과부화는 연출만, 공격 모션 없음)",
+            note = "스킬 9종 · 특수 강화 구현",
             availability = CharacterAvailability.Playable, visual = Player.LeniaVisual,
             catalog = SkillCatalog.Lenia, startSkill = "LA01",
         },

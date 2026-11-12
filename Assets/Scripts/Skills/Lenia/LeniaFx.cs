@@ -135,6 +135,53 @@ public static class LeniaFx
         }
     }
 
+    // ---------- 지면 · 터렛 연출 시트 (2행 × 4열, 칸 443px, 2026-11-12) ----------
+    public static Sprite[] GroundShockwave => SpriteEffect.LoadFrames("Lenia_GroundShockwave", 2, 4, 1f);
+    public static Sprite[] OverloadCast => SpriteEffect.LoadFrames("Lenia_OverloadCast", 2, 4, 1f);
+    public static Sprite[] BoostCast => SpriteEffect.LoadFrames("Lenia_BoostCast", 2, 4, 1f);
+    public static Sprite[] TurretDeploy => SpriteEffect.LoadFrames("Lenia_TurretDeploy", 2, 4, 1f);
+    public static Sprite[] TurretDespawn => SpriteEffect.LoadFrames("Lenia_TurretDespawn", 2, 4, 1f);
+    public const float TurretFxSize = 2.2f;         // [임시] 터렛 설치 · 소멸 한 칸 (먼지 최대 ≈ 칸의 70% ≈ 1.55유닛)
+    public const float OverloadCastRadius = 1.2f;   // [임시] 터렛 과부화 시전 고리 반경
+    public const float BoostCastRadius = 1.2f;      // [임시] 터렛 강화 시전 고리 반경
+    public const float FootOffset = 0.64f;          // 플레이어 transform 은 발 위 0.64유닛 (Player.CharacterVisual 참고)
+
+    /// <summary>지면 충격파: 반경 r 범위에 맞춰 (고리 최대 ≈ 칸의 90%). 시트가 없으면 false → 호출 쪽 도형 연출</summary>
+    public static bool Shockwave(Vector2 at, float r)
+    {
+        var f = GroundShockwave;
+        if (f == null) return false;
+        SpriteEffect.Spawn(f, 12.5f, null, at, UnityEngine.Random.Range(0f, 360f), false, 3, r * 2f / 0.9f);   // 적(5) 아래 지면
+        return true;
+    }
+
+    /// <summary>
+    /// 시전 고리: 플레이어 발밑에서 따라다니며 반경 r 까지 퍼짐. extent = 고리 최대 크기 / 칸 (과부화 0.86 · 강화 0.89).
+    /// 시트가 없으면 false
+    /// </summary>
+    public static bool CastRing(Sprite[] frames, Transform owner, float r, float fps = 12.5f, float extent = 0.86f)
+    {
+        if (frames == null || owner == null) return false;
+        SpriteEffect.Spawn(frames, fps, owner, Vector2.down * FootOffset, 0f, false, 4, r * 2f / extent);
+        return true;
+    }
+
+    /// <summary>
+    /// 포격 낙하 지점 표시: 반경 r 원 (그림의 원 지름 497px / 512), seconds 동안 깜빡이다 사라짐.
+    /// 그림이 없으면 기존 붉은 원
+    /// </summary>
+    public static void TargetMarker(Vector2 at, float r, float seconds)
+    {
+        var s = Single("Lenia_TargetMarker", 497f, r * 2f, new Vector2(0.5f, 0.5f));
+        if (s == null) { Fx.Circle(at, r, new Color(1f, 0.3f, 0.2f, 0.5f), seconds); return; }
+        var go = new GameObject("TargetMarker");
+        go.transform.position = at;
+        var sr = go.AddComponent<SpriteRenderer>();
+        sr.sprite = s;
+        sr.sortingOrder = 2;   // 지면 바로 위, 적 · 보석 아래
+        go.AddComponent<MarkerFx>().Init(sr, seconds);
+    }
+
     public static void Spark(Vector2 at) => SpriteEffect.Spawn(Impact, 12.5f, null, at, UnityEngine.Random.Range(0f, 360f), false, 12, ImpactSize);
 
     /// <summary>감전 표시: 대상 몸에 seconds 동안 반복 (적 반경에 맞춤, 가운데 비어 있음)</summary>
@@ -345,5 +392,25 @@ public class MissileProjectile : MonoBehaviour
             return;
         }
         transform.position = pos + to.normalized * step;
+    }
+}
+
+
+/// <summary>LeniaFx.TargetMarker: 나타나며 살짝 줄어들고, 깜빡임이 점점 빨라지다 사라짐</summary>
+public class MarkerFx : MonoBehaviour
+{
+    SpriteRenderer sr;
+    float life, t;
+
+    public void Init(SpriteRenderer r, float seconds) { sr = r; life = Mathf.Max(0.05f, seconds); }
+
+    void Update()
+    {
+        t += Time.deltaTime;
+        if (t >= life) { Destroy(gameObject); return; }
+        float k = t / life;
+        transform.localScale = Vector3.one * Mathf.Lerp(1.15f, 1f, Mathf.Clamp01(t / 0.12f));
+        float blink = 0.75f + 0.25f * Mathf.Cos(t * Mathf.Lerp(10f, 30f, k));   // [임시] 떨어질수록 빠르게
+        var c = sr.color; c.a = Mathf.Clamp01(t / 0.08f) * blink; sr.color = c;
     }
 }

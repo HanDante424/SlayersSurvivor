@@ -101,7 +101,10 @@ public class Turret : MonoBehaviour
                 break;
         }
         t.ShowIdle();
-        Fx.Circle(at, 0.6f, Fx.FireBright, 0.25f);   // 설치 표시
+        // 설치 표시: 착지 먼지 (가운데 = 터렛 자리는 비어 있음). 터렛(8) 바로 아래
+        var deploy = LeniaFx.TurretDeploy;
+        if (deploy != null) SpriteEffect.Spawn(deploy, 12.5f, null, at, 0f, false, 7, LeniaFx.TurretFxSize);
+        else Fx.Circle(at, 0.6f, Fx.FireBright, 0.25f);
         return t;
     }
 
@@ -253,7 +256,10 @@ public class Turret : MonoBehaviour
                 CameraFollow.Shake(0.1f, 0.12f);
             }
         }
-        Fx.Disc(at, 0.5f, new Color(0.7f, 0.7f, 0.7f, 0.5f), 0.25f);
+        // 소멸: 분해 연기 · 부품 조각 (터렛 높이 중간에서)
+        var despawn = LeniaFx.TurretDespawn;
+        if (despawn != null) SpriteEffect.Spawn(despawn, 10f, null, at + Vector2.up * (height * 0.35f), 0f, false, 9, LeniaFx.TurretFxSize);
+        else Fx.Disc(at, 0.5f, new Color(0.7f, 0.7f, 0.7f, 0.5f), 0.25f);
         Destroy(gameObject);
     }
 
@@ -367,7 +373,7 @@ public class Turret : MonoBehaviour
         yield return new WaitForSeconds(0.3f);
         if (Player.I == null) yield break;
         Vector2 point = (Vector2)Player.I.transform.position + UnityEngine.Random.insideUnitCircle * OrbitalMissileArea;
-        Fx.Circle(point, r, new Color(1f, 0.3f, 0.2f, 0.5f), DropHeight / DropSpeed);   // 낙하 지점 표시
+        LeniaFx.TargetMarker(point, r, DropHeight / DropSpeed);   // 낙하 지점 표시
         MissileProjectile.Spawn(point + Vector2.up * DropHeight, null, point, DropSpeed, r, dmg, fromAbove: true, onHit: ApplyOnHit);
     }
 

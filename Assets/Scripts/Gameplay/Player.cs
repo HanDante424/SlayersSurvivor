@@ -135,6 +135,8 @@ public class Player : MonoBehaviour
         /// <summary>공격 모션 {id}_Slash: 프레임 수 (0 = 없음), 칸 월드 크기 · 피벗 (무기 때문에 칸이 더 큼)</summary>
         public int attackCols;
         public float attackCell, attackPivotY;
+        /// <summary>공격 모션 재생 속도 (0 = 설정 파일 attackFps)</summary>
+        public float attackFps;
     }
 
     /// <summary>
@@ -154,11 +156,14 @@ public class Player : MonoBehaviour
     /// 레니아 (외형 테스트): Tools/normalize_character_sheets.py 로 정렬한 시트 (칸 256px, 캐릭터 키 200px, 발끝 = 아래 16px).
     /// 에른과 화면 키(약 1.62유닛)·발 기준 transform 높이(발 위 0.64유닛)가 같도록:
     ///   cell = 1.62 / (200/256) ≈ 2.07,  pivotY = 16/256 + 0.64/2.07 ≈ 0.372
-    /// 정지 = 방향마다 1장, 이동 = 8프레임 10fps. 공격 모션은 아직 없음 (공격 시 모션 없이 판정만)
+    /// 정지 = 방향마다 1장, 이동 = 8프레임 10fps.
+    /// 공격 모션 = 스패너 휘두르기 Lenia_Slash 4×8 (2026-11-12, 칸 256px · 발끝 아래 16px 로 이동 시트와 같은 기준이라 cell · pivot 동일).
+    /// 레니아의 모든 스킬 사용(투척 · 터렛 설치 · 수동 4종)에 같은 모션
     /// </summary>
     public static readonly CharacterVisual LeniaVisual = new CharacterVisual
     {
         id = "Lenia", cell = 2.07f, pivotY = 0.372f, idleCols = 1, runCols = 8, idleFps = 1f, runFps = 10f,
+        attackCols = 8, attackCell = 2.07f, attackPivotY = 0.372f, attackFps = 12f,   // [임시] 원본 10fps → 투척 쿨타임(1.5초)에 맞춰 조금 빠르게
     };
 
     /// <summary>다음 게임에서 쓸 외형 (타이틀 화면에서 선택). 스킬은 아직 모두 에른 스트레이 것</summary>
@@ -223,7 +228,8 @@ public class Player : MonoBehaviour
             anim.LoadClip(SpriteSheetAnimator.Idle, CharacterId + "_Idle", 4, v.idleCols, cell, pivotY, v.idleFps, true);
             // 공격 모션 · 기본 공격 이펙트는 시트가 있는 캐릭터만 (없으면 LoadClip/LoadFrames 가 건너뜀)
             if (v.attackCols > 0)
-                anim.LoadClip(Slash, CharacterId + "_" + Slash, 4, v.attackCols, v.attackCell, v.attackPivotY, Cfg.attackFps, false);
+                anim.LoadClip(Slash, CharacterId + "_" + Slash, 4, v.attackCols, v.attackCell, v.attackPivotY,
+                             v.attackFps > 0f ? v.attackFps : Cfg.attackFps, false);
             // 크기는 Spawn 때 설정 값으로 맞추므로 1유닛 기준으로 자름
             fxSlash = SpriteEffect.LoadFrames(CharacterId + "_FireSlash", 2, 8, 1f);
             transform.localScale = Vector3.one;

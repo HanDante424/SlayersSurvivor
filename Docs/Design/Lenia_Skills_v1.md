@@ -45,3 +45,13 @@
 ## 리소스 (`Assets/Resources/Sprites/Lenia_*`)
 TurretStandard(반동 4×8) · MissileTurret(정지 4방향) · TeslaTower(정지 4방향) · TeslaRingAttack(4×8) · TurretBullet · Missile · Spanner · Hammer ·
 MissileExplosion(가장자리 페이드) · ExhaustSmoke_A/B/C · ElectricImpact · TeslaCharge · Lightning_01~04 · ShockedStatus
+
+2026-11-12 추가 (GPT 제작, `LeniaFx` 맨 위 상수로 크기 조정):
+| 파일 | 규격 | 쓰는 곳 |
+|---|---|---|
+| `Lenia_Slash` | 4행(아래·왼·오·위) × 8열, 칸 256px, 12fps | 스패너 휘두르기 = 레니아의 **모든** 스킬 사용 모션 (투척 · 터렛 설치 · 수동 4종) |
+| `Lenia_GroundShockwave` | 2×4, 칸 443px | 지면 강타 · 지진 · 연쇄 충격 · 붕괴의 낙인 · 망치 강화 타격 충격파 (범위 반경에 맞춤) |
+| `Lenia_TargetMarker` | 512px 1장 | 포격 · 집속탄 · 궤도 폭격 낙하 지점 (떨어질수록 빠르게 깜빡임) |
+| `Lenia_BoostCast` | 2×4, 10fps | 터렛 강화 시전 (플레이어 발밑 황금 톱니 고리) |
+| `Lenia_OverloadCast` | 2×4 | 터렛 과부화 시전 (플레이어 발밑 고리) |
+| `Lenia_TurretDeploy` · `Lenia_TurretDespawn` | 2×4 | 터렛 설치 착지 먼지 · 지속 시간 종료 분해 |
