@@ -296,7 +296,7 @@ public abstract class Skill : MonoBehaviour
         float bestSq = maxDist * maxDist;
         foreach (var e in Enemy.All)
         {
-            if (e.hp <= 0) continue;
+            if (e.hp <= 0 || e.IsWall || e.Hidden) continue;   // 포위 고블린 · 맵 이탈 중인 보스는 조준하지 않음
             float sq = ((Vector2)e.transform.position - from).sqrMagnitude;
             if (sq < bestSq) { bestSq = sq; best = e; }
         }

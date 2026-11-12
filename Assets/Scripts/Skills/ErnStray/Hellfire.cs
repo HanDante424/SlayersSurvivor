@@ -172,7 +172,7 @@ public class Hellfire : Skill
         // 소각: 지속 피해가 적용될 때마다 (화상 틱 · 폭발 · 일촉즉발 · 타오름 각각). 특수 피해 → 다른 트리거 없음
         if (HasSpecial(Incinerate) && d.type == DamageType.DoT && e.hp > 0)
         {
-            float pct = e.kind == EnemyKind.Boss ? IncinerateBoss : IncinerateNormal;
+            float pct = e.IsBoss ? IncinerateBoss : IncinerateNormal;
             float amount = Mathf.Max(IncinerateMin, e.maxHp * pct);   // 체력이 낮은 적도 최소 1 (결정 2026-11-10)
             e.Hit(new DamageInfo(amount, DamageType.Special, this, CastKind.Indirect, isFixed: true),
                   Vector2.zero, Enemy.NoKnock);

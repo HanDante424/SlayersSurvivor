@@ -2,9 +2,30 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public enum EnemyKind { Bat, Runner, Tank, Boss }
+/// <summary>
+/// 몬스터 종류 (2026-11-12 사용자: 고블린 계열). 기본 몹 4종 + [임시] 보스.
+/// 중간보스 고블린 장로 · 홉 고블린 기사는 패턴 설계 후 추가 (Docs/Design/Monsters_v1.md)
+/// </summary>
+public enum EnemyKind
+{
+    /// <summary>고블린: 기본 몹</summary>
+    Goblin,
+    /// <summary>고블린 궁수: 원거리, 공격할 때 멈춤</summary>
+    GoblinArcher,
+    /// <summary>홉 고블린: 중형</summary>
+    Hobgoblin,
+    /// <summary>고블린 라이더: 돌진</summary>
+    GoblinRider,
+    /// <summary>고블린 장로: 마법 · 중간보스 (GoblinElderAI)</summary>
+    GoblinElder,
+    /// <summary>홉 고블린 기사: 중형 · 중간보스 (HobgoblinKnightAI)</summary>
+    HobgoblinKnight,
+    /// <summary>[임시] 예전 보스 — 지금은 나오지 않음 (홉 고블린 기사 설계 후 정리)</summary>
+    Boss,
+}
 
-public class Enemy : MonoBehaviour
+/// <summary>적 1마리. 종류별 행동(궁수 사격 · 라이더 돌진)은 EnemyBehaviors.cs (partial)</summary>
+public partial class Enemy : MonoBehaviour
 {
     public static readonly List<Enemy> All = new List<Enemy>();
 
@@ -18,6 +39,30 @@ public class Enemy : MonoBehaviour
     public EnemyKind kind;
     public float hp, maxHp, speed, damage, radius;
     public int xp;
+
+    /// <summary>화면 표시 이름 (보스 UI 등)</summary>
+    public string DisplayName => kind switch
+    {
+        EnemyKind.Goblin => "고블린",
+        EnemyKind.GoblinArcher => "고블린 궁수",
+        EnemyKind.Hobgoblin => "홉 고블린",
+        EnemyKind.GoblinRider => "고블린 라이더",
+        EnemyKind.GoblinElder => "고블린 장로",
+        EnemyKind.HobgoblinKnight => "홉 고블린 기사",
+        _ => "보스",
+    };
+
+    /// <summary>보스급 (중간보스 포함): 넉백 · 뇌진탕 없음, 소각 보스 비율</summary>
+    public bool IsBoss => kind == EnemyKind.Boss || kind == EnemyKind.GoblinElder || kind == EnemyKind.HobgoblinKnight;
+    /// <summary>맵에서 이탈 중 (홉 고블린 기사 뛰어오르기): 맞지 않음 · 조준 안 됨 · 접촉 피해 없음</summary>
+    public bool Hidden { get; private set; }
+    public void SetHidden(bool on) { Hidden = on; if (sr != null) sr.enabled = !on; }
+    /// <summary>중간보스 포위 고블린 (움직이지 않는 벽, MidBossArena)</summary>
+    public bool IsWall { get; private set; }
+    /// <summary>밀리지 않음 (넉백 · 밀어내기 · 적끼리 밀기)</summary>
+    bool Immovable => IsBoss || IsWall;
+    GoblinElderAI elderAI;
+    HobgoblinKnightAI knightAI;
 
     SpriteRenderer sr;
     Color baseColor;
@@ -39,7 +84,7 @@ public class Enemy : MonoBehaviour
     /// <summary>이 적이 넉백되는 동안 다른 적과 충돌하면 stun 초 기절 (충돌 1회로 끝)</summary>
     public void MarkConcussion(float window, float stun, bool stunOther)
     {
-        if (kind == EnemyKind.Boss) return;   // 보스는 넉백되지 않음
+        if (Immovable) return;   // 보스 · 포위 고블린은 넉백되지 않음
         concussLeft = window; concussStun = stun; concussStunsOther = stunOther;
     }
 
@@ -49,7 +94,7 @@ public class Enemy : MonoBehaviour
     /// <param name="indirect">'간접 사용'에서 나온 기절 (터렛 공격 · 추가 투사체 · 충격파 · 범위 충격). 범위 충격 연쇄 방지용</param>
     public void Stun(float seconds, bool indirect = false)
     {
-        if (seconds <= 0f) return;
+        if (seconds <= 0f || Hidden) return;
         bool was = IsStunned;
         seconds *= CombatMods.StunDurationMul();               // 충격 역학 '기절' '지속 시간' +%
         if (was) seconds += CombatMods.StunReapplyAdd();       // 재기절
@@ -106,7 +151,7 @@ public class Enemy : MonoBehaviour
     /// <summary>피해 없이 밀어내기</summary>
     public void Push(Vector2 dir, float force)
     {
-        if (kind == EnemyKind.Boss) return;
+        if (Immovable) return;
         knockback = dir.normalized * force;
     }
 
@@ -125,11 +170,15 @@ public class Enemy : MonoBehaviour
         Color col; float scale; SpriteFactory.Shape shape = SpriteFactory.Shape.Circle;
         switch (k)
         {
+            // [임시] 수치 — 기획 대기. scale = 그림 긴 변(유닛), 플레이어 키 약 1.62
             default:
-            case EnemyKind.Bat:    maxHp = 10;  speed = 2.2f; damage = 8;  xp = 1;  scale = 0.6f; col = new Color(0.85f, 0.3f, 0.35f); break;
-            case EnemyKind.Runner: maxHp = 7;   speed = 3.6f; damage = 6;  xp = 2;  scale = 0.5f; col = new Color(1f, 0.6f, 0.2f); shape = SpriteFactory.Shape.Diamond; break;
-            case EnemyKind.Tank:   maxHp = 60;  speed = 1.4f; damage = 15; xp = 5;  scale = 1.1f; col = new Color(0.55f, 0.3f, 0.7f); shape = SpriteFactory.Shape.Square; break;
-            case EnemyKind.Boss:   maxHp = 900; speed = 1.8f; damage = 25; xp = 60; scale = 2.2f; col = new Color(0.9f, 0.1f, 0.15f); break;
+            case EnemyKind.Goblin:       maxHp = 10;  speed = 2.2f; damage = 8;  xp = 1;  scale = 0.8f; col = new Color(0.45f, 0.75f, 0.3f); break;
+            case EnemyKind.GoblinArcher: maxHp = 8;   speed = 2.0f; damage = 5;  xp = 2;  scale = 0.8f; col = new Color(0.85f, 0.8f, 0.3f); shape = SpriteFactory.Shape.Diamond; break;
+            case EnemyKind.Hobgoblin:    maxHp = 60;  speed = 1.4f; damage = 15; xp = 5;  scale = 1.3f; col = new Color(0.3f, 0.5f, 0.25f); shape = SpriteFactory.Shape.Square; break;
+            case EnemyKind.GoblinRider:  maxHp = 16;  speed = 2.6f; damage = 10; xp = 3;  scale = 1.2f; col = new Color(0.75f, 0.45f, 0.25f); shape = SpriteFactory.Shape.Diamond; break;
+            case EnemyKind.GoblinElder:  maxHp = 500; speed = 1.0f; damage = 15; xp = 40; scale = 1.4f; col = new Color(0.6f, 0.35f, 0.85f); break;
+            case EnemyKind.HobgoblinKnight: maxHp = 900; speed = 0.9f; damage = 20; xp = 60; scale = 1.8f; col = new Color(0.35f, 0.45f, 0.55f); shape = SpriteFactory.Shape.Square; break;
+            case EnemyKind.Boss:         maxHp = 900; speed = 1.8f; damage = 25; xp = 60; scale = 2.2f; col = new Color(0.9f, 0.1f, 0.15f); break;
         }
         maxHp *= hpMul;
         hp = maxHp;
@@ -137,8 +186,21 @@ public class Enemy : MonoBehaviour
         radius = baseScale * Tuning.Enemy.HitboxRatio(kind);
         transform.localScale = Vector3.one * scale;
         HitboxView.Attach(transform, HitboxView.EnemyColor, () => radius);
-        sr = SpriteFactory.AddRenderer(gameObject, "Enemy_" + k, shape, col, k == EnemyKind.Boss ? 6 : 5);
+        sr = SpriteFactory.AddRenderer(gameObject, "Enemy_" + k, shape, col, IsBoss ? 6 : 5);
         baseColor = sr.color;
+        if (k == EnemyKind.GoblinElder) elderAI = gameObject.AddComponent<GoblinElderAI>();
+        if (k == EnemyKind.HobgoblinKnight) knightAI = gameObject.AddComponent<HobgoblinKnightAI>();
+    }
+
+    /// <summary>중간보스 포위 고블린 1마리: 고블린 모습 · 체력 hp · 움직이지 않음</summary>
+    public static Enemy SpawnWall(Vector2 pos, float hp)
+    {
+        var e = Spawn(EnemyKind.Goblin, pos, 1f);
+        e.name = "ArenaGoblin";
+        e.IsWall = true;
+        e.maxHp = e.hp = hp;
+        e.xp = MidBossArena.WallXp;
+        return e;
     }
 
     void OnEnable() => All.Add(this);
@@ -178,20 +240,24 @@ public class Enemy : MonoBehaviour
 
         if (concussLeft > 0) CheckConcussion(pos);
 
-        float moveSpeed = stunned ? 0f : speed * slowMul * statusSpeedMul;
-        pos += (dir * moveSpeed + knockback) * Time.deltaTime;
+        // 종류별 행동 (기절하면 준비 중인 공격 취소)
+        float speedMul = slowMul * statusSpeedMul;
+        Vector2 vel = Vector2.zero, face = dir;
+        if (stunned) CancelAttack();
+        else vel = Behave(pos, dir, dist, speedMul, ref face);
+        pos += (vel + knockback) * Time.deltaTime;
         knockback = Vector2.Lerp(knockback, Vector2.zero, KnockDecay * Time.deltaTime);
         transform.position = pos;
-        if (!stunned) sr.flipX = dir.x < 0;
+        if (!stunned && Mathf.Abs(face.x) > 0.01f) sr.flipX = face.x < 0;
 
         // 기절 중에는 접촉 공격 없음
         float touch = radius + p.radius;
-        if (!stunned && (p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);
+        if (!stunned && !Hidden && (p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);
 
         // 너무 멀어지면 플레이어 근처로 재배치 (뱀서 방식)
         // 기준은 카메라 시야에 맞춰 자동 (화면 밖 생성 거리 + 6 넘으면 화면 밖 생성 거리로)
         float far = GameManager.OffscreenRadius;
-        if (dist > far + 6f) transform.position = (Vector2)p.transform.position + UnityEngine.Random.insideUnitCircle.normalized * far;
+        if (!Immovable && dist > far + 6f) transform.position = (Vector2)p.transform.position + UnityEngine.Random.insideUnitCircle.normalized * far;
 
         if (flash > 0)
         {
@@ -252,12 +318,13 @@ public class Enemy : MonoBehaviour
     /// </summary>
     public void Hit(DamageInfo info, Vector2 fromDir, float knock = 3f)
     {
-        if (hp <= 0) return;
+        if (hp <= 0 || Hidden) return;   // 맵 이탈 중에는 맞지 않음
         float dmg = DamageMath.Target(this, info);
+        if (knightAI != null && !info.isFixed) dmg = Mathf.Floor(dmg * knightAI.DamageMul(fromDir) + 1e-4f);   // 방패 막기 (고정 피해 제외)
         if (DebugCheats.OneHitKill) dmg = Mathf.Max(dmg, hp);   // 테스트: 한 방에 처치
         if (!DebugCheats.ImmortalEnemies) hp -= dmg;            // 테스트: 피해 숫자만 표시
         flash = 0.08f;
-        if (kind != EnemyKind.Boss && knock >= 0f) knockback = fromDir.normalized * knock;   // NoKnock = 진행 중인 넉백 유지
+        if (!Immovable && knock >= 0f) knockback = fromDir.normalized * knock;   // NoKnock = 진행 중인 넉백 유지
         DamageText.Show(transform.position, dmg);
         if (info.type != DamageType.Special)
         {
@@ -287,6 +354,7 @@ public class Enemy : MonoBehaviour
         for (int i = start; i < n; i += 2)
         {
             var a = All[i];
+            if (a.IsWall || a.IsBoss) continue;   // 포위 고블린 · 보스는 밀리지 않음 (다른 적만 밀려남)
             Vector2 pa = a.transform.position;
             Vector2 push = Vector2.zero;
             int checks = 0;
@@ -294,6 +362,7 @@ public class Enemy : MonoBehaviour
             {
                 if (i == j) continue;
                 var b = All[j];
+                if (b.Hidden) continue;
                 Vector2 d = pa - (Vector2)b.transform.position;
                 float min = a.radius + b.radius;
                 float sq = d.sqrMagnitude;

@@ -71,9 +71,10 @@ public class TitleScreen : MonoBehaviour
     {
         var kinds = new[]
         {
-            ("Enemy_Bat", SpriteFactory.Shape.Circle, new Color(0.85f, 0.3f, 0.35f), 0.6f),
-            ("Enemy_Runner", SpriteFactory.Shape.Diamond, new Color(1f, 0.6f, 0.2f), 0.5f),
-            ("Enemy_Tank", SpriteFactory.Shape.Square, new Color(0.55f, 0.3f, 0.7f), 1.1f),
+            ("Enemy_Goblin", SpriteFactory.Shape.Circle, new Color(0.45f, 0.75f, 0.3f), 0.8f),
+            ("Enemy_GoblinArcher", SpriteFactory.Shape.Diamond, new Color(0.85f, 0.8f, 0.3f), 0.8f),
+            ("Enemy_Hobgoblin", SpriteFactory.Shape.Square, new Color(0.3f, 0.5f, 0.25f), 1.3f),
+            ("Enemy_GoblinRider", SpriteFactory.Shape.Diamond, new Color(0.75f, 0.45f, 0.25f), 1.2f),
         };
         for (int i = 0; i < 28; i++)
         {

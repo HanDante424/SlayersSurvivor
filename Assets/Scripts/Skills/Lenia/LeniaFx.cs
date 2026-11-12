@@ -199,7 +199,7 @@ public static class LeniaFx
         float bestSq = maxDist * maxDist;
         foreach (var e in Enemy.All)
         {
-            if (e == null || e.hp <= 0 || (exclude != null && exclude.Contains(e))) continue;
+            if (e == null || e.hp <= 0 || e.IsWall || e.Hidden || (exclude != null && exclude.Contains(e))) continue;   // 포위 고블린은 조준하지 않음
             float sq = ((Vector2)e.transform.position - from).sqrMagnitude;
             if (sq < bestSq) { bestSq = sq; best = e; }
         }

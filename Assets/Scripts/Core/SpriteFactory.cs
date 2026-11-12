@@ -4,7 +4,7 @@ using UnityEngine;
 /// <summary>
 /// 임시 그래픽 생성기.
 /// Assets/Resources/Sprites/ 에 같은 이름의 스프라이트를 넣으면 자동으로 그 이미지를 사용합니다.
-/// 이름 목록: Player, Enemy_Bat, Enemy_Runner, Enemy_Tank, Enemy_Boss, Soul_Small, Soul_Mid, Soul_Large, FireBall, Ground
+/// 이름 목록: Player, Enemy_Goblin, Enemy_GoblinArcher, Enemy_Hobgoblin, Enemy_GoblinRider, Enemy_Boss, Enemy_Arrow, Soul_Small, Soul_Mid, Soul_Large, FireBall, Ground
 ///
 /// 크기: 그림의 긴 변이 1유닛이 되도록 맞춘 뒤 각 오브젝트의 scale 로 키움 (도형 대체 이미지와 같은 기준).
 ///       투명 여백도 크기에 포함되므로 그림은 여백 없이 꽉 채워 자를 것.
@@ -56,7 +56,7 @@ public static class SpriteFactory
         return s;
     }
 
-    public enum Shape { Circle, Square, Diamond, Ring, Ground }
+    public enum Shape { Circle, Square, Diamond, Ring, Ground, HalfDisc }
 
     static Sprite Make(Shape shape)
     {
@@ -75,6 +75,9 @@ public static class SpriteFactory
             {
                 case Shape.Circle:
                     a = Mathf.Clamp01((1f - Mathf.Sqrt(dx * dx + dy * dy)) * c);
+                    break;
+                case Shape.HalfDisc:   // 오른쪽 반원 (회전시켜 방향을 맞춤)
+                    a = dx >= 0f ? Mathf.Clamp01((1f - Mathf.Sqrt(dx * dx + dy * dy)) * c) * Mathf.Clamp01(dx * c + 1f) : 0f;
                     break;
                 case Shape.Square:
                     a = 1f;

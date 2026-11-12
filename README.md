@@ -15,7 +15,7 @@ Unity Hub → Add → 이 폴더 → Play (타이틀부터 시작). 타이틀 "�
 - 궁극기: Q (게이지가 가득 찼을 때)
 - 레벨업 선택: 마우스 클릭 또는 1 / 2 / 3
 - 일시정지: ESC, 재시작: R (게임 오버 후)
-- 테스트: F1 판정 표시, F2 치트 패널 (무적, 경험치 미드랍, 레벨 +1/+10, 궁극기 게이지 채우기 등), F6 쿨타임 감소 100%, F7 자동 스킬 사용 금지, F8 적 생성 중지, 치트 패널 오른쪽 열에서 스킬별 사용 금지 · 스킬별 Lv+1 (기본 강화 → 특수 강화 화면 바로 열기)
+- 테스트: F1 판정 표시, F2 치트 패널 (무적, 경험치 미드랍, 레벨 +1/+10, 궁극기 게이지 채우기 등), F6 쿨타임 감소 100%, F7 자동 스킬 사용 금지, F8 적 생성 중지, F10 고블린 장로 소환 · F12 홉 고블린 기사 소환 (중간보스 + 포위, 적 생성 중지와 같이 사용 가능 · 치트 버튼 옆에 항상 표시), F11 보스 체력 절반 (지금 체력의 절반, 죽지 않음), 치트 패널 오른쪽 열에서 스킬별 사용 금지 · 스킬별 Lv+1 (기본 강화 → 특수 강화 화면 바로 열기)
 
 ## 현재 구현 (에른 스트레이)
 - 자동 6종: 파이어 슬래시, 솔라 슬래시, 파이어 볼, 파이어 버스터, 파이어 블레이드, 파이어 스톰
@@ -47,7 +47,7 @@ Unity Hub → Add → 이 폴더 → Play (타이틀부터 시작). 타이틀 "�
   F1 판정 표시에서 하늘색 원 = 솔라 슬래시 넉백 범위 (피해 없이 밀기만)
 - 기획서에 등급조차 없는 값(참격 횟수, 슬로우 비율 등): `Assets/Scripts/Skills/ErnStray/*.cs` 각 클래스 맨 위 `[임시]` 상수
 - 캐릭터 감각 값: `Assets/Resources/Config/ErnStrayConfig.asset`
-- 적 판정: `Assets/Resources/Config/EnemyConfig.asset`, 적 스탯: `Enemy.cs` → `Setup()`
+- 적 판정: `Assets/Resources/Config/EnemyConfig.asset`, 적 스탯: `Enemy.cs` → `Setup()`, 궁수 · 라이더 행동 수치: `EnemyBehaviors.cs` 맨 위
 - 스폰 속도/난이도 곡선: `GameManager.cs` → `Spawning()`
 
 ## 그래픽 교체
@@ -56,7 +56,7 @@ Unity Hub → Add → 이 폴더 → Play (타이틀부터 시작). 타이틀 "�
 - 이펙트: `ErnStray_FireSlash` (기본 공격, 치명타도 동일), `FireBall`
 - 스킬 이펙트 (FireForge 제작, `ErnSkillFx` 에서 로드 · 크기/속도는 각 스킬 `[임시] Fx*` 상수):
   `ErnStray_SkillFireSlash` 2행 x 4열(7프레임) · `ErnStray_SkillTripleSlash` 2행 x 5열 · `ErnStray_SkillSolarSlash` 4행 x 3열
-- 적: `Enemy_Bat`, `Enemy_Runner`, `Enemy_Tank`, `Enemy_Boss` — 오른쪽을 보는 그림 1장, 여백 없이 자름 (긴 변 = 1유닛 × 적 크기)
+- 적: `Enemy_Goblin`, `Enemy_GoblinArcher`, `Enemy_Hobgoblin`, `Enemy_GoblinRider`, `Enemy_Boss`([임시]), 궁수 화살 `Enemy_Arrow` — 오른쪽을 보는 그림 1장, 여백 없이 자름 (긴 변 = 1유닛 × 적 크기). 몬스터 기획: [Docs/Design/Monsters_v1.md](Docs/Design/Monsters_v1.md)
 - 경험치 = 영혼 조각: `Soul_Small` (청백, 1~4) · `Soul_Mid` (청록, 5~19) · `Soul_Large` (붉은 주황, 20~), 256px · 떠서 흔들리는 연출은 `Gem.cs`
 - 바닥: `Ground` — 이음매 없는 반복 타일 1장 = `SpriteFactory.GroundTileSize` (6유닛). 현재 Dark_Moss_Wasteland_Tile_v1 (경계 번진 띠 보정)
 - 한 장짜리 그림(적 · 영혼 조각 · `FireBall`)은 긴 변이 1유닛이 되도록 맞춘 뒤 각 오브젝트 크기를 곱함

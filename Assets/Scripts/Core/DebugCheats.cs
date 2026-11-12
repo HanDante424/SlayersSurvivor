@@ -6,6 +6,8 @@ using UnityEngine;
 /// 화면 왼쪽 아래 버튼 또는 단축키로 켜고 끕니다.
 ///  F1 판정 표시 / F2 패널 열기 / F3 무적 / F4 원히트킬 / F5 적 체력 무제한
 ///  F6 쿨타임 감소 100% / F7 자동 스킬 사용 금지 / F8 적 생성 중지 / F9 경험치 미드랍
+///  F10 고블린 장로 소환 · F12 홉 고블린 기사 소환 (중간보스 + 포위, 적 생성 중지와 함께 사용 가능 — 패널이 닫혀 있어도 버튼 표시)
+///  F11 보스 체력 절반 (지금 체력의 절반으로, 죽지 않음 — 50% 패턴 강화 확인용, 보스가 있을 때 버튼 표시)
 ///  레벨 +1 / +10 (궁극기 획득 Lv.45 확인용), 궁극기 게이지 채우기, 화상 표시 테스트 (파티클 확인용)
 ///  오른쪽 열: 스킬별 사용 금지 (레벨업 후보 스킬 + 보유 스킬) / Lv+1 = 그 스킬의 기본 강화 화면 바로 열기
 ///            (Lv.5·10·15 특수 강화 확인용, 캐릭터 레벨은 그대로)
@@ -23,7 +25,7 @@ public class DebugCheats : MonoBehaviour
     public static bool NoCooldown;
     /// <summary>자동 스킬이 발동하지 않음 — 수동 스킬만 테스트할 때</summary>
     public static bool NoAutoSkills;
-    /// <summary>새 적(보스 포함)이 생성되지 않음. 이미 있는 적은 그대로</summary>
+    /// <summary>새 적(일반 몹 · 3분 중간보스)이 생성되지 않음. 이미 있는 적은 그대로. 보스 소환(F10)은 예외</summary>
     public static bool NoSpawn;
     /// <summary>적이 죽어도 경험치 보석을 떨어뜨리지 않음 — 레벨업 화면 없이 스킬만 볼 때</summary>
     public static bool NoXpDrop;
@@ -46,7 +48,31 @@ public class DebugCheats : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.F7)) NoAutoSkills = !NoAutoSkills;
         if (Input.GetKeyDown(KeyCode.F8)) NoSpawn = !NoSpawn;
         if (Input.GetKeyDown(KeyCode.F9)) NoXpDrop = !NoXpDrop;
+        if (Input.GetKeyDown(KeyCode.F10)) SummonBoss(EnemyKind.GoblinElder);
+        if (Input.GetKeyDown(KeyCode.F12)) SummonBoss(EnemyKind.HobgoblinKnight);
+        if (Input.GetKeyDown(KeyCode.F11)) HalveBossHp();
     }
+
+    /// <summary>
+    /// 보스 소환: 지금 위치에 중간보스 + 포위 고블린 (적 생성 중지와 무관하게 동작).
+    /// 체력 배율은 경과 시간 기준 (일반 스폰과 같은 공식). 이미 중간보스가 있으면 무시
+    /// </summary>
+    static void SummonBoss(EnemyKind kind)
+    {
+        if (MidBossArena.Active || Player.I == null || GameManager.I == null || GameManager.I.State != GameState.Playing) return;
+        MidBossArena.Begin(kind, Player.I.transform.position, 1f + GameManager.I.Elapsed / 60f * 0.35f);
+    }
+
+    /// <summary>보스 체력을 지금 체력의 절반으로 (최소 1, 피해가 아니라 체력만 바뀜 → 피격 트리거 없음)</summary>
+    static void HalveBossHp()
+    {
+        var b = MidBossArena.Boss;
+        if (b == null) return;
+        b.hp = Mathf.Max(1f, Mathf.Floor(b.hp * 0.5f));
+    }
+
+    static string ElderLabel => MidBossArena.Active ? "보스 진행 중" : "장로 소환 (F10)";
+    static string KnightLabel => MidBossArena.Active ? "보스 진행 중" : "기사 소환 (F12)";
 
     static void SetOneHitKill(bool on)
     {
@@ -86,6 +112,15 @@ public class DebugCheats : MonoBehaviour
                 GUI.color = Color.white;
             }
             if (GUI.Button(new Rect(x, H - bh - 12, 140, bh), "치트 (F2)", UIStyles.MenuButton)) open = true;
+            if (MidBossArena.Active)
+            {
+                if (GUI.Button(new Rect(x + 148, H - bh - 12, 230, bh), "보스 체력 절반 (F11)", UIStyles.MenuButton)) HalveBossHp();
+            }
+            else
+            {
+                if (GUI.Button(new Rect(x + 148, H - bh - 12, 190, bh), ElderLabel, UIStyles.MenuButton)) SummonBoss(EnemyKind.GoblinElder);
+                if (GUI.Button(new Rect(x + 346, H - bh - 12, 190, bh), KnightLabel, UIStyles.MenuButton)) SummonBoss(EnemyKind.HobgoblinKnight);
+            }
             return;
         }
 
@@ -103,6 +138,9 @@ public class DebugCheats : MonoBehaviour
             "레벨 +10",
             "궁극기 게이지 채우기",
             FlameSword.I != null ? "화상 1스택 부여 (화면 안 적)" : "화상 표시 테스트 (화면 안 적 5초)",
+            ElderLabel + " · 고블린 장로",
+            KnightLabel + " · 홉 고블린 기사",
+            MidBossArena.Active ? "보스 체력 절반 (F11)" : "보스 체력 절반 (보스 없음)",
             "닫기 (F2)",
         };
         float top = H - 12 - labels.Length * (bh + gap);
@@ -133,7 +171,10 @@ public class DebugCheats : MonoBehaviour
                     foreach (var e in SkillHits.OnScreen(onScreen))
                         if (FlameSword.I != null) FlameSword.I.AddStacks(e, 1); else e.ShowBurn(5f);
                     break;
-                case 12: open = false; break;
+                case 12: SummonBoss(EnemyKind.GoblinElder); break;
+                case 13: SummonBoss(EnemyKind.HobgoblinKnight); break;
+                case 14: HalveBossHp(); break;
+                case 15: open = false; break;
             }
         }
 

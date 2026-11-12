@@ -19,7 +19,20 @@ public class Player : MonoBehaviour
 
     // 감각 조정 값은 설정 파일에서 (Assets/Resources/Config/ErnStrayConfig.asset)
     static PlayerConfig Cfg => Tuning.ErnStray;
-    public float moveSpeed => Cfg.moveSpeed * moveSpeedMul;
+    public float moveSpeed => Cfg.moveSpeed * moveSpeedMul * ZoneSlowMul;
+
+    // 장판 감속 (얼음 지대): 장판이 매 프레임 다시 걸어 줌, 안 걸리면 다음 프레임에 풀림
+    float zoneSlowMul = 1f;
+    int zoneSlowFrame = -10;
+    float ZoneSlowMul => Time.frameCount - zoneSlowFrame <= 1 ? zoneSlowMul : 1f;
+
+    /// <summary>이번 프레임 장판 감속 (여러 장판이면 가장 강한 것)</summary>
+    public void ApplyZoneSlow(float mul)
+    {
+        if (Time.frameCount - zoneSlowFrame > 1) zoneSlowMul = mul;
+        else zoneSlowMul = Mathf.Min(zoneSlowMul, mul);
+        zoneSlowFrame = Time.frameCount;
+    }
     public float pickupRadius => Cfg.pickupRadius * pickupMul;
     /// <summary>피격 판정 반경</summary>
     public float radius => Cfg.hurtRadius;
@@ -51,6 +64,24 @@ public class Player : MonoBehaviour
 
     public void SetInvulnerable(float seconds) => skillInvuln = Mathf.Max(skillInvuln, seconds);
     public void Root(float seconds) => rootLeft = Mathf.Max(rootLeft, seconds);
+
+    // ---------- 보스 공격: 기절 · 밀려남 ----------
+    float stunLeft;
+    Vector2 knockVel;
+    /// <summary>기절: 이동 · 수동 스킬 사용 불가 (자동 스킬은 계속)</summary>
+    public bool IsStunned => stunLeft > 0f;
+
+    /// <summary>
+    /// 보스 공격 적중: 피해 + 기절(초) + 밀려남(거리, 방향). 무적(치트 · 스킬 무적) 중이면 아무 효과 없음.
+    /// 피격 직후 0.35초 무적은 피해만 막고 기절 · 밀려남은 그대로 적용
+    /// </summary>
+    public void HitByBoss(float damage, float stun, Vector2 knockDir, float knockDistance)
+    {
+        if (DebugCheats.God || IsInvulnerable || GameManager.I.State != GameState.Playing) return;
+        TakeDamage(damage);
+        if (stun > 0f) { stunLeft = Mathf.Max(stunLeft, stun); Root(stun); }
+        if (knockDistance > 0f && knockDir.sqrMagnitude > 0.0001f) knockVel = knockDir.normalized * Enemy.KnockSpeed(knockDistance);
+    }
 
     /// <summary>
     /// 돌진. distance 를 duration 동안 이동. onStep 은 매 프레임(위치 이동 후) 호출.
@@ -263,6 +294,7 @@ public class Player : MonoBehaviour
         float dt = Time.deltaTime;
         if (skillInvuln > 0) skillInvuln -= dt;
         if (rootLeft > 0) rootLeft -= dt;
+        if (stunLeft > 0) stunLeft -= dt;
 
         var input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
         if (input.sqrMagnitude > 1f) input.Normalize();
@@ -289,6 +321,16 @@ public class Player : MonoBehaviour
             if (anim != null) anim.SetMove(input);
             else if (Mathf.Abs(input.x) > 0.01f) sr.flipX = input.x < 0;
         }
+
+        // 보스 공격 밀려남
+        if (knockVel.sqrMagnitude > 0.01f)
+        {
+            transform.position += (Vector3)(knockVel * dt);
+            knockVel = Vector2.Lerp(knockVel, Vector2.zero, Enemy.KnockDecay * dt);
+        }
+
+        // 중간보스 포위 고블린 사이로 지나갈 수 없음 (돌진 포함)
+        MidBossArena.ConstrainPlayer(this);
 
         // 스킬 입력 [임시 키: SkillTuning]
         var T = Tuning.Skills;
@@ -317,7 +359,8 @@ public class Player : MonoBehaviour
         for (int i = 0; i < skills.Count; i++) skills[i].Tick(dt);
 
         // 스킬 무적 표시: 살짝 밝게
-        if (invuln <= 0) sr.color = IsInvulnerable ? new Color(1f, 0.85f, 0.6f, 0.8f) : baseColor;
+        if (invuln <= 0) sr.color = IsInvulnerable ? new Color(1f, 0.85f, 0.6f, 0.8f)
+                                   : IsStunned ? new Color(1f, 0.95f, 0.45f) : baseColor;   // 기절 = 노랑
     }
 
     public void TakeDamage(float dmg)

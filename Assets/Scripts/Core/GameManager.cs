@@ -24,6 +24,7 @@ public class GameManager : MonoBehaviour
 
     float spawnTimer;
     float nextBossTime = 180f;
+    int bossCount;
     readonly List<Upgrade> choices = new List<Upgrade>();
     int pendingLevelUps;
 
@@ -40,6 +41,7 @@ public class GameManager : MonoBehaviour
         I = this;
         Time.timeScale = 1f;
         CombatMods.Clear();   // 재시작 시 이전 판의 패시브 수정자가 남지 않게
+        MidBossArena.Reset();  // 중간보스 포위 상태도 새 판으로
         Application.targetFrameRate = 120;
 
         var cam = Camera.main;
@@ -103,26 +105,34 @@ public class GameManager : MonoBehaviour
         float hpMul = 1f + minutes * 0.35f;
 
         spawnTimer -= Time.deltaTime;
-        if (spawnTimer <= 0 && Enemy.All.Count < maxEnemies)
+        if (spawnTimer <= 0 && Enemy.All.Count - MidBossArena.WallCount < maxEnemies)   // 포위 고블린은 수에서 뺌
         {
             spawnTimer = interval;
             int batch = 1 + (int)(minutes * 0.8f);
             for (int i = 0; i < batch; i++) Enemy.Spawn(PickKind(minutes), SpawnPos(), hpMul);
         }
 
-        if (Elapsed >= nextBossTime)
+        // 중간보스: 3분마다 고블린 장로 → 홉 고블린 기사 번갈아 (이전 중간보스가 아직 살아 있으면 쓰러뜨린 뒤 바로)
+        if (Elapsed >= nextBossTime && !MidBossArena.Active)
         {
             nextBossTime += 180f;
-            Enemy.Spawn(EnemyKind.Boss, SpawnPos(), hpMul);
+            MidBossArena.Begin(bossCount++ % 2 == 0 ? EnemyKind.GoblinElder : EnemyKind.HobgoblinKnight, Player.I.transform.position, hpMul);
         }
     }
 
+    /// <summary>
+    /// [임시] 등장 비율: 처음엔 고블린만 → 45초부터 궁수 · 1분 30초부터 라이더 · 2분부터 홉 고블린, 시간이 갈수록 각 비율이 올라감 (각 최대 20%)
+    /// </summary>
     EnemyKind PickKind(float minutes)
     {
+        float hob = minutes > 2f ? Mathf.Min(0.2f, 0.05f + (minutes - 2f) * 0.03f) : 0f;
+        float rider = minutes > 1.5f ? Mathf.Min(0.2f, 0.08f + (minutes - 1.5f) * 0.03f) : 0f;
+        float archer = minutes > 0.75f ? Mathf.Min(0.2f, 0.1f + (minutes - 0.75f) * 0.03f) : 0f;
         float r = Random.value;
-        if (minutes > 2f && r < Mathf.Min(0.2f, 0.05f + minutes * 0.02f)) return EnemyKind.Tank;
-        if (minutes > 1f && r < 0.45f) return EnemyKind.Runner;
-        return EnemyKind.Bat;
+        if (r < hob) return EnemyKind.Hobgoblin;
+        if (r < hob + rider) return EnemyKind.GoblinRider;
+        if (r < hob + rider + archer) return EnemyKind.GoblinArcher;
+        return EnemyKind.Goblin;
     }
 
     /// <summary>화면 밖 거리: 플레이어(화면 중앙)에서 화면 모서리 + 1.5 유닛. 적 생성·재배치 기준</summary>
@@ -637,6 +647,36 @@ public class GameManager : MonoBehaviour
     static string KeyLabel(KeyCode k) => k == KeyCode.Space ? "SPC" : k.ToString();
 
     // ---------- UI (IMGUI 임시 UI, 스타일은 UIStyles 공용) ----------
+    static GUIStyle bossNameStyle, bossHpStyle;
+
+    /// <summary>
+    /// 보스 전용 UI (화면 위 가운데): 몬스터 이름 + 체력 바 (현재 / 최대, 50% 눈금 = 패턴 강화 시점).
+    /// 중간보스(MidBossArena.Boss)가 살아 있을 때만
+    /// </summary>
+    void DrawBossBar(float W)
+    {
+        var b = MidBossArena.Boss;
+        if (b == null) return;
+        if (bossNameStyle == null)
+        {
+            bossNameStyle = new GUIStyle(UIStyles.Label) { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
+                                                           normal = { textColor = UIStyles.Accent } };
+            bossHpStyle = new GUIStyle(UIStyles.Label) { fontSize = 15, alignment = TextAnchor.MiddleCenter };
+        }
+        float bw = Mathf.Clamp(W * 0.42f, 360f, 760f), bh = 20f;
+        float bx = (W - bw) / 2f, ny = 46f, by = ny + 32f;
+        GUI.Label(new Rect(bx, ny, bw, 30), b.DisplayName, bossNameStyle);
+        GUI.color = new Color(0, 0, 0, 0.8f);
+        GUI.DrawTexture(new Rect(bx - 2, by - 2, bw + 4, bh + 4), UIStyles.White);   // 테두리
+        GUI.color = Color.white;
+        float t = b.maxHp > 0f ? Mathf.Clamp01(b.hp / b.maxHp) : 0f;
+        UIStyles.Bar(new Rect(bx, by, bw, bh), t, t > 0.5f ? new Color(0.85f, 0.2f, 0.25f) : new Color(1f, 0.45f, 0.15f));
+        GUI.color = new Color(1f, 1f, 1f, 0.6f);
+        GUI.DrawTexture(new Rect(bx + bw * 0.5f - 1, by, 2, bh), UIStyles.White);   // 50% 눈금
+        GUI.color = Color.white;
+        GUI.Label(new Rect(bx, by, bw, bh), $"{Mathf.CeilToInt(Mathf.Max(0f, b.hp))} / {Mathf.CeilToInt(b.maxHp)}", bossHpStyle);
+    }
+
     void OnGUI()
     {
         UIStyles.Init();
@@ -650,6 +690,8 @@ public class GameManager : MonoBehaviour
         var ts = TimeSpan.FromSeconds(Elapsed);
         GUI.Label(new Rect(W / 2 - 40, 18, 120, 30), $"{ts.Minutes:00}:{ts.Seconds:00}", UIStyles.Label);
         GUI.Label(new Rect(W - 160, 18, 150, 30), $"처치 {Kills}", UIStyles.Label);
+
+        DrawBossBar(W);
 
         // 체력 바 (플레이어 아래)
         var sp = Camera.main.WorldToScreenPoint(p.transform.position + Vector3.down * p.HealthBarOffset);
