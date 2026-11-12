@@ -54,7 +54,7 @@ public class Turret : MonoBehaviour
     // 수치 지정용 (화면에 표기하지 않음)
     public const float OrbitalMissileArea = 5f;  // 궤도 폭격: 플레이어 주변 낙하 반경
     public const float OrbitalTeslaArea = 8f;    // 낙뢰 발생(Lv15): 플레이어 주변 낙뢰 반경
-    const float OrbitalStrikeRadius = 1.3f;      // [임시] 낙뢰 1발 피해 반경
+    const float OrbitalStrikeRadius = 1.3f * 0.4f;   // [임시] 낙뢰 1발 피해 반경 (1.3 → -60%, 2026-11-12 사용자)
     const float DropHeight = 7f, DropSpeed = 14f;   // [임시] 궤도 폭격 낙하 (포격 실시와 같은 값)
     const float MaxIntervalCut = 0.9f;           // '공격 간격' 감소 상한 (쿨타임 감소와 같은 90%)
 
@@ -404,7 +404,7 @@ public class Turret : MonoBehaviour
             Vector2 p = (Vector2)Player.I.transform.position + UnityEngine.Random.insideUnitCircle * OrbitalTeslaArea;
             float r = OrbitalStrikeRadius * rangeScale;
             LeniaFx.Bolt(p + Vector2.up * 8f, p, 0.25f);
-            LeniaFx.Spark(p);
+            LeniaFx.LightningStrike(p, r);   // 피격 범위 크기 그대로 표시
             HitDebug.Circle(p, r, HitDebug.BlastColor);
             SkillHits.Circle(p, r, Shot(), Enemy.NoKnock, ApplyOnHit);
             yield break;

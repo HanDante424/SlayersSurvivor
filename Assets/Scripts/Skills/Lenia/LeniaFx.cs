@@ -115,6 +115,26 @@ public static class LeniaFx
         HitDebug.Circle(at, r, HitDebug.BlastColor);
     }
 
+    /// <summary>
+    /// 낙뢰 착탄: 피격 범위(반경 r)가 그대로 보이도록 전기 충격 시트를 범위 크기로 키우고,
+    /// 범위 경계 원 + 옅은 채움 + 경계까지 뻗는 작은 방전을 함께 표시
+    /// </summary>
+    public static void LightningStrike(Vector2 at, float r)
+    {
+        var col = new Color(0.55f, 0.85f, 1f, 1f);
+        Fx.Disc(at, r, new Color(col.r, col.g, col.b, 0.22f), 0.3f, 0f);
+        Fx.Circle(at, r, new Color(col.r, col.g, col.b, 0.85f), 0.35f, null, 0f);
+        var f = Impact;
+        if (f != null) SpriteEffect.Spawn(f, 12.5f, null, at, UnityEngine.Random.Range(0f, 360f), false, 12, r * 2f / 0.85f);
+        const int arcs = 5;   // [임시] 경계까지 뻗는 방전 수
+        float a0 = UnityEngine.Random.Range(0f, 360f);
+        for (int i = 0; i < arcs; i++)
+        {
+            float a = (a0 + 360f / arcs * i + UnityEngine.Random.Range(-15f, 15f)) * Mathf.Deg2Rad;
+            Bolt(at, at + new Vector2(Mathf.Cos(a), Mathf.Sin(a)) * r, 0.2f);
+        }
+    }
+
     public static void Spark(Vector2 at) => SpriteEffect.Spawn(Impact, 12.5f, null, at, UnityEngine.Random.Range(0f, 360f), false, 12, ImpactSize);
 
     /// <summary>감전 표시: 대상 몸에 seconds 동안 반복 (적 반경에 맞춤, 가운데 비어 있음)</summary>
