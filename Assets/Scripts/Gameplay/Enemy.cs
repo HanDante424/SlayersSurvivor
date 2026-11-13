@@ -259,13 +259,14 @@ public partial class Enemy : MonoBehaviour
             // [임시] 가니악 (레이드 보스): 수치 미정 · 이동 속도 느림 (사용자). 그림 Enemy_Ganiac 없으면 짙은 보라 원
             case EnemyKind.Ganiac:       maxHp = 3000; speed = 1.0f; damage = 20; xp = 100; scale = 2.25f; col = new Color(0.35f, 0.12f, 0.45f); break;   // 크기 3 → 2.25 (사용자: 0.75배)
             // [임시] 카구츠치: 수치 전부 미정 (가니악 값을 확정으로 쓰지 않음 — 테스트용 임시). 그림 Enemy_Kagutsuchi 없으면 주황 원
-            case EnemyKind.Kagutsuchi:   maxHp = 3000; speed = 1.0f; damage = 20; xp = 100; scale = 2.25f; col = new Color(0.9f, 0.4f, 0.15f); break;   // 크기 3 → 2.25 (사용자: 0.75배)
-            // 야타의 거울: 체력은 생성 때 카구츠치 최대 체력 × 15 로 덮어씀. [임시] 크기 1.1, 그림 Enemy_KagutsuchiMirror 없으면 밝은 원
+            case EnemyKind.Kagutsuchi:   maxHp = 3000; speed = 1.0f; damage = 20; xp = 100; scale = 4f; col = new Color(0.9f, 0.4f, 0.15f); break;   // 그림 Enemy_Kagutsuchi (옥좌에 앉은 정면 치비, 2026-11-13) 옥좌 포함 키 4 [임시] (그림 전 도형 크기 2.25)
+            // 야타의 거울: 체력은 생성 때 카구츠치 최대 체력 × 15 로 덮어씀. [임시] 크기 1.6 (그림 Enemy_KagutsuchiMirror 2026-11-13, 보스 키 4 에 맞춰 1.1 → 1.6), 그림 없으면 밝은 원
             // 아메노무라쿠모: 체력은 생성 때 덮어씀. 크기 (길이 · 두께) 는 KagutsuchiBlade 가 정함. 흰색 · 은색 (사용자)
             case EnemyKind.KagutsuchiSword: maxHp = 1; speed = 0f; damage = 0; xp = 0; scale = 1f; col = new Color(0.92f, 0.94f, 0.98f, 0.97f); shape = SpriteFactory.Shape.Square; break;
-            case EnemyKind.KagutsuchiMirror: maxHp = 1; speed = 0f; damage = 0; xp = 0; scale = 1.1f; col = new Color(0.85f, 0.92f, 1f, 0.95f); break;
+            case EnemyKind.KagutsuchiMirror: maxHp = 1; speed = 0f; damage = 0; xp = 0; scale = 1.6f; col = new Color(0.85f, 0.92f, 1f, 0.95f); break;
             // [임시] 가니악의 검: 체력 미정. 그림 Enemy_GaniacSword 없으면 보라 마름모
-            case EnemyKind.GaniacSword:  maxHp = 200; speed = 0f; damage = 0; xp = 0; scale = 1.6f; col = new Color(0.6f, 0.3f, 0.9f); shape = SpriteFactory.Shape.Diamond; break;
+            case EnemyKind.GaniacSword:  maxHp = 200; speed = 0f; damage = 0; xp = 0; scale = 2.4f;   // 그림 Enemy_GaniacSword (땅에 박힌 검, 2026-11-13) 키 2.4 [임시]
+                                          col = new Color(0.6f, 0.3f, 0.9f); shape = SpriteFactory.Shape.Diamond; break;
         }
         // 일반 몹 이동 속도 -10% (2026-11-13 플레이 테스트 피드백: 피로도). 보스 · 중간보스는 그대로
         if (k == EnemyKind.Goblin || k == EnemyKind.GoblinArcher || k == EnemyKind.Hobgoblin || k == EnemyKind.GoblinRider) speed *= MobSpeedMul;
@@ -342,6 +343,7 @@ public partial class Enemy : MonoBehaviour
         if (Stage.Bounded && !Scripted) pos = Stage.ClampInside(pos, radius);   // 제한된 맵 (레이드): 경계 밖으로 나가지 않음
         transform.position = pos;
         if (anim != null) { if (!stunned) lastFace = face; }   // 방향은 4방향 시트가 정함
+        else if (kind == EnemyKind.Kagutsuchi) { }   // 카구츠치 = 정면 그림만 (2026-11-13 사용자) → 좌우 반전 없음
         else if (!stunned && Mathf.Abs(face.x) > 0.01f) sr.flipX = face.x < 0;
 
         // 기절 중에는 접촉 공격 없음

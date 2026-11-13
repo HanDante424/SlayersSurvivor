@@ -106,8 +106,8 @@
 - 50% 아래로 내려가는 순간, 돌고 있던 돌진 쿨타임이 5초보다 길면 5초로 줄임
 
 ## 그림 (`Assets/Resources/Sprites/`)
-2026-11-12 적용 (GPT 제작, 오른쪽을 보는 정지 그림 · 여백 4px): 고블린 · 궁수 256px, 홉 고블린 · 라이더(늑대) 384px, 장로 · 기사 512px. 판정 비율은 몸통을 덮는 원으로 맞춤 (위 표). 화살 · 마력탄 그림은 아직 없음 (도형)
-`Enemy_Goblin` · `Enemy_GoblinArcher` · `Enemy_Hobgoblin` · `Enemy_GoblinRider` · `Enemy_GoblinElder` · `Enemy_HobgoblinKnight` · `Enemy_Arrow`(화살, 오른쪽을 향한 가로 그림) · `Enemy_MagicBolt`(마력탄, 긴 변 0.32)
+2026-11-12 적용 (GPT 제작, 오른쪽을 보는 정지 그림 · 여백 4px): 고블린 · 궁수 256px, 홉 고블린 · 라이더(늑대) 384px, 장로 · 기사 512px. 판정 비율은 몸통을 덮는 원으로 맞춤 (위 표). 화살 · 마력탄 그림 2026-11-14 적용: 화살 1944 × 333 (길이 0.5, 깃털 ~ 촉 전체) · 마력탄 1604 × 640 (구체 중심을 그림 중심에 맞추려고 오른쪽에 투명 여백 추가, 구체 지름 0.32 = 그림 폭 약 1.03 [임시])
+`Enemy_Goblin` · `Enemy_GoblinArcher` · `Enemy_Hobgoblin` · `Enemy_GoblinRider` · `Enemy_GoblinElder` · `Enemy_HobgoblinKnight` · `Enemy_Arrow`(화살, 오른쪽을 향한 가로 그림) · `Enemy_MagicBolt`(마력탄, 구체 지름 0.32 · 왼쪽 꼬리)
 - 오른쪽을 보는 정지 그림 1장 (왼쪽은 게임이 좌우 반전), 투명 여백 없이 자름 → 긴 변이 위 표의 크기가 됨
 - 없으면 색 도형 (고블린 초록 원 · 궁수 노랑 마름모 · 홉 고블린 짙은 초록 사각형 · 라이더 갈색 마름모 · 장로 보라 원 · 기사 청회색 사각형 · 마력탄 보라 작은 원)
 - 그림을 넣은 뒤 F1 판정 표시로 판정 비율을 몸통에 맞출 것

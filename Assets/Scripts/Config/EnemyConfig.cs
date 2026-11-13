@@ -19,9 +19,9 @@ public class EnemyConfig : ScriptableObject
     [Tooltip("[임시] 가니악 (레이드 보스) — 그림이 생기면 몸통에 맞춰 조정")]
     [Range(0.1f, 1.5f)] public float ganiacHitbox = 0.45f;
     [Tooltip("[임시] 가니악의 검 (특수 패턴 3 파괴 대상)")]
-    [Range(0.1f, 1.5f)] public float ganiacSwordHitbox = 0.4f;
+    [Range(0.1f, 1.5f)] public float ganiacSwordHitbox = 0.3f;   // 그림 (가는 세로 검) 기준
     [Tooltip("[임시] 카구츠치 (레이드 보스) — 그림이 생기면 몸통에 맞춰 조정")]
-    [Range(0.1f, 1.5f)] public float kagutsuchiHitbox = 0.45f;
+    [Range(0.1f, 1.5f)] public float kagutsuchiHitbox = 0.35f;   // 그림 (옥좌 포함 키 4 · 폭 약 2.9) 기준 → 판정 반경 1.4
     [Tooltip("[임시] 야타의 거울 (카구츠치 주변 궤도)")]
     [Range(0.1f, 1.5f)] public float kagutsuchiMirrorHitbox = 0.45f;
     [Tooltip("[임시] 아메노무라쿠모 (카구츠치의 검) — 검 가운데 원 반경 (크기 1 기준)")]

@@ -366,6 +366,9 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     bool MirrorAlive => mirror != null && mirror.Alive;
     bool BladeAlive => blade != null && blade.Alive;
     Vector2 Pos => transform.position;
+    const float LaserGap = 1f;           // 보스에서 나가는 레이저는 보스 몸 바깥 1 에서 시작 (2026-11-13 사용자)
+    /// <summary>보스에서 d 방향으로 쏘는 레이저의 시작점 = 몸(판정 반경) 바깥 LaserGap</summary>
+    Vector2 Muzzle(Vector2 d) => Pos + d * (e.radius + LaserGap);
     Vector2 ToPlayer { get { var d = (P != null ? P.HurtCenter : Pos + Vector2.down) - Pos; return d.sqrMagnitude > 0.0001f ? d.normalized : Vector2.down; } }
 
     bool PlayerInHalf(Vector2 at, Vector2 dir, float r)
@@ -411,8 +414,9 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     // [임시] 첫 방향 = 경고가 뜰 때의 플레이어 쪽
     IEnumerator ReflectRoutine()
     {
-        Vector2 from = transform.position;
-        Vector2 aim = P != null ? P.HurtCenter - from : Vector2.down;
+        Vector2 aim = P != null ? P.HurtCenter - Pos : Vector2.down;
+        aim = aim.sqrMagnitude > 0.000001f ? aim.normalized : Vector2.down;
+        Vector2 from = Stage.ClampInside(Muzzle(aim), 0f);   // 몸 바깥 1 에서 시작
         yield return ReflectLaser(from, aim, ReflectBounces, ReflectWidth, ReflectWarn, ReflectLaserTime, ReflectDamage);
     }
 
@@ -434,8 +438,9 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
 
         Vector2 mp = mirror.transform.position;
         Vector2 toMirror = mp - Pos;
-        float beamLen = toMirror.magnitude;
-        RaidLaser.Line(Pos, toMirror.normalized, beamLen, MirrorBeamWidth, MirrorBeamTime, MirrorBeamDamage, 0.5f, null, FireCore, FireEdge);
+        Vector2 beamFrom = Muzzle(toMirror.normalized);
+        float beamLen = Mathf.Max(0.05f, (mp - beamFrom).magnitude);
+        RaidLaser.Line(beamFrom, toMirror.normalized, beamLen, MirrorBeamWidth, MirrorBeamTime, MirrorBeamDamage, 0.5f, null, FireCore, FireEdge);
         Fx.Circle(mp, 1f, FireFx, MirrorBeamTime, mirror.transform);
         yield return WaitActive(MirrorFanDelay);
 
@@ -501,7 +506,8 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
 
         // 보스 → 거울 레이저 (패턴 끝까지)
         Vector2 toMirror = c - Pos;
-        s1Beam = RaidLaser.Line(Pos, toMirror.normalized, toMirror.magnitude, S1BeamWidth, 999f, S1BeamDamage, 0.5f, null, FireCore, FireEdge);
+        Vector2 s1From = Muzzle(toMirror.normalized);
+        s1Beam = RaidLaser.Line(s1From, toMirror.normalized, Mathf.Max(0.05f, (c - s1From).magnitude), S1BeamWidth, 999f, S1BeamDamage, 0.5f, null, FireCore, FireEdge);
         Fx.Circle(c, 1f, FireFx, 0.6f, mirror.transform);
 
         // 방사 레이저 5회
@@ -966,7 +972,8 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
             {
                 float a = baseAng - FanReflectArc * 0.5f + FanReflectArc * i / (FanReflectCount - 1);
                 float r = a * Mathf.Deg2Rad;
-                running.Add(StartCoroutine(ReflectLaser(Pos, new Vector2(Mathf.Cos(r), Mathf.Sin(r)), FanReflectBounces,
+                Vector2 rd = new Vector2(Mathf.Cos(r), Mathf.Sin(r));
+                running.Add(StartCoroutine(ReflectLaser(Stage.ClampInside(Muzzle(rd), 0f), rd, FanReflectBounces,
                                                          FanReflectWidth, FanReflectWarn, FanReflectLaserTime, FanReflectDamage)));
             }
             foreach (var c in running) yield return c;
@@ -1059,10 +1066,10 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     {
         yield return Wait(NovaBeamDelay);
         Vector2 at = Center + new Vector2(0f, -NovaCenterDown);
-        Vector2 from = transform.position;
-        Vector2 d = at - from;
-        float len = d.magnitude;
-        d = len > 0.001f ? d / len : Vector2.down;
+        Vector2 d = at - Pos;
+        d = d.sqrMagnitude > 0.000001f ? d.normalized : Vector2.down;
+        Vector2 from = Muzzle(d);
+        float len = Mathf.Max(0.05f, (at - from).magnitude);
         RaidLaser.Line(from, d, len, NovaBeamWidth, NovaWarnDelay + NovaGrowTime, NovaBeamDamage, 0.5f, null, FireCore, FireEdge);
         Fx.Circle(at, 1f, FireFx, 0.4f);
         yield return Wait(NovaWarnDelay);
@@ -1101,7 +1108,8 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         float baseAng = toCenter.sqrMagnitude > 0.01f ? Mathf.Atan2(toCenter.y, toCenter.x) * Mathf.Rad2Deg : -90f;
         float a = (baseAng + Random.Range(-IntroLaserFan * 0.5f, IntroLaserFan * 0.5f)) * Mathf.Deg2Rad;
         Vector2 d = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
-        float len = Stage.ExitDistance(Stage.ClampInside(from, 0f), d);
+        from = Stage.ClampInside(Muzzle(d), 0f);   // 몸 바깥 1 에서 시작
+        float len = Stage.ExitDistance(from, d);
         var w = BossWarning.Box(from, d, len, IntroLaserWidth, IntroLaserWarn);
         warnings.RemoveAll(x => x == null);
         warnings.Add(w);
@@ -1276,9 +1284,11 @@ public class KagutsuchiBlade : MonoBehaviour
         b.Body = body;
         b.boss = boss;
         b.pos = b.RestPos; b.angle = RestAngle;
-        body.transform.localScale = new Vector3(KagutsuchiAI.SwordLength, KagutsuchiAI.SwordThick, 1f);
+        // 그림 Enemy_KagutsuchiSword (2026-11-13, 칼끝이 오른쪽 = 각도 방향인 가로 검, 1200 × 126): 손잡이 끝 ~ 칼끝 = 검 길이, 비율 그대로 (두께 약 0.5)
+        bool art = SpriteFactory.TryGet("Enemy_KagutsuchiSword") != null;
+        body.transform.localScale = art ? Vector3.one * KagutsuchiAI.SwordLength : new Vector3(KagutsuchiAI.SwordLength, KagutsuchiAI.SwordThick, 1f);
         // 은색 테두리 (도형일 때)
-        if (SpriteFactory.TryGet("Enemy_KagutsuchiSword") == null)
+        if (!art)
         {
             var rim = new GameObject("Rim");
             rim.transform.SetParent(body.transform, false);
