@@ -63,9 +63,10 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     const float MirrorMoveMax = 0.6f;    // [임시] 거울이 정면에 도착할 때까지 최대 대기
     const float MirrorBeamTime = 1f;     // 보스가 폭 1 레이저를 1초간 거울에 발사 (사용자)
     const float MirrorBeamWidth = 1f;    // (사용자)
-    const float MirrorFanDelay = 0.5f;   // 0.5초 후 부채꼴 경고 (사용자) — [해석] 보스 레이저 시작 0.5초 뒤, 경고는 보스 레이저가 끝날 때 발사
+    const float MirrorFanDelay = 0.5f;   // 보스 레이저 시작 0.5초 후 부채꼴 경고 (사용자)
+    const float MirrorFanWarn = 0.75f;   // 경고 0.75초 뒤 레이저 공격 (사용자)
     const int MirrorFanCount = 10;       // 10개 (사용자)
-    const float MirrorFanWidth = 2f;     // 폭 2 (사용자)
+    const float MirrorFanWidth = 1f;     // 부채꼴 레이저 폭 (사용자: 2 → 1)
     const float MirrorFanLaserTime = 0.5f;   // 0.5초 지속, 맵을 꿰뚫음 (사용자)
     const float MirrorFanAngle = 90f;    // [임시] 부채꼴 각도 (거울에서 플레이어 쪽)
     const float MirrorCooldown = 10f;    // 쿨타임 10초 (사용자)
@@ -77,7 +78,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     const float SwordSweepWarn = 2f;     // 2초 뒤 횡베기 (사용자)
     const float SwordCutDelay = 0.5f;    // 횡베기 0.5초 뒤 베기 경고 시작 (사용자)
     const int SwordCutCount = 10;        // 10회 (사용자)
-    const float SwordCutWidth = 2f;      // radius 1 의 검 = 폭 2 (사용자)
+    const float SwordCutWidth = 1f;      // 후속 베기 폭 (사용자: 2 → 1)
     const float SwordCutWarn = 0.8f;     // [임시] 경고 → 베기 (10개 한번에, 사용자)
     const float SwordCutFlash = 0.15f;   // [임시] 베기 표시 시간
     const float SwordCooldown = 12f;     // [임시] 기획 미정
@@ -103,11 +104,34 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     // ---------- 공격 패턴 5: 아래로 내려와 회전하며 플레이어 쪽 5 이동 × 2 ----------
     const float MarchFirstWarn = 1f;     // 1초 경고 (사용자)
     const float MarchSecondWarn = 1.5f;  // 1.5초 경고 (사용자)
-    const float MarchDistance = 5f;      // 플레이어 위치로 5 이동 (사용자)
-    const float MarchTime = 0.5f;        // [임시] 5 이동에 걸리는 시간
+    const float MarchDistance = 8f;      // 플레이어 위치로 이동 (사용자: 5 → 8)
+    const float MarchTime = 0.5f;        // [임시] 8 이동에 걸리는 시간
     const float MarchCooldown = 12f;     // [임시] 기획 미정
     const float MarchFirstUse = 10f;     // [임시]
     const float MarchDamage = 25f;       // [임시] 한 번 이동에 1번
+
+    // ---------- 공격 패턴 6: 반쪽씩 차오르는 경고 → 화염장벽 ----------
+    const float WallStagger = 0.5f;      // 두 경고는 0.5초 간격으로 차오르기 시작 (사용자)
+    const float WallFillTime = 5f;       // 차오르는 데 걸리는 시간 (사용자: 1.5 → 5초)
+    const float WallMoveTime = 1f;       // [임시] 화염장벽이 반쪽을 가로지르는 시간
+    const float WallThick = 1.5f;        // [임시] 화염장벽 두께
+    const float WallCooldown = 20f;      // 쿨타임 20초 (사용자)
+    const float WallFirstUse = 12f;      // [임시]
+    const float WallDamage = 25f;        // [임시] 장벽 하나에 1번
+
+    // ---------- 공격 패턴 7: 120도 부채꼴 반사 레이저 5개, 각도 바꿔 반복 ----------
+    const int FanReflectCount = 5;       // 레이저 5개 (사용자)
+    const float FanReflectArc = 120f;    // 수직 기준 120도 부채꼴 (사용자) — [해석] 보스에서 아래쪽 수직이 중심
+    const float FanReflectWidth = 1f;    // 폭 1 (사용자)
+    const int FanReflectBounces = 3;     // 총 3회 반사 (사용자)
+    const float FanReflectWarn = 1f;     // 경고 1초 (사용자)
+    const float FanReflectLaserTime = 0.5f;  // 레이저 0.5초 (사용자)
+    const float FanReflectGap = 0.5f;    // 레이저가 사라지고 0.5초 후 다시 시전 (사용자)
+    const float FanReflectShift = 8f;    // 다시 시전할 때 각도 8도씩 이동 (사용자)
+    const int FanReflectCasts = 3;       // [임시] 시전 횟수 (기획 미정)
+    const float FanReflectCooldown = 15f;    // 쿨타임 15초 (사용자)
+    const float FanReflectFirstUse = 14f;    // [임시]
+    const float FanReflectDamage = 20f;  // [임시] 구간마다
 
     // 검 색 (사용자: 흰색, 은색 언저리)
     static readonly Color SwordCore = new Color(0.9f, 0.93f, 0.98f, 0.95f);
@@ -174,15 +198,17 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         warnings.Clear();
         if (mirror != null) Destroy(mirror.gameObject);
         if (blade != null) Destroy(blade.gameObject);
+        foreach (var w in fireWalls) if (w != null) Destroy(w);
+        fireWalls.Clear();
         if (intro) { CameraFollow.ClearFocus(); CameraFollow.ResetZoom(); }
     }
 
     // ---------- 패턴 진행 ----------
     // [임시] 규칙: 패턴은 한 번에 하나 · 쿨타임은 패턴이 끝난 뒤부터 · 기절하면 진행 중 패턴이 멈췄다가 이어서 (가니악과 같은 방식, 공통 쿨타임 없음)
     //         준비된 패턴이 여러 개면 무작위
-    enum Pattern { Reflect, MirrorBeam, SwordCut, Thrust, March }
-    static readonly float[] Cooldowns = { ReflectCooldown, MirrorCooldown, SwordCooldown, ThrustCooldown, MarchCooldown };
-    readonly float[] cd = { ReflectFirstUse, MirrorFirstUse, SwordFirstUse, ThrustFirstUse, MarchFirstUse };
+    enum Pattern { Reflect, MirrorBeam, SwordCut, Thrust, March, FireWall, FanReflect }
+    static readonly float[] Cooldowns = { ReflectCooldown, MirrorCooldown, SwordCooldown, ThrustCooldown, MarchCooldown, WallCooldown, FanReflectCooldown };
+    readonly float[] cd = { ReflectFirstUse, MirrorFirstUse, SwordFirstUse, ThrustFirstUse, MarchFirstUse, WallFirstUse, FanReflectFirstUse };
     readonly List<int> ready = new List<int>();
     bool busy;
 
@@ -200,6 +226,8 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
             if (cd[(int)Pattern.SwordCut] <= 0f && BladeAlive) ready.Add((int)Pattern.SwordCut);
             if (cd[(int)Pattern.Thrust] <= 0f && BladeAlive) ready.Add((int)Pattern.Thrust);
             if (cd[(int)Pattern.March] <= 0f && BladeAlive) ready.Add((int)Pattern.March);
+            if (cd[(int)Pattern.FireWall] <= 0f) ready.Add((int)Pattern.FireWall);
+            if (cd[(int)Pattern.FanReflect] <= 0f) ready.Add((int)Pattern.FanReflect);
             if (ready.Count > 0)
             {
                 var p = (Pattern)ready[Random.Range(0, ready.Count)];
@@ -209,7 +237,9 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
                     Pattern.MirrorBeam => MirrorBeamRoutine(),
                     Pattern.SwordCut => SwordCutRoutine(),
                     Pattern.Thrust => ThrustRoutine(),
-                    _ => MarchRoutine(),
+                    Pattern.March => MarchRoutine(),
+                    Pattern.FireWall => FireWallRoutine(),
+                    _ => FanReflectRoutine(),
                 };
                 StartCoroutine(Run(body, () => cd[(int)p] = Cooldowns[(int)p]));
             }
@@ -272,7 +302,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
 
     // ---------- 공격 패턴 2: 거울 반사 부채꼴 레이저 ----------
     // 야타의 거울을 보스 정면 (플레이어 쪽) 거리 2 로 이동 → 보스가 폭 1 레이저를 1초간 거울에 발사
-    // → 0.5초 뒤 거울에서 부채꼴 무작위 방향으로 폭 2 경고 10개 → (보스 레이저가 끝나는 순간) 0.5초 레이저가 맵을 꿰뚫음
+    // → 0.5초 뒤 거울에서 부채꼴 무작위 방향으로 폭 1 경고 10개 → 경고 0.75초 뒤 0.5초 레이저가 맵을 꿰뚫음
     // → 거울 복귀. 쿨타임 10초
     IEnumerator MirrorBeamRoutine()
     {
@@ -293,9 +323,9 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         Fx.Circle(mp, 1f, FireFx, MirrorBeamTime, mirror.transform);
         yield return WaitActive(MirrorFanDelay);
 
-        // 거울에서 부채꼴 (플레이어 쪽) 무작위 방향 10개 경고 → 보스 레이저가 끝날 때 발사
+        // 거울에서 부채꼴 (플레이어 쪽) 무작위 방향 10개 경고 → 0.75초 뒤 발사
         float baseAng = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
-        float fanWarn = MirrorBeamTime - MirrorFanDelay;
+        float fanWarn = MirrorFanWarn;   // 경고 0.75초 뒤 발사 (2026-11-13 사용자)
         Vector2 origin = Stage.ClampInside(mp, 0f);
         var rays = new List<(Vector2 d, float len)>();
         for (int i = 0; i < MirrorFanCount; i++)
@@ -382,7 +412,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
 
     // ---------- 공격 패턴 3: 검 횡베기 → 맵 가르는 베기 10회 ----------
     // 검을 반원 베기의 시작점 (반원 한쪽 끝, 2026-11-13 사용자) 에 준비 + 반원 (반경 10) 경고 → 2초 뒤 횡베기
-    // → 0.5초 뒤 맵의 무작위 방향 · 각도로 맵을 가로지르는 경고 10개 한번에 → 폭 2 (radius 1 검) 베기 10개 한번에 → 검 복귀
+    // → 0.5초 뒤 맵의 무작위 방향 · 각도로 맵을 가로지르는 경고 10개 한번에 → 폭 1 베기 10개 한번에 → 검 복귀
     // [해석] 검은 반원 바깥쪽에 — 검 끝이 반경 10 경계에 닿게 (검 가운데 = 보스에서 10 - 길이/2)
     IEnumerator SwordCutRoutine()
     {
@@ -473,8 +503,8 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         if (BladeAlive) blade.Release();   // 검 복귀
     }
 
-    // ---------- 공격 패턴 5: 아래에서 회전하며 플레이어 쪽 5 이동 × 2 ----------
-    // 검이 카구츠치 아래로 → 1초 경고 → 회전하며 플레이어 위치로 5 이동 → 1.5초 경고 → 다시 회전하며 5 이동 → 검 복귀
+    // ---------- 공격 패턴 5: 아래에서 회전하며 플레이어 쪽 8 이동 × 2 ----------
+    // 검이 카구츠치 아래로 → 1초 경고 → 회전하며 플레이어 위치로 8 이동 → 1.5초 경고 → 다시 회전하며 8 이동 → 검 복귀
     IEnumerator MarchRoutine()
     {
         if (!BladeAlive) yield break;
@@ -496,6 +526,111 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
             cur = next;
         }
         if (BladeAlive) blade.Release();   // 검 복귀
+    }
+
+    // ---------- 공격 패턴 6: 반쪽씩 차오르는 경고 → 화염장벽 ----------
+    // 맵 중심에서 수직 또는 수평을 정함 → 그 선을 기준으로 좌우 (또는 상하) 반쪽마다 경고.
+    // 차오르기 시작하는 쪽 = 공격 방향 (수직 분할 = 위/아래, 수평 분할 = 좌/우). 두 경고는 0.5초 간격으로 차오르기 시작, 5초에 다 참
+    // → 다 차면 화염장벽이 같은 방향으로 이동하며 공격. 쿨타임 20초
+    IEnumerator FireWallRoutine()
+    {
+        Vector2 min = Center - Half, max = Center + Half;
+        bool vertical = Random.value < 0.5f;
+        Rect a = vertical ? Rect.MinMaxRect(min.x, min.y, Center.x, max.y) : Rect.MinMaxRect(min.x, min.y, max.x, Center.y);
+        Rect b = vertical ? Rect.MinMaxRect(Center.x, min.y, max.x, max.y) : Rect.MinMaxRect(min.x, Center.y, max.x, max.y);
+        bool firstA = Random.value < 0.5f;   // 어느 쪽이 먼저 차오를지
+        // 공격 방향 (2026-11-13 사용자): 수직으로 나눠 좌우에 생기면 무조건 위 또는 아래로, 수평으로 나눠 상하에 생기면 무조건 왼쪽 또는 오른쪽으로 차오름
+        //   (어느 쪽인지는 반쪽마다 무작위)
+        Vector2 DirFor() => vertical ? (Random.value < 0.5f ? Vector2.up : Vector2.down)
+                                     : (Random.value < 0.5f ? Vector2.right : Vector2.left);
+        var r1 = StartCoroutine(FireWallHalf(firstA ? a : b, DirFor(), 0f));
+        var r2 = StartCoroutine(FireWallHalf(firstA ? b : a, DirFor(), WallStagger));
+        yield return r1;
+        yield return r2;
+    }
+
+    /// <summary>반쪽 하나: delay 뒤 d 방향으로 차오르는 경고 (5초) → 같은 방향으로 화염장벽 이동</summary>
+    IEnumerator FireWallHalf(Rect area, Vector2 d, float delay)
+    {
+        float len = Mathf.Abs(d.x) > 0f ? area.width : area.height;     // 공격 방향 길이
+        float wid = Mathf.Abs(d.x) > 0f ? area.height : area.width;     // 장벽 길이 (가로지르는 폭)
+        Vector2 from = area.center - d * (len * 0.5f);                   // 차오르기 시작하는 변의 가운데
+
+        // 바탕 경고 (흐리게) — 처음부터 표시해 두 반쪽이 다 보이게
+        var baseW = Track(BossWarning.Box(from, d, len, wid, 0f));
+        baseW.SetColor(new Color(1f, 0.2f, 0.15f, 0.12f));
+        yield return WaitActive(delay);
+
+        // 차오르는 경고: 시작 변에서 공격 방향으로 길어짐
+        var fill = Track(BossWarning.Box(from, d, 0.01f, wid, 0f));
+        for (float t = 0f; t < WallFillTime;)
+        {
+            if (Playing && !e.IsStunned) t = Mathf.Min(WallFillTime, t + Time.deltaTime);
+            float l = Mathf.Max(0.01f, len * t / WallFillTime);
+            if (fill != null)
+            {
+                fill.transform.position = from + d * (l * 0.5f);
+                fill.transform.localScale = new Vector3(l, wid, 1f);
+            }
+            yield return null;
+        }
+        if (fill != null) Destroy(fill.gameObject);
+        if (baseW != null) Destroy(baseW.gameObject);
+
+        // 화염장벽: 시작 변에서 공격 방향으로 반쪽을 가로지름
+        var wall = new GameObject("FireWall");
+        wall.transform.rotation = Quaternion.Euler(0, 0, Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg);
+        wall.transform.localScale = new Vector3(WallThick, wid, 1f);
+        var wsr = wall.AddComponent<SpriteRenderer>();
+        wsr.sprite = SpriteFactory.Get("Fx_Square", SpriteFactory.Shape.Square);
+        wsr.color = FireCore;
+        wsr.sortingOrder = 8;
+        var glow = new GameObject("Glow");
+        glow.transform.SetParent(wall.transform, false);
+        glow.transform.localScale = new Vector3(0.35f, 1f, 1f);
+        var gsr = glow.AddComponent<SpriteRenderer>();
+        gsr.sprite = wsr.sprite; gsr.color = FireEdge; gsr.sortingOrder = 9;
+        fireWalls.RemoveAll(x => x == null);
+        fireWalls.Add(wall);
+        CameraFollow.Shake(0.1f, 0.1f);
+
+        bool hit = false;
+        for (float t = 0f; t < WallMoveTime;)
+        {
+            if (Playing && !e.IsStunned) t = Mathf.Min(WallMoveTime, t + Time.deltaTime);
+            float along = WallThick * 0.5f + (len - WallThick) * (t / WallMoveTime);
+            Vector2 c = from + d * along;
+            if (wall != null) wall.transform.position = c;
+            var p = P;
+            if (!hit && p != null && GaniacAI.InBox(p.HurtCenter, c - d * (WallThick * 0.5f), d, WallThick, wid, p.radius))
+            { hit = true; p.TakeDamage(WallDamage); }
+            yield return null;
+        }
+        if (wall != null) Destroy(wall);
+    }
+
+    readonly List<GameObject> fireWalls = new List<GameObject>();
+
+    // ---------- 공격 패턴 7: 120도 부채꼴 반사 레이저 5개, 각도 바꿔 반복 ----------
+    // 보스에서 수직 (아래) 기준 120도 부채꼴로 폭 1 레이저 5개 → 각각 맵 벽에서 총 3회 반사. 경고 1초 → 레이저 0.5초
+    // → 레이저가 사라지고 0.5초 후 다시 시전, 각도 8도씩 이동. [임시] 3번 시전. 쿨타임 15초
+    IEnumerator FanReflectRoutine()
+    {
+        float shiftSign = Random.value < 0.5f ? -1f : 1f;   // [임시] 이동 방향 무작위 (매 시전 같은 쪽으로)
+        for (int k = 0; k < FanReflectCasts; k++)
+        {
+            if (k > 0) yield return WaitActive(FanReflectGap);
+            float baseAng = -90f + shiftSign * FanReflectShift * k;
+            var running = new List<Coroutine>();
+            for (int i = 0; i < FanReflectCount; i++)
+            {
+                float a = baseAng - FanReflectArc * 0.5f + FanReflectArc * i / (FanReflectCount - 1);
+                float r = a * Mathf.Deg2Rad;
+                running.Add(StartCoroutine(ReflectLaser(Pos, new Vector2(Mathf.Cos(r), Mathf.Sin(r)), FanReflectBounces,
+                                                         FanReflectWidth, FanReflectWarn, FanReflectLaserTime, FanReflectDamage)));
+            }
+            foreach (var c in running) yield return c;
+        }
     }
 
     /// <summary>
@@ -745,7 +880,7 @@ public class KagutsuchiMirror : MonoBehaviour
 /// </summary>
 public class KagutsuchiBlade : MonoBehaviour
 {
-    const float RestGap = 0.6f;              // [임시] 보스 몸과 검 사이
+    const float RestGap = 1.5f;              // [임시] 보스 몸과 검 사이 (사용자: 조금 더 옆으로 — 0.6 → 1.5)
     const float RestAngle = 90f;             // 옆 자리: 수직으로 세움 (2026-11-13 사용자)
     const float ReturnSpeed = 20f, ReturnTurn = 540f;   // [임시] 복귀 속도 (유닛/초 · 도/초)
 

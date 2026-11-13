@@ -367,6 +367,9 @@ public class BossWarning : MonoBehaviour
         return w;
     }
 
+    /// <summary>경고 색 바꾸기 (깜빡임은 이 색 기준). 카구츠치 화염장벽의 흐린 바탕 경고 등</summary>
+    public void SetColor(Color c) { color = c; if (sr != null) sr.color = c; }
+
     /// <summary>원 경고 위치 · 반경 바꾸기 (뛰어오르기)</summary>
     public void Set(Vector2 at, float r)
     {
