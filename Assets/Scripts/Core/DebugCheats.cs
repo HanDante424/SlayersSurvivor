@@ -8,6 +8,7 @@ using UnityEngine;
 ///  F6 쿨타임 감소 100% / F7 자동 스킬 사용 금지 / F8 적 생성 중지 / F9 경험치 미드랍
 ///  F10 고블린 장로 소환 · F12 홉 고블린 기사 소환 (중간보스 + 포위, 적 생성 중지와 함께 사용 가능 — 패널이 닫혀 있어도 버튼 표시)
 ///  F11 보스 체력 절반 (지금 체력의 절반으로, 죽지 않음 — 50% 패턴 강화 확인용, 보스가 있을 때 버튼 표시)
+///  보스 체력 -30% (최대 체력의 30% 만큼, 죽지 않음 — 가니악 특수 패턴 3 확인용, 보스가 있을 때 버튼 표시)
 ///  레벨 +1 / +10 (궁극기 획득 Lv.45 확인용), 궁극기 게이지 채우기, 화상 표시 테스트 (파티클 확인용)
 ///  오른쪽 열: 스킬별 사용 금지 (레벨업 후보 스킬 + 보유 스킬) / Lv+1 = 그 스킬의 기본 강화 화면 바로 열기
 ///            (Lv.5·10·15 특수 강화 확인용, 캐릭터 레벨은 그대로)
@@ -30,7 +31,12 @@ public class DebugCheats : MonoBehaviour
     /// <summary>적이 죽어도 경험치 보석을 떨어뜨리지 않음 — 레벨업 화면 없이 스킬만 볼 때</summary>
     public static bool NoXpDrop;
 
-    /// <summary>스킬별 사용 금지 (SkillEntry.id). 자동 = 발동 안 함, 수동 = 키 입력 무시</summary>
+    /// <summary>
+    /// 가니악 특수 패턴 비활성화 (레이드 전용, 패널 오른쪽 끝 열). 0 = 특수 패턴 1 … 3 = 특수 패턴 4.
+    /// 1 · 2 (등장 연출) 는 판 시작 때 확인 → 켠 뒤 재시작(R)하면 반영. 둘 다 끄면 보스가 바로 맵 중앙에 나타남.
+    /// 3 · 4 는 꺼져 있는 동안 체력 조건을 넘어도 쓰지 않음 (켜면 다음 기회에 사용). 쓰지 않으면 그 뒤 해제되는 공격 패턴(5 / 6 · 7)도 해제 안 됨
+    /// </summary>
+    public static readonly bool[] NoGaniacSpecial = new bool[4];
     static readonly HashSet<string> disabledSkills = new HashSet<string>();
     public static bool IsSkillDisabled(string id) => disabledSkills.Contains(id);
     static void ToggleSkill(string id) { if (!disabledSkills.Remove(id)) disabledSkills.Add(id); }
@@ -59,6 +65,7 @@ public class DebugCheats : MonoBehaviour
     /// </summary>
     static void SummonBoss(EnemyKind kind)
     {
+        if (Stage.IsRaid) return;   // 레이드: 맵이 포위 원(반경 20)보다 좁아 중간보스 소환 안 함
         if (MidBossArena.Active || Player.I == null || GameManager.I == null || GameManager.I.State != GameState.Playing) return;
         MidBossArena.Begin(kind, Player.I.transform.position, 1f + GameManager.I.Elapsed / 60f * 0.35f);
     }
@@ -66,13 +73,24 @@ public class DebugCheats : MonoBehaviour
     /// <summary>보스 체력을 지금 체력의 절반으로 (최소 1, 피해가 아니라 체력만 바뀜 → 피격 트리거 없음)</summary>
     static void HalveBossHp()
     {
-        var b = MidBossArena.Boss;
+        var b = AnyBoss;
         if (b == null) return;
         b.hp = Mathf.Max(1f, Mathf.Floor(b.hp * 0.5f));
     }
 
-    static string ElderLabel => MidBossArena.Active ? "보스 진행 중" : "장로 소환 (F10)";
-    static string KnightLabel => MidBossArena.Active ? "보스 진행 중" : "기사 소환 (F12)";
+    /// <summary>보스 체력을 최대 체력의 30% 만큼 깎음 (최소 1, 피해가 아니라 체력만 바뀜 — 가니악 특수 패턴 3 체력 90 · 60 · 30% 확인용)</summary>
+    static void CutBossHp30()
+    {
+        var b = AnyBoss;
+        if (b == null) return;
+        b.hp = Mathf.Max(1f, Mathf.Floor(b.hp - b.maxHp * 0.3f));
+    }
+
+    /// <summary>살아 있는 중간보스 또는 레이드 보스</summary>
+    static Enemy AnyBoss => MidBossArena.Boss ?? RaidStage.Boss;
+
+    static string ElderLabel => Stage.IsRaid ? "레이드 중 소환 불가" : MidBossArena.Active ? "보스 진행 중" : "장로 소환 (F10)";
+    static string KnightLabel => Stage.IsRaid ? "레이드 중 소환 불가" : MidBossArena.Active ? "보스 진행 중" : "기사 소환 (F12)";
 
     static void SetOneHitKill(bool on)
     {
@@ -105,6 +123,7 @@ public class DebugCheats : MonoBehaviour
             if (NoXpDrop) on.Add("경험치 미드랍");
             if (HitboxView.Show) on.Add("판정 표시");
             foreach (var e in SkillList()) if (disabledSkills.Contains(e.id)) on.Add($"{e.name} 금지");
+            for (int i = 0; i < NoGaniacSpecial.Length; i++) if (NoGaniacSpecial[i]) on.Add($"특수 패턴 {i + 1} 끔");
             if (on.Count > 0)
             {
                 GUI.color = UIStyles.Accent;
@@ -112,11 +131,12 @@ public class DebugCheats : MonoBehaviour
                 GUI.color = Color.white;
             }
             if (GUI.Button(new Rect(x, H - bh - 12, 140, bh), "치트 (F2)", UIStyles.MenuButton)) open = true;
-            if (MidBossArena.Active)
+            if (AnyBoss != null)
             {
                 if (GUI.Button(new Rect(x + 148, H - bh - 12, 230, bh), "보스 체력 절반 (F11)", UIStyles.MenuButton)) HalveBossHp();
+                if (GUI.Button(new Rect(x + 386, H - bh - 12, 230, bh), "보스 체력 -30%", UIStyles.MenuButton)) CutBossHp30();
             }
-            else
+            else if (!Stage.IsRaid)
             {
                 if (GUI.Button(new Rect(x + 148, H - bh - 12, 190, bh), ElderLabel, UIStyles.MenuButton)) SummonBoss(EnemyKind.GoblinElder);
                 if (GUI.Button(new Rect(x + 346, H - bh - 12, 190, bh), KnightLabel, UIStyles.MenuButton)) SummonBoss(EnemyKind.HobgoblinKnight);
@@ -140,7 +160,8 @@ public class DebugCheats : MonoBehaviour
             FlameSword.I != null ? "화상 1스택 부여 (화면 안 적)" : "화상 표시 테스트 (화면 안 적 5초)",
             ElderLabel + " · 고블린 장로",
             KnightLabel + " · 홉 고블린 기사",
-            MidBossArena.Active ? "보스 체력 절반 (F11)" : "보스 체력 절반 (보스 없음)",
+            AnyBoss != null ? "보스 체력 절반 (F11)" : "보스 체력 절반 (보스 없음)",
+            AnyBoss != null ? "보스 체력 -30% (최대 체력 기준)" : "보스 체력 -30% (보스 없음)",
             "닫기 (F2)",
         };
         float top = H - 12 - labels.Length * (bh + gap);
@@ -174,14 +195,18 @@ public class DebugCheats : MonoBehaviour
                 case 12: SummonBoss(EnemyKind.GoblinElder); break;
                 case 13: SummonBoss(EnemyKind.HobgoblinKnight); break;
                 case 14: HalveBossHp(); break;
-                case 15: open = false; break;
+                case 15: CutBossHp30(); break;
+                case 16: open = false; break;
             }
         }
+
+        // ---- 레이드: 가니악 특수 패턴 비활성화 (스킬 열 오른쪽) ----
+        float sx = x + w + 18, sw = 250, lw = 74;
+        if (Stage.IsRaid) DrawGaniacSpecialToggles(sx + sw + lw + 30, H, bh, gap);
 
         // ---- 오른쪽 열: 스킬별 사용 금지 ----
         var skillsToShow = SkillList();
         if (skillsToShow.Count == 0) return;
-        float sx = x + w + 18, sw = 250, lw = 74;
         float stop = H - 12 - (skillsToShow.Count + 1) * (bh + gap);
         GUI.color = UIStyles.Dim;
         GUI.DrawTexture(new Rect(sx - 6, stop - 6, sw + lw + 18, (skillsToShow.Count + 1) * (bh + gap) + 6), UIStyles.White);
@@ -206,6 +231,32 @@ public class DebugCheats : MonoBehaviour
                 GameManager.I?.DebugUpgradeSkill(owned);
             GUI.enabled = true;
         }
+    }
+
+    static readonly string[] GaniacSpecialNames =
+    {
+        "특수 1 (직선 10개 · 등장)",
+        "특수 2 (중앙 레이저 · 등장)",
+        "특수 3 (가니악의 검)",
+        "특수 4 (구석 레이저 난사)",
+    };
+
+    static void DrawGaniacSpecialToggles(float gx, float H, float bh, float gap)
+    {
+        const float gw = 260;
+        int rows = NoGaniacSpecial.Length + 2;
+        float top = H - 12 - rows * (bh + gap);
+        GUI.color = UIStyles.Dim;
+        GUI.DrawTexture(new Rect(gx - 6, top - 6, gw + 12, rows * (bh + gap) + 6), UIStyles.White);
+        GUI.color = Color.white;
+        GUI.Label(new Rect(gx, top, gw, bh), "가니악 특수 패턴 사용", UIStyles.Small);
+        for (int i = 0; i < NoGaniacSpecial.Length; i++)
+        {
+            var r = new Rect(gx, top + (i + 1) * (bh + gap), gw, bh);
+            if (GUI.Button(r, $"{GaniacSpecialNames[i]}  {OnOff(!NoGaniacSpecial[i])}", Small)) NoGaniacSpecial[i] = !NoGaniacSpecial[i];
+        }
+        GUI.Label(new Rect(gx, top + (NoGaniacSpecial.Length + 1) * (bh + gap), gw, bh),
+                  "<size=12>특수 1 · 2 는 재시작(R)부터 반영</size>", new GUIStyle(UIStyles.Small) { richText = true });
     }
 
     /// <summary>패널에 보일 스킬: 레벨업 후보 스킬 + 이미 보유한 스킬 (카탈로그 순서)</summary>

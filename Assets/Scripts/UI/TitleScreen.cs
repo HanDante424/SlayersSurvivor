@@ -26,7 +26,8 @@ public class TitleScreen : MonoBehaviour
     void Awake()
     {
         Time.timeScale = 1f;
-        items.Add(new MenuItem { label = "플레이", enabled = true, action = OpenCharacterSelect });
+        items.Add(new MenuItem { label = "플레이", enabled = true, action = () => OpenCharacterSelect(StageKind.Survival) });
+        items.Add(new MenuItem { label = "레이드 보스", enabled = true, action = () => OpenCharacterSelect(StageKind.Raid) });
         items.Add(new MenuItem { label = "설정", enabled = false, action = () => ShowToast("설정은 준비 중입니다.") });
         items.Add(new MenuItem { label = "게임 종료", enabled = true, action = SceneLoader.Quit });
 
@@ -37,9 +38,11 @@ public class TitleScreen : MonoBehaviour
     /// <summary>열려 있는 캐릭터 선택 화면 (없으면 null). 열려 있는 동안 타이틀 메뉴는 입력 · 표시 안 함</summary>
     CharacterSelect select;
 
-    void OpenCharacterSelect()
+    /// <summary>스테이지를 정하고 캐릭터 선택 화면 열기 (시작하면 Main 씬이 그 스테이지로)</summary>
+    void OpenCharacterSelect(StageKind stage)
     {
         if (select != null) return;
+        Stage.Current = stage;
         select = CharacterSelect.Open(gameObject, onBack: () => select = null);
     }
 
