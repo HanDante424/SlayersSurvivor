@@ -84,7 +84,7 @@ public class CharacterSelect : MonoBehaviour
         UIStyles.Init();
         float W = Screen.width, H = Screen.height;
         UIStyles.Overlay(new Color(0, 0, 0, 0.55f));
-        GUI.Label(new Rect(0, H * 0.06f, W, 60), "캐릭터 선택", UIStyles.Big);
+        GUI.Label(new Rect(0, H * 0.06f, W, 60), Stage.IsRaid ? "캐릭터 선택 — 레이드 보스" : "캐릭터 선택", UIStyles.Big);
 
         var list = CharacterRoster.All;
         int n = list.Count;

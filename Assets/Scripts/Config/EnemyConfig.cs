@@ -16,6 +16,10 @@ public class EnemyConfig : ScriptableObject
     [Range(0.1f, 1.5f)] public float elderHitbox = 0.28f;
     [Range(0.1f, 1.5f)] public float knightHitbox = 0.32f;
     [Range(0.1f, 1.5f)] public float bossHitbox = 0.5f;
+    [Tooltip("[임시] 가니악 (레이드 보스) — 그림이 생기면 몸통에 맞춰 조정")]
+    [Range(0.1f, 1.5f)] public float ganiacHitbox = 0.45f;
+    [Tooltip("[임시] 가니악의 검 (특수 패턴 3 파괴 대상)")]
+    [Range(0.1f, 1.5f)] public float ganiacSwordHitbox = 0.4f;
 
     public float HitboxRatio(EnemyKind kind)
     {
@@ -27,6 +31,8 @@ public class EnemyConfig : ScriptableObject
             case EnemyKind.GoblinElder:  return elderHitbox;
             case EnemyKind.HobgoblinKnight: return knightHitbox;
             case EnemyKind.Boss:         return bossHitbox;
+            case EnemyKind.Ganiac:       return ganiacHitbox;
+            case EnemyKind.GaniacSword:  return ganiacSwordHitbox;
             default:                     return goblinHitbox;
         }
     }

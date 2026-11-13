@@ -332,6 +332,13 @@ public class Player : MonoBehaviour
         // 중간보스 포위 고블린 사이로 지나갈 수 없음 (돌진 포함)
         MidBossArena.ConstrainPlayer(this);
 
+        // 제한된 맵 (레이드): 피격 판정 원이 경계 밖으로 나가지 않음 (돌진 · 밀려남 포함)
+        if (Stage.Bounded)
+        {
+            Vector2 c = HurtCenter, inside = Stage.ClampInside(c, radius);
+            if (inside != c) transform.position += (Vector3)(inside - c);
+        }
+
         // 스킬 입력 [임시 키: SkillTuning]
         var T = Tuning.Skills;
         for (int i = 0; i < T.manualKeys.Length; i++)
@@ -363,9 +370,10 @@ public class Player : MonoBehaviour
                                    : IsStunned ? new Color(1f, 0.95f, 0.45f) : baseColor;   // 기절 = 노랑
     }
 
-    public void TakeDamage(float dmg)
+    /// <param name="ignoreHitInvuln">피격 직후 0.35초 무적을 무시 (빠른 연타 보스 공격 — 가니악 연속 베기). 치트 · 스킬 무적은 그대로 막음</param>
+    public void TakeDamage(float dmg, bool ignoreHitInvuln = false)
     {
-        if (DebugCheats.God || invuln > 0 || IsInvulnerable || GameManager.I.State != GameState.Playing) return;
+        if (DebugCheats.God || (invuln > 0 && !ignoreHitInvuln) || IsInvulnerable || GameManager.I.State != GameState.Playing) return;
         hp -= dmg;
         invuln = 0.35f;
         CameraFollow.Shake(0.12f, 0.15f);

@@ -22,6 +22,10 @@ public enum EnemyKind
     HobgoblinKnight,
     /// <summary>[임시] 예전 보스 — 지금은 나오지 않음 (홉 고블린 기사 설계 후 정리)</summary>
     Boss,
+    /// <summary>가니악 벤데스트라: 레이드 보스 (레이드 스테이지 전용, GaniacAI · Docs/Design/Raid_Ganiac_Plan_v0.1.md)</summary>
+    Ganiac,
+    /// <summary>가니악의 검 (특수 패턴 3): 움직이지 않는 파괴 대상 · 접촉 피해 없음 · 경험치 없음</summary>
+    GaniacSword,
 }
 
 /// <summary>적 1마리. 종류별 행동(궁수 사격 · 라이더 돌진)은 EnemyBehaviors.cs (partial)</summary>
@@ -49,20 +53,25 @@ public partial class Enemy : MonoBehaviour
         EnemyKind.GoblinRider => "고블린 라이더",
         EnemyKind.GoblinElder => "고블린 장로",
         EnemyKind.HobgoblinKnight => "홉 고블린 기사",
+        EnemyKind.Ganiac => "가니악 벤데스트라",
+        EnemyKind.GaniacSword => "가니악의 검",
         _ => "보스",
     };
 
     /// <summary>보스급 (중간보스 포함): 넉백 · 뇌진탕 없음, 소각 보스 비율</summary>
-    public bool IsBoss => kind == EnemyKind.Boss || kind == EnemyKind.GoblinElder || kind == EnemyKind.HobgoblinKnight;
+    public bool IsBoss => kind == EnemyKind.Boss || kind == EnemyKind.GoblinElder || kind == EnemyKind.HobgoblinKnight || kind == EnemyKind.Ganiac;
     /// <summary>맵에서 이탈 중 (홉 고블린 기사 뛰어오르기): 맞지 않음 · 조준 안 됨 · 접촉 피해 없음</summary>
     public bool Hidden { get; private set; }
     public void SetHidden(bool on) { Hidden = on; if (sr != null) sr.enabled = !on; }
+    /// <summary>그림 투명도 배율 (가니악 맵 이탈 · 등장 시 흐려짐). 1 = 보통</summary>
+    public float alpha = 1f;
     /// <summary>중간보스 포위 고블린 (움직이지 않는 벽, MidBossArena)</summary>
     public bool IsWall { get; private set; }
     /// <summary>밀리지 않음 (넉백 · 밀어내기 · 적끼리 밀기)</summary>
-    bool Immovable => IsBoss || IsWall;
+    bool Immovable => IsBoss || IsWall || kind == EnemyKind.GaniacSword;
     GoblinElderAI elderAI;
     HobgoblinKnightAI knightAI;
+    GaniacAI ganiacAI;
 
     SpriteRenderer sr;
     Color baseColor;
@@ -179,6 +188,10 @@ public partial class Enemy : MonoBehaviour
             case EnemyKind.GoblinElder:  maxHp = 500; speed = 1.0f; damage = 15; xp = 40; scale = 1.4f; col = new Color(0.6f, 0.35f, 0.85f); break;
             case EnemyKind.HobgoblinKnight: maxHp = 900; speed = 0.9f; damage = 20; xp = 60; scale = 1.8f; col = new Color(0.35f, 0.45f, 0.55f); shape = SpriteFactory.Shape.Square; break;
             case EnemyKind.Boss:         maxHp = 900; speed = 1.8f; damage = 25; xp = 60; scale = 2.2f; col = new Color(0.9f, 0.1f, 0.15f); break;
+            // [임시] 가니악 (레이드 보스): 수치 미정 · 이동 속도 느림 (사용자). 그림 Enemy_Ganiac 없으면 짙은 보라 원
+            case EnemyKind.Ganiac:       maxHp = 3000; speed = 1.0f; damage = 20; xp = 100; scale = 3.0f; col = new Color(0.35f, 0.12f, 0.45f); break;
+            // [임시] 가니악의 검: 체력 미정. 그림 Enemy_GaniacSword 없으면 보라 마름모
+            case EnemyKind.GaniacSword:  maxHp = 200; speed = 0f; damage = 0; xp = 0; scale = 1.6f; col = new Color(0.6f, 0.3f, 0.9f); shape = SpriteFactory.Shape.Diamond; break;
         }
         maxHp *= hpMul;
         hp = maxHp;
@@ -190,6 +203,7 @@ public partial class Enemy : MonoBehaviour
         baseColor = sr.color;
         if (k == EnemyKind.GoblinElder) elderAI = gameObject.AddComponent<GoblinElderAI>();
         if (k == EnemyKind.HobgoblinKnight) knightAI = gameObject.AddComponent<HobgoblinKnightAI>();
+        if (k == EnemyKind.Ganiac) ganiacAI = gameObject.AddComponent<GaniacAI>();
     }
 
     /// <summary>중간보스 포위 고블린 1마리: 고블린 모습 · 체력 hp · 움직이지 않음</summary>
@@ -247,17 +261,19 @@ public partial class Enemy : MonoBehaviour
         else vel = Behave(pos, dir, dist, speedMul, ref face);
         pos += (vel + knockback) * Time.deltaTime;
         knockback = Vector2.Lerp(knockback, Vector2.zero, KnockDecay * Time.deltaTime);
+        if (Stage.Bounded) pos = Stage.ClampInside(pos, radius);   // 제한된 맵 (레이드): 경계 밖으로 나가지 않음
         transform.position = pos;
         if (!stunned && Mathf.Abs(face.x) > 0.01f) sr.flipX = face.x < 0;
 
         // 기절 중에는 접촉 공격 없음
         float touch = radius + p.radius;
-        if (!stunned && !Hidden && (p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);
+        if (damage > 0f && !stunned && !Hidden && (p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);   // 접촉 피해 0 = 닿아도 피격 무적이 생기지 않음
 
         // 너무 멀어지면 플레이어 근처로 재배치 (뱀서 방식)
         // 기준은 카메라 시야에 맞춰 자동 (화면 밖 생성 거리 + 6 넘으면 화면 밖 생성 거리로)
         float far = GameManager.OffscreenRadius;
-        if (!Immovable && dist > far + 6f) transform.position = (Vector2)p.transform.position + UnityEngine.Random.insideUnitCircle.normalized * far;
+        if (!Immovable && dist > far + 6f)
+            transform.position = Stage.ClampInside((Vector2)p.transform.position + UnityEngine.Random.insideUnitCircle.normalized * far, radius);
 
         if (flash > 0)
         {
@@ -272,6 +288,7 @@ public partial class Enemy : MonoBehaviour
                      : slowLeft > 0 ? Color.Lerp(baseColor, new Color(0.4f, 0.6f, 1f), 0.5f)
                      : baseColor;
         }
+        if (alpha < 1f) { var c = sr.color; c.a *= Mathf.Clamp01(alpha); sr.color = c; }
     }
 
     void CheckConcussion(Vector2 pos)
@@ -341,7 +358,7 @@ public partial class Enemy : MonoBehaviour
         dead = true;
         GameManager.I.OnEnemyKilled(this);
         Killed?.Invoke(this);
-        if (!DebugCheats.NoXpDrop) Gem.Spawn(transform.position, xp);   // 치트 F9
+        if (xp > 0 && !DebugCheats.NoXpDrop) Gem.Spawn(transform.position, xp);   // 치트 F9 · 경험치 0 (가니악의 검) 은 드랍 없음
         Destroy(gameObject);
     }
 
@@ -354,7 +371,7 @@ public partial class Enemy : MonoBehaviour
         for (int i = start; i < n; i += 2)
         {
             var a = All[i];
-            if (a.IsWall || a.IsBoss) continue;   // 포위 고블린 · 보스는 밀리지 않음 (다른 적만 밀려남)
+            if (a.Immovable) continue;   // 포위 고블린 · 보스 · 가니악의 검은 밀리지 않음 (다른 적만 밀려남)
             Vector2 pa = a.transform.position;
             Vector2 push = Vector2.zero;
             int checks = 0;

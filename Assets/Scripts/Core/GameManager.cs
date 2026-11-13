@@ -63,6 +63,10 @@ public class GameManager : MonoBehaviour
         var start = SkillCatalog.Find(player.Catalog, CharacterRoster.Selected?.startSkill ?? "A01");
         if (start != null) player.AddOrLevelSkill(start);
 
+        // 레이드 보스 스테이지: 플레이어 · 레이드 보스 시작 위치 (일반 스폰 · 중간보스 없음)
+        RaidStage.Reset();
+        if (Stage.IsRaid) RaidStage.Begin(player);
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
         gameObject.AddComponent<DebugCheats>();   // 테스트용 치트 패널 (F2)
 #endif
@@ -90,6 +94,7 @@ public class GameManager : MonoBehaviour
         if (State != GameState.Playing) return;
 
         Elapsed += Time.deltaTime;
+        if (Stage.IsRaid) { Enemy.Separate(); return; }   // 레이드: 시간 제한 · 일반 스폰 없음 (보스 처치 = 승리)
         if (Elapsed >= surviveTime) { Victory(); return; }
 
         if (!DebugCheats.NoSpawn) Spawning();   // 치트 F8: 적 생성 중지
@@ -463,6 +468,12 @@ public class GameManager : MonoBehaviour
     public void GameOver() => SetState(GameState.GameOver);
     void Victory() => SetState(GameState.Victory);
 
+    /// <summary>스테이지 목표 달성 (레이드 보스 처치). 게임 오버와 같은 프레임이면 게임 오버 유지</summary>
+    public void StageCleared()
+    {
+        if (State != GameState.GameOver) Victory();
+    }
+
     void Restart() => SceneLoader.Load(SceneManager.GetActiveScene().name);
     void ToTitle() => SceneLoader.Load(SceneLoader.Title);
 
@@ -651,12 +662,14 @@ public class GameManager : MonoBehaviour
 
     /// <summary>
     /// 보스 전용 UI (화면 위 가운데): 몬스터 이름 + 체력 바 (현재 / 최대, 50% 눈금 = 패턴 강화 시점).
-    /// 중간보스(MidBossArena.Boss)가 살아 있을 때만
+    /// 중간보스(MidBossArena.Boss) 또는 레이드 보스(RaidStage.Boss)가 살아 있을 때만
     /// </summary>
     void DrawBossBar(float W)
     {
-        var b = MidBossArena.Boss;
+        var b = MidBossArena.Boss ?? RaidStage.Boss;
         if (b == null) return;
+        // 레이드 보스 첫 등장 전 (맵 이탈 상태)에는 체력 바 없음. 등장 후 이동 패턴으로 잠깐 이탈할 때는 그대로 표시
+        if (Stage.IsRaid && b.Hidden && b.TryGetComponent<GaniacAI>(out var g) && g.InIntro) return;
         if (bossNameStyle == null)
         {
             bossNameStyle = new GUIStyle(UIStyles.Label) { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
@@ -692,6 +705,7 @@ public class GameManager : MonoBehaviour
         GUI.Label(new Rect(W - 160, 18, 150, 30), $"처치 {Kills}", UIStyles.Label);
 
         DrawBossBar(W);
+        GaniacAI.DrawHud(W);   // 가니악 특수 패턴 3 카운트다운
 
         // 체력 바 (플레이어 아래)
         var sp = Camera.main.WorldToScreenPoint(p.transform.position + Vector3.down * p.HealthBarOffset);
@@ -744,8 +758,10 @@ public class GameManager : MonoBehaviour
         else if (State == GameState.GameOver || State == GameState.Victory)
         {
             UIStyles.Overlay(new Color(0, 0, 0, 0.7f));
-            GUI.Label(new Rect(0, H * 0.3f, W, 60), State == GameState.Victory ? "생존 성공!" : "게임 오버", UIStyles.Big);
-            GUI.Label(new Rect(0, H * 0.3f + 80, W, 30), $"생존 시간 {ts.Minutes:00}:{ts.Seconds:00}   레벨 {Level}   처치 {Kills}", UIStyles.Center);
+            string result = State != GameState.Victory ? "게임 오버" : Stage.IsRaid ? "레이드 성공!" : "생존 성공!";
+            string timeLabel = Stage.IsRaid ? "전투 시간" : "생존 시간";
+            GUI.Label(new Rect(0, H * 0.3f, W, 60), result, UIStyles.Big);
+            GUI.Label(new Rect(0, H * 0.3f + 80, W, 30), $"{timeLabel} {ts.Minutes:00}:{ts.Seconds:00}   레벨 {Level}   처치 {Kills}", UIStyles.Center);
             if (GUI.Button(new Rect(mbx, H * 0.3f + 140, mbw, mbh), "다시 하기 (R)", UIStyles.MenuButton)) Restart();
             if (GUI.Button(new Rect(mbx, H * 0.3f + 140 + mbh + 14, mbw, mbh), "타이틀로", UIStyles.MenuButton)) ToTitle();
         }
