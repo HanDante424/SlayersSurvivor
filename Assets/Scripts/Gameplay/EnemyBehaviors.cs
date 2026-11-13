@@ -140,6 +140,8 @@ public class EnemyShot : MonoBehaviour
 {
     // [임시] 화면 크기 (유닛)
     const float ArrowLength = 0.5f, BoltSize = 0.32f;
+    // 그림 Enemy_MagicBolt (2026-11-14): 구체 + 왼쪽 꼬리, 구체 중심 = 그림 중심 (구체 지름 = 그림 폭의 약 31%) → 구체가 BoltSize 가 되게
+    const float BoltImageSize = BoltSize / 0.31f;
 
     Vector2 dir;
     float speed, left, damage, hitRadius, tipOffset;
@@ -149,7 +151,7 @@ public class EnemyShot : MonoBehaviour
               from, dir, speed, travel, damage, 0.12f, ArrowLength * 0.4f);
 
     public static void MagicBolt(Vector2 from, Vector2 dir, float speed, float travel, float damage) =>
-        Spawn("Enemy_MagicBolt", SpriteFactory.Shape.Circle, new Color(0.75f, 0.4f, 1f), Vector3.one * BoltSize, BoltSize,
+        Spawn("Enemy_MagicBolt", SpriteFactory.Shape.Circle, new Color(0.75f, 0.4f, 1f), Vector3.one * BoltSize, BoltImageSize,
               from, dir, speed, travel, damage, BoltSize * 0.45f, 0f);
 
     static void Spawn(string sprite, SpriteFactory.Shape shape, Color color, Vector3 fallbackScale, float imageSize,

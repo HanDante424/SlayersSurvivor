@@ -60,6 +60,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
     const float SpinWarn = 1.25f, SpinRadius = 4f, SpinAdvance = 7f;   // 1.25초 경고 → 7 돌진하며 반경 4 전방위 베기 (사용자: 경고 0.75 → 1.75 → 1.25 · 반경 5 → 4 · 이동 2 → 5 → 10 → 7)
     const float SpinDamage = 25f;        // [임시]
     const float AdvanceTime = 0.2f;      // [임시] 횡베기하며 2 이동하는 데 걸리는 시간
+    const float SwingSweepTime = 0.18f;  // [임시] 휘두르기 이펙트: 반원을 지나가는 시간
     const float SpinAdvanceTime = 0.35f; // [임시] 전방위 베기 돌진 7 이동에 걸리는 시간 (속도 20, 공격 패턴 2 돌진과 같음)
 
     // ---------- 체력 50% 아래 강화: 전방위 베기 뒤 방사 레이저 (공격 패턴 1 · 2 · 3) ----------
@@ -92,6 +93,13 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
     const float WideTrigger = 8f;        // 플레이어가 반경 8 안 (사용자)
     const float WideWarn = 1.25f, WideRadius = 9f; // 반경 9 반원 경고 1.25초 → 횡베기 1회 → 같은 반원 연속 베기 (사용자: 경고 1 → 1.25 · 반경 10 → 9)
     const float WideFlurryWarn = 0.75f;  // 횡베기 뒤 연속 베기 선딜 0.75초 (같은 반원 경고 표시) (사용자)
+    // 패턴 4 연속 베기 = 가니악 동작 없이 베기 이펙트만 (2026-11-13 사용자). 그림 Ganiac_SlashFx (2×4, 칸 444px, 8번째 칸은 빈 칸 → 7프레임)
+    const string SlashFxSheet = "Ganiac_SlashFx";
+    const int SlashFxFrames = 7;
+    const float SlashFxFps = 22f;        // [임시] 7프레임 ≈ 0.32초
+    const float SlashFxSize = 3.6f;      // [임시] 이펙트 한 칸 월드 크기
+    const int SlashFxPerHit = 2;         // [임시] 1타당 이펙트 수
+    const float SlashFxConvexDeg = 225f; // 그림 초승달의 볼록한 쪽 = 왼쪽 아래 → 베는 방향으로 돌림
     const float WideCooldown = 15f;      // [임시] 기획 미정
 
     const float PatternGap = 3f;         // 패턴 간 공통 쿨타임: 패턴이 끝난 뒤 3초 동안 다음 패턴 없음 (사용자: 1.5 → 3)
@@ -117,7 +125,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
     const float StormInterval = 0.05f;   // 0.05초 간격 (사용자)
     const int StormPerVolley = 5;        // 5개씩 (사용자)
     const float StormLaserTime = 0.1f;   // 레이저 하나 0.1초 지속 (사용자)
-    const float StormRepeatDelay = 1f;   // 끝나면 1초 뒤 우측 상단에서 1회 반복 (사용자)
+    const float StormRepeatDelay = 1f;   // 끝나면 1초 뒤 대각선 반대편 모서리에서 1회 반복 (사용자)
     const float StormLaserWidth = 1.2f;  // [임시]
     const float StormDamage = 10f;       // [임시] 레이저 1개당 (피격 무적 0.35초 적용)
     const float StormAngleMargin = 6f;   // [임시] 안전 지대 쪽으로는 쏘지 않음 (가장자리 각도 여유, 도)
@@ -129,6 +137,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
     const float SummonZigzag = 1.5f;     // [임시] 좌우로 엇갈리는 폭 (지그재그)
     const float SummonWait = 1f;         // 1초 대기 후 돌진 (사용자)
     const float SummonSpinRadius = 6f;   // 검에 닿으면 반경 6 전방위 베기 (사용자)
+    const float DarkSwordLength = 2f;    // [임시] 어둠의 검 그림 길이 (유닛)
 
     // ---------- 공격 패턴 6 · 7 공통: 횡베기 → 맵 가르는 레이저 6개 (특수 패턴 4 이후 해제) ----------
     const float LaserSweepWarn = 0.5f, LaserSweepRadius = 4f;   // 0.5초 경고 → 반경 4 횡베기 (사용자)
@@ -227,8 +236,8 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
             StartCoroutine(SwordPhase());
             return Vector2.zero;
         }
-        // 특수 패턴 4: 체력 75 · 50 · 25% (특수 패턴 3 카운트다운 중에도 사용 — 카운트다운은 계속 흐름)
-        if (!busy && !DebugCheats.NoGaniacSpecial[3] && nextStormThreshold < StormThresholds.Length && e.hp <= e.maxHp * StormThresholds[nextStormThreshold])
+        // 특수 패턴 4: 체력 75 · 50 · 25%. 특수 패턴끼리 겹치지 않게 특수 패턴 3 (카운트다운 포함) 이 끝난 뒤 (2026-11-13 사용자)
+        if (!busy && !swordPhase && !DebugCheats.NoGaniacSpecial[3] && nextStormThreshold < StormThresholds.Length && e.hp <= e.maxHp * StormThresholds[nextStormThreshold])
         {
             StartCoroutine(StormPhase());
             return Vector2.zero;
@@ -347,9 +356,10 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
                 Destroy(s.gameObject);
                 Fx.Circle(Pos, 1.5f, new Color(0.75f, 0.4f, 1f, 0.7f), 0.3f);
                 Track(BossWarning.Circle(Pos, SwordStrikeRadius, SwordStrikeWarn));
-                yield return WaitActive(SwordStrikeWarn);
+                yield return WarnThenSlash(SwordStrikeWarn, ToPlayer);
                 Fx.Disc(Pos, SwordStrikeRadius, new Color(0.45f, 0.15f, 0.7f, 0.45f), 0.3f);
                 Fx.Circle(Pos, SwordStrikeRadius, new Color(0.8f, 0.55f, 1f, 0.8f), 0.3f);
+                GaniacSwing.Spin(transform, ToPlayer, SwordStrikeRadius, 0.3f);
                 CameraFollow.Shake(0.25f, 0.25f);
                 if (PlayerInCircle(Pos, SwordStrikeRadius)) P.HitByBoss(SwordStrikeDamage, 0f, Vector2.zero, 0f);
             }
@@ -366,8 +376,8 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
     }
 
     // ---------- 특수 패턴 4 ----------
-    // 좌측 하단 모서리에서 가로 · 세로 6 안쪽으로 순간이동 → 보스와 모서리 사이(안전 지대)를 뺀 맵 전체 경고 7초
-    // → 경고 자리에 0.1초 레이저를 0.05초 간격으로 5개씩 무차별 난사, 3초 → 1초 뒤 우측 상단에서 1회 반복
+    // 무작위 모서리에서 가로 · 세로 6 안쪽으로 순간이동 → 보스와 모서리 사이(안전 지대)를 뺀 맵 전체 경고 7초
+    // → 경고 자리에 0.1초 레이저를 0.05초 간격으로 5개씩 무차별 난사, 3초 → 1초 뒤 대각선 반대편 모서리에서 1회 반복
     IEnumerator StormPhase()
     {
         busy = true;
@@ -375,7 +385,9 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
         while (nextStormThreshold < StormThresholds.Length && e.hp <= e.maxHp * StormThresholds[nextStormThreshold]) nextStormThreshold++;   // 여러 단계를 넘으면 1번만
         CameraFollow.ZoomToFullMap();   // 화면 축소 (2026-11-13 사용자)
 
-        Vector2[] corners = { new Vector2(-1f, -1f), new Vector2(1f, 1f) };   // 좌측 하단 → 우측 상단
+        // 대각선 2개 (좌하 ↔ 우상 · 좌상 ↔ 우하) 중 무작위, 시작 모서리도 무작위 → 반대편 모서리에서 1회 반복 (2026-11-13 사용자: 좌측 대각선도)
+        Vector2 first = new Vector2(Random.value < 0.5f ? -1f : 1f, Random.value < 0.5f ? -1f : 1f);
+        Vector2[] corners = { first, -first };
         for (int c = 0; c < corners.Length; c++)
         {
             if (c > 0) yield return WaitActive(StormRepeatDelay);
@@ -554,23 +566,46 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
     {
         faceDir = dir;
         Track(BossWarning.HalfDisc(Pos, dir, r, warn));
-        yield return WaitActive(warn);
+        yield return WarnThenSlash(warn, dir);
         Fx.Arc(Pos, dir, r, new Color(0.75f, 0.45f, 1f, 0.85f), 0.2f);
+        GaniacSwing.Arc(transform, dir, r, SwingSweepTime);   // 반원을 따라 큰 검이 지나감
         CameraFollow.Shake(0.08f, 0.08f);
         if (PlayerInHalf(Pos, dir, r)) P.HitByBoss(SweepDamage, 0f, Vector2.zero, 0f);
         if (advance > 0f) yield return Move(dir * advance, AdvanceTime);
     }
 
+    /// <summary>
+    /// 경고 warn 초 대기. 끝나기 Enemy.SlashLead 초 전에 베기 동작을 시작해서, 칼이 지나가는 프레임이 판정 순간과 맞게
+    /// </summary>
+    IEnumerator WarnThenSlash(float warn, Vector2 dir)
+    {
+        float lead = Mathf.Min(warn, Enemy.SlashLead);
+        yield return WaitActive(warn - lead);
+        e.PlayAttackAnim(dir);
+        yield return WaitActive(lead);
+    }
+
     /// <summary>반경 r 반원 연속 베기: 0.1초 판정 · 0.05초 딜레이 × 10 (경고 없음 — 부르는 쪽에서). 판정마다 1번씩, 피격 무적 무시</summary>
-    IEnumerator Flurry(Vector2 dir, float r)
+    /// <param name="effectOnly">true (패턴 4) = 가니악 베기 동작 · 휘두르는 검 없이, 반원 안에 베기 이펙트(Ganiac_SlashFx)만. 그림이 없으면 기존 연출</param>
+    IEnumerator Flurry(Vector2 dir, float r, bool effectOnly = false)
     {
         faceDir = dir;
+        Sprite[] slashFx = effectOnly ? SpriteEffect.LoadFrames(SlashFxSheet, 2, 4, SlashFxSize, SlashFxFrames) : null;
         for (int i = 0; i < FlurryHits; i++)
         {
-            // 베기 방향을 조금씩 흔들어 연타 느낌 (판정은 같은 반원)
-            float wobble = (i % 2 == 0 ? -1f : 1f) * 18f * Mathf.Deg2Rad;
-            Vector2 fxDir = new Vector2(dir.x * Mathf.Cos(wobble) - dir.y * Mathf.Sin(wobble), dir.x * Mathf.Sin(wobble) + dir.y * Mathf.Cos(wobble));
-            Fx.Arc(Pos, fxDir, r, new Color(0.75f, 0.45f, 1f, 0.8f), FlurryActive);
+            if (slashFx != null)
+            {
+                SpawnSlashFx(slashFx, dir, r);
+            }
+            else
+            {
+                if (i % 4 == 0) e.PlayAttackAnim(dir);   // 연타: 베기 동작을 4타마다 다시
+                // 베기 방향을 조금씩 흔들어 연타 느낌 (판정은 같은 반원)
+                float wobble = (i % 2 == 0 ? -1f : 1f) * 18f * Mathf.Deg2Rad;
+                Vector2 fxDir = new Vector2(dir.x * Mathf.Cos(wobble) - dir.y * Mathf.Sin(wobble), dir.x * Mathf.Sin(wobble) + dir.y * Mathf.Cos(wobble));
+                Fx.Arc(Pos, fxDir, r, new Color(0.75f, 0.45f, 1f, 0.8f), FlurryActive);
+                GaniacSwing.Arc(transform, fxDir, r, FlurryActive, i % 2 == 1);   // 연타: 번갈아 반대 방향으로
+            }
             bool hitThis = false;
             for (float t = 0f; t < FlurryActive;)
             {
@@ -608,7 +643,22 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
         yield return Sweep(dir, WideRadius, WideWarn, 0f);
         Track(BossWarning.HalfDisc(Pos, dir, WideRadius, WideFlurryWarn));   // 연속 베기 선딜
         yield return WaitActive(WideFlurryWarn);
-        yield return Flurry(dir, WideRadius);
+        yield return Flurry(dir, WideRadius, effectOnly: true);   // 가니악은 가만히, 베기 이펙트만 (사용자)
+    }
+
+    /// <summary>반경 r 반원(dir 방향) 안 무작위 위치에 베기 이펙트 SlashFxPerHit 개. 볼록한 쪽이 바깥(보스 반대편)을 향하게, 각도 · 좌우 반전 무작위</summary>
+    void SpawnSlashFx(Sprite[] frames, Vector2 dir, float r)
+    {
+        float baseDeg = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        for (int k = 0; k < SlashFxPerHit; k++)
+        {
+            float a = baseDeg + Random.Range(-75f, 75f);
+            float d = r * Random.Range(0.3f, 0.8f);
+            Vector2 at = Pos + new Vector2(Mathf.Cos(a * Mathf.Deg2Rad), Mathf.Sin(a * Mathf.Deg2Rad)) * d;
+            float rot = a - SlashFxConvexDeg + Random.Range(-35f, 35f);
+            float scale = Random.Range(0.8f, 1.15f);
+            SpriteEffect.Spawn(frames, SlashFxFps, null, at, rot, false, 12, scale);
+        }
     }
 
     /// <summary>1.25초 경고 → 플레이어 쪽으로 7 돌진하며 반경 4 전방위 베기</summary>
@@ -622,9 +672,10 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
         Track(BossWarning.Circle(from, SpinRadius, SpinWarn));
         if ((to - from).sqrMagnitude > 0.01f) Track(BossWarning.Box(from, (to - from).normalized, (to - from).magnitude, SpinRadius * 2f, SpinWarn));
         Track(BossWarning.Circle(to, SpinRadius, SpinWarn));
-        yield return WaitActive(SpinWarn);
+        yield return WarnThenSlash(SpinWarn, dir);
 
         Fx.Circle(Pos, SpinRadius, new Color(0.8f, 0.55f, 1f, 0.8f), SpinAdvanceTime + 0.1f, transform);   // 보스를 따라가는 회전 베기
+        GaniacSwing.Spin(transform, dir, SpinRadius, SpinAdvanceTime + 0.1f);
         Fx.Disc(Pos, SpinRadius, new Color(0.5f, 0.2f, 0.8f, 0.35f), 0.2f);
         CameraFollow.Shake(0.12f, 0.12f);
         bool hit = false;
@@ -774,6 +825,8 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
             Fx.Disc(Pos, SummonSpinRadius, new Color(0.45f, 0.15f, 0.7f, 0.45f), 0.25f);
             Fx.Circle(Pos, SummonSpinRadius, new Color(0.8f, 0.55f, 1f, 0.8f), 0.25f);
             CameraFollow.Shake(0.12f, 0.12f);
+            e.PlayAttackAnim(ToPlayer);
+            GaniacSwing.Spin(transform, ToPlayer, SummonSpinRadius, 0.25f);
             if (PlayerInCircle(Pos, SummonSpinRadius)) P.HitByBoss(SpinDamage, 0f, Vector2.zero, 0f);
         }
         foreach (var m in marks) if (m != null) Destroy(m);
@@ -784,7 +837,9 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
     {
         var go = new GameObject("GaniacDarkSword");
         go.transform.position = at;
-        go.transform.localScale = new Vector3(0.7f, 1.6f, 1f);
+        // 그림 Ganiac_DarkSword (칼끝이 아래인 세로 검) 이 있으면 길이 DarkSwordLength, 없으면 도형
+        bool art = SpriteFactory.TryGet("Ganiac_DarkSword") != null;
+        go.transform.localScale = art ? Vector3.one * DarkSwordLength : new Vector3(0.7f, 1.6f, 1f);
         SpriteFactory.AddRenderer(go, "Ganiac_DarkSword", SpriteFactory.Shape.Diamond, new Color(0.3f, 0.1f, 0.45f, 0.95f), 7);
         darkSwords.RemoveAll(x => x == null);
         darkSwords.Add(go);
@@ -949,6 +1004,24 @@ public class RaidLaser : MonoBehaviour
         return l;
     }
 
+    /// <summary>레이저 위치 · 방향 · 길이를 바꿈 (회전하는 레이저). 판정도 같이 바뀜</summary>
+    public void SetLine(Vector2 from, Vector2 dir, float length)
+    {
+        dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.up;
+        this.from = from; this.dir = dir;
+        transform.position = from + dir * length * 0.5f;
+        transform.rotation = Quaternion.Euler(0, 0, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
+        if (!Mathf.Approximately(length, this.length))
+        {
+            foreach (var sr in parts)
+            {
+                var s = sr.transform.localScale;
+                sr.transform.localScale = new Vector3(length, s.y, 1f);
+            }
+            this.length = length;
+        }
+    }
+
     void Part(Vector2 offset, Vector2 size, Color c, int order)
     {
         var go = new GameObject("LaserPart");
@@ -994,5 +1067,175 @@ public class RaidLaser : MonoBehaviour
             p.TakeDamage(damage);
             hitTimer = tick;
         }
+    }
+}
+
+/// <summary>
+/// 가니악 휘두르기 이펙트 (2026-11-13 사용자: 일반 검 그림을 베기 패턴 휘두르기 이펙트로, 검 크기는 그대로 + 베는 듯한 파티클).
+/// 그림 Ganiac_DarkSword (칼끝이 아래인 세로 검) 를 길이 BladeLength (어둠의 검의 2배) 로, 손잡이 끝을 보스 중심에 두고
+/// 반원(횡베기) 또는 한 바퀴(전방위 베기)를 돌며 지나간 뒤 사라짐. 칼끝이 지나간 자리에 짧은 베기 줄기 · 불티 파티클.
+/// 공격 범위는 기존 보라 반원 · 원 연출이 보여 줌. 그림이 없으면 아무것도 안 함
+/// </summary>
+public class GaniacSwing : MonoBehaviour
+{
+    const float BladeLength = 4f;        // 휘두르기 검 길이 (사용자: 어둠의 검 크기 2 → 2배)
+    const float PivotFromTop = 0.02f;    // 손잡이 끝(폼멜) = 그림 위쪽 2% 지점
+    static readonly Color Tint = new Color(0.82f, 0.72f, 1f, 0.92f);   // [임시] 보라빛 · 살짝 투명
+    // [임시] 베기 파티클
+    const float StreakInterval = 0.012f; // 칼끝 줄기 생성 간격
+    const float StreakLife = 0.16f, StreakWidth = 0.07f;
+    const float SparkChance = 0.35f;     // 줄기마다 불티가 튈 확률
+    const float SparkLife = 0.28f, SparkSpeed = 3.5f, SparkSize = 0.09f;
+    static readonly Color StreakColor = new Color(0.92f, 0.85f, 1f, 0.85f);
+    static readonly Color SparkColor = new Color(0.75f, 0.5f, 1f, 0.95f);
+    static Sprite bladeSprite;
+
+    Transform follow;
+    SpriteRenderer sr;
+    float from, to, time, t, streakTimer;
+    Vector2 lastTip;
+    bool hasTip;
+
+    /// <summary>dir 을 가운데로 한 반원 (180도) 을 seconds 동안. reverse 면 반대 방향으로. r 은 쓰지 않음 (호환용)</summary>
+    public static void Arc(Transform boss, Vector2 dir, float r, float seconds, bool reverse = false)
+    {
+        float c = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        Spawn(boss, reverse ? c - 90f : c + 90f, reverse ? c + 90f : c - 90f, seconds);
+    }
+
+    /// <summary>dir 에서 시작해 한 바퀴 (전방위 베기). r 은 쓰지 않음 (호환용)</summary>
+    public static void Spin(Transform boss, Vector2 dir, float r, float seconds)
+    {
+        float c = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        Spawn(boss, c, c - 360f, seconds);
+    }
+
+    static void Spawn(Transform boss, float fromDeg, float toDeg, float seconds)
+    {
+        if (boss == null) return;
+        var sprite = BladeSprite();
+        if (sprite == null) return;
+        var go = new GameObject("GaniacSwing");
+        go.transform.position = boss.position;
+        var s = go.AddComponent<GaniacSwing>();
+        s.follow = boss; s.from = fromDeg; s.to = toDeg; s.time = Mathf.Max(0.05f, seconds);
+        s.sr = go.AddComponent<SpriteRenderer>();
+        s.sr.sprite = sprite;
+        s.sr.color = Tint;
+        s.sr.sortingOrder = 12;
+        s.Apply(0f);
+    }
+
+    /// <summary>칼끝까지 길이 BladeLength 인 스프라이트 (손잡이 끝 = 피벗)</summary>
+    static Sprite BladeSprite()
+    {
+        if (bladeSprite != null) return bladeSprite;
+        var tex = Resources.Load<Texture2D>("Sprites/Ganiac_DarkSword");
+        if (tex == null) return null;
+        float ppu = tex.height * (1f - PivotFromTop) / BladeLength;
+        bladeSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 1f - PivotFromTop), ppu, 0, SpriteMeshType.FullRect);
+        return bladeSprite;
+    }
+
+    float Angle(float k) => Mathf.Lerp(from, to, k);
+    Vector2 Tip(float ang) => (Vector2)transform.position + new Vector2(Mathf.Cos(ang * Mathf.Deg2Rad), Mathf.Sin(ang * Mathf.Deg2Rad)) * BladeLength;
+
+    void Apply(float k)
+    {
+        float ang = Angle(k);
+        transform.rotation = Quaternion.Euler(0, 0, ang + 90f);   // 그림의 칼끝(아래) 이 ang 방향을 향하게
+        var c = Tint;
+        c.a *= k < 0.7f ? 1f : Mathf.Clamp01((1f - k) / 0.3f);   // 끝무렵 사라짐
+        sr.color = c;
+    }
+
+    void Update()
+    {
+        if (GameManager.I != null && GameManager.I.State != GameState.Playing) return;
+        if (follow != null) transform.position = follow.position;
+        t += Time.deltaTime;
+        float k = Mathf.Clamp01(t / time);
+        float sk = Mathf.SmoothStep(0f, 1f, k);
+        Apply(sk);
+
+        // 칼끝이 지나간 자리: 짧은 베기 줄기 (지난 위치 → 지금 위치), 가끔 불티
+        Vector2 tip = Tip(Angle(sk));
+        streakTimer -= Time.deltaTime;
+        if (hasTip && streakTimer <= 0f && k < 0.9f)
+        {
+            streakTimer = StreakInterval;
+            Vector2 d = tip - lastTip;
+            if (d.sqrMagnitude > 0.0004f)
+            {
+                SlashParticle.Streak(lastTip, tip, StreakWidth, StreakLife, StreakColor);
+                if (Random.value < SparkChance)
+                {
+                    Vector2 outward = (tip - (Vector2)transform.position).normalized;
+                    Vector2 v = (outward * Random.Range(0.4f, 1f) + d.normalized * Random.Range(0.2f, 0.8f)) * SparkSpeed;
+                    SlashParticle.Spark(tip, v, SparkSize, SparkLife, SparkColor);
+                }
+            }
+            lastTip = tip;
+        }
+        if (!hasTip) { lastTip = tip; hasTip = true; }
+        if (k >= 1f) Destroy(gameObject);
+    }
+}
+
+/// <summary>베기 파티클 1개: 줄기(두 점 사이 가는 막대, 제자리에서 옅어짐) · 불티(날아가며 작아짐)</summary>
+public class SlashParticle : MonoBehaviour
+{
+    SpriteRenderer sr;
+    Vector2 vel;
+    float life, t;
+    Color color;
+    Vector3 baseScale;
+    bool shrink;
+
+    public static void Streak(Vector2 a, Vector2 b, float width, float life, Color c)
+    {
+        Vector2 d = b - a;
+        var p = Make("SlashStreak", SpriteFactory.Shape.Square, (a + b) * 0.5f, new Vector3(d.magnitude + width, width, 1f),
+                     Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg, life, c);
+        p.shrink = false;
+    }
+
+    public static void Spark(Vector2 at, Vector2 velocity, float size, float life, Color c)
+    {
+        var p = Make("SlashSpark", SpriteFactory.Shape.Diamond, at, new Vector3(size * 1.8f, size, 1f),
+                     Mathf.Atan2(velocity.y, velocity.x) * Mathf.Rad2Deg, life, c);
+        p.vel = velocity;
+        p.shrink = true;
+    }
+
+    static SlashParticle Make(string name, SpriteFactory.Shape shape, Vector2 at, Vector3 scale, float angle, float life, Color c)
+    {
+        var go = new GameObject(name);
+        go.transform.position = at;
+        go.transform.rotation = Quaternion.Euler(0, 0, angle);
+        go.transform.localScale = scale;
+        var p = go.AddComponent<SlashParticle>();
+        p.sr = go.AddComponent<SpriteRenderer>();
+        p.sr.sprite = SpriteFactory.Get("Fx_" + shape, shape);
+        p.sr.sortingOrder = 13;
+        p.sr.color = c;
+        p.color = c; p.life = Mathf.Max(0.02f, life); p.baseScale = scale;
+        return p;
+    }
+
+    void Update()
+    {
+        if (GameManager.I != null && GameManager.I.State != GameState.Playing) return;
+        t += Time.deltaTime;
+        float k = t / life;
+        if (k >= 1f) { Destroy(gameObject); return; }
+        if (vel.sqrMagnitude > 0f)
+        {
+            transform.position += (Vector3)(vel * Time.deltaTime);
+            vel *= 1f - Mathf.Min(1f, 4f * Time.deltaTime);   // 금방 느려짐
+        }
+        if (shrink) transform.localScale = baseScale * (1f - k);
+        else transform.localScale = new Vector3(baseScale.x, baseScale.y * (1f - k * 0.7f), 1f);   // 줄기는 가늘어지며
+        sr.color = new Color(color.r, color.g, color.b, color.a * (1f - k));
     }
 }

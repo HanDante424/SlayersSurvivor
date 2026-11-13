@@ -133,6 +133,54 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     const float FanReflectFirstUse = 14f;    // [임시]
     const float FanReflectDamage = 20f;  // [임시] 구간마다
 
+    // ---------- 기본 설정: 거울 · 검 파괴 (2026-11-13 사용자) ----------
+    const float BrokenTakenMul = 3f;     // 야타의 거울 · 아메노무라쿠모가 파괴되면 각각 보스 '받는 최종 피해량' +200% (서로 곱)
+
+    // ---------- 특수 패턴 1: 거울 방사 레이저 (2026-11-13 사용자) ----------
+    static readonly float[] Special1Thresholds = { 0.7f, 0.4f, 0.1f };   // 체력이 30 · 60 · 90% 감소할 때
+    const float S1MirrorMoveMax = 2f;    // [임시] 거울이 맵 중앙에 도착할 때까지 최대 대기
+    const float S1BeamWidth = 1f;        // 보스 → 거울 레이저 폭 1, 패턴 동안 계속 (사용자)
+    const float S1BeamDamage = 10f;      // [임시] 0.5초마다
+    const float S1FirstDelay = 0.5f;     // 0.5초 뒤 (사용자)
+    const float S1Warn = 1f;             // 1초 경고 (사용자)
+    const float S1RadialStep = 15f;      // 방사 레이저 15도 간격 (사용자: 15 → 25 → 15)
+    const float S1RadialTime = 0.75f;    // 레이저 0.75초 (사용자)
+    const float S1RadialGap = 0.5f;      // 0.5초 후 다시 경고 (사용자)
+    static readonly float[] S1RadialOffsets = { 0f, 5f, 10f, 5f, 0f };   // 총 5회, 처음 위치에서 0 → +5 → +10 → +5 → 0 (사용자 확인)
+    const float S1SpinStep = 30f;        // 회전 레이저 30도 간격 (사용자: 10 → 30)
+    const float S1SpinTime = 3f;         // 3초간 회전 후 사라짐 (사용자)
+    const float S1SpinSpeed = 10f;       // [임시] "천천히" = 초당 10도 (3초에 30도)
+    const float S1Gap = 0.5f;            // 회전 전 · 회전 사이 0.5초 (사용자)
+    const float S1LaserWidth = 0.5f;     // 방사 · 회전 레이저 폭 (사용자: 0.5)
+    const float S1RadialDamage = 20f, S1SpinDamage = 15f;   // [임시] 방사 1개당 · 회전 (0.5초마다)
+    const float S1MirrorTakenMul = 3f;   // 이 패턴 동안 야타의 거울 '받는 최종 피해량' +200% (사용자)
+
+    // ---------- 특수 패턴 2: 아메노무라쿠모 난무 (2026-11-13 사용자) ----------
+    static readonly float[] Special2Thresholds = { 0.9f, 0.6f, 0.3f };   // 체력이 90 · 60 · 30% 가 될 때
+    const float S2BladeTakenMul = 4f;    // 패턴 중 검 '받는 최종 피해량' +300% (사용자)
+    const int S2Dashes = 5;              // 돌진 → 베기 총 5번 (사용자)
+    const float S2CutDelay = 0.5f;       // 검이 맵을 빠져나간 뒤 0.5초 후 경고 (사용자)
+    const float S2CutWarn = 1f;          // 1초 후 베기 (사용자)
+    const float S2CutWidth = 0.5f;       // 베기 폭 0.5 (사용자)
+    const float S2AfterCut = 1f;         // 베기 1초 뒤 다시 돌진 (사용자)
+    const float S2StuckTime = 10f;       // 가운데 박힌 검 10초 (사용자)
+    const float S2StuckInterval = 0.1f;  // 베기 난사 0.1초 간격 경고 (사용자: 0.05 → 0.1)
+    const float S2FinalWarn = 3f;        // 연속 베기 경고 3초 (사용자: 5 → 3)
+    const float S2FinalRadius = 12f;     // 반경 12 (사용자: 8 → 12)
+    const float S2FinalInterval = 0.2f;  // 0.2초 간격 연속 베기 3초 (사용자)
+    const float S2FinalTime = 3f;
+    // [임시] 기획에 없는 값
+    const float S2OutDistance = 3f;      // 맵 밖 거리 (검이 대기하는 곳)
+    const float S2LeaveTime = 0.4f;      // 처음 맵을 빠져나가는 시간
+    const float S2DashWarn = 0.5f;       // 돌진 경로 경고 0.5초 (예고 없이 날아오지 않게, 사용자: 유지)
+    const float S2DashSpeed = 100f;      // 돌진 속도 (사용자: 100)
+    const float S2DashWidth = 1f;        // 돌진 경고 · 판정 폭
+    const int S2CutCount = 20;           // 돌진 후속 베기 수 (사용자: 20) — 맵을 가르는 직선, 위치 · 각도 무작위
+    const float S2CutFlash = 0.15f;      // 베기 표시 시간
+    const float S2StuckWarn = 1f;        // 박힌 검 경고 → 베기
+    const float S2StuckDropTime = 0.4f;  // 가운데로 날아가 박히는 시간
+    const float S2DashDamage = 25f, S2CutDamage = 20f, S2StuckDamage = 15f, S2FinalDamage = 8f;   // 피해 (연속 베기는 0.2초마다, 피격 무적 무시)
+
     // 검 색 (사용자: 흰색, 은색 언저리)
     static readonly Color SwordCore = new Color(0.9f, 0.93f, 0.98f, 0.95f);
     static readonly Color SwordEdge = new Color(1f, 1f, 1f, 1f);
@@ -146,6 +194,39 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     bool intro = true;
     KagutsuchiMirror mirror;
     KagutsuchiBlade blade;
+    bool mirrorSpawned, bladeSpawned;          // 한 번이라도 나타났는지 (파괴 = 나타난 뒤 체력 0)
+    bool special1Pending, inSpecial1;
+    bool special2Pending, inSpecial2;
+    int special2Next;
+    int special1Next;                          // 다음 체력 문턱 (Special1Thresholds)
+    Mod mod;
+
+    bool MirrorBroken => mirrorSpawned && !MirrorAlive;
+    bool BladeBroken => bladeSpawned && !BladeAlive;
+
+    /// <summary>
+    /// 받는 최종 피해량: 거울 · 검이 파괴되면 보스 ×3 씩 (대상 단계, 고정 피해 제외),
+    /// 특수 패턴 1 동안 야타의 거울 ×3
+    /// </summary>
+    class Mod : CombatModifier
+    {
+        readonly KagutsuchiAI k;
+        public Mod(KagutsuchiAI k) => this.k = k;
+        public override float ReceivedMul(Enemy target, in DamageInfo d)
+        {
+            if (target == k.e)
+                return (k.MirrorBroken ? BrokenTakenMul : 1f) * (k.BladeBroken ? BrokenTakenMul : 1f);
+            if (k.inSpecial1 && k.mirror != null && target == k.mirror.Body) return S1MirrorTakenMul;
+            if (k.inSpecial2 && k.blade != null && target == k.blade.Body) return S2BladeTakenMul;
+            return 1f;
+        }
+    }
+
+    void OnEnable()
+    {
+        mod ??= new Mod(this);
+        CombatMods.Add(mod);
+    }
     readonly List<BossWarning> warnings = new List<BossWarning>();
 
     static Player P => Player.I;
@@ -194,6 +275,8 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
 
     void OnDisable()
     {
+        if (mod != null) CombatMods.Remove(mod);
+        StopSpecial1Lasers();
         foreach (var w in warnings) if (w != null) Destroy(w.gameObject);
         warnings.Clear();
         if (mirror != null) Destroy(mirror.gameObject);
@@ -216,6 +299,19 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     public Vector2 Behave(Vector2 toPlayer, float moveSpeed, ref Vector2 face)
     {
         face = intro ? Vector2.down : toPlayer;
+        if (!intro) { CheckSpecial1(); CheckSpecial2(); }
+        if (!intro && !busy && special1Pending)
+        {
+            // 특수 패턴 1: 진행 중인 패턴이 끝난 뒤 바로 (다른 패턴 쿨타임과 무관)
+            special1Pending = false;
+            if (MirrorAlive) StartCoroutine(Run(Special1Routine(), null));
+        }
+        if (!intro && !busy && special2Pending)
+        {
+            // 특수 패턴 2: 진행 중인 패턴이 끝난 뒤 바로
+            special2Pending = false;
+            if (BladeAlive) StartCoroutine(Run(Special2Routine(), null));
+        }
         if (!intro && !busy)
         {
             for (int i = 0; i < cd.Length; i++) if (cd[i] > 0f) cd[i] -= Time.deltaTime;
@@ -247,9 +343,32 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         return Vector2.zero;   // 고정형 보스 (2026-11-13 사용자): 처음 등장해 멈춘 자리에서 움직이지 않음 (바라보는 방향만 플레이어 쪽)
     }
 
+    /// <summary>체력이 30 · 60 · 90% 줄어든 순간 → 특수 패턴 1 예약 (한 번에 여러 문턱을 넘어도 1번). 거울이 파괴됐으면 사용 안 함</summary>
+    void CheckSpecial1()
+    {
+        if (e.maxHp <= 0f) return;
+        float ratio = e.hp / e.maxHp;
+        bool crossed = false;
+        while (special1Next < Special1Thresholds.Length && ratio <= Special1Thresholds[special1Next]) { special1Next++; crossed = true; }
+        if (crossed && MirrorAlive) special1Pending = true;
+    }
+
+    /// <summary>체력이 90 · 60 · 30% 가 된 순간 → 특수 패턴 2 예약 (한 번에 여러 문턱을 넘어도 1번). 검이 파괴됐으면 사용 안 함</summary>
+    void CheckSpecial2()
+    {
+        if (e.maxHp <= 0f) return;
+        float ratio = e.hp / e.maxHp;
+        bool crossed = false;
+        while (special2Next < Special2Thresholds.Length && ratio <= Special2Thresholds[special2Next]) { special2Next++; crossed = true; }
+        if (crossed && BladeAlive) special2Pending = true;
+    }
+
     bool MirrorAlive => mirror != null && mirror.Alive;
     bool BladeAlive => blade != null && blade.Alive;
     Vector2 Pos => transform.position;
+    const float LaserGap = 1f;           // 보스에서 나가는 레이저는 보스 몸 바깥 1 에서 시작 (2026-11-13 사용자)
+    /// <summary>보스에서 d 방향으로 쏘는 레이저의 시작점 = 몸(판정 반경) 바깥 LaserGap</summary>
+    Vector2 Muzzle(Vector2 d) => Pos + d * (e.radius + LaserGap);
     Vector2 ToPlayer { get { var d = (P != null ? P.HurtCenter : Pos + Vector2.down) - Pos; return d.sqrMagnitude > 0.0001f ? d.normalized : Vector2.down; } }
 
     bool PlayerInHalf(Vector2 at, Vector2 dir, float r)
@@ -295,8 +414,9 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     // [임시] 첫 방향 = 경고가 뜰 때의 플레이어 쪽
     IEnumerator ReflectRoutine()
     {
-        Vector2 from = transform.position;
-        Vector2 aim = P != null ? P.HurtCenter - from : Vector2.down;
+        Vector2 aim = P != null ? P.HurtCenter - Pos : Vector2.down;
+        aim = aim.sqrMagnitude > 0.000001f ? aim.normalized : Vector2.down;
+        Vector2 from = Stage.ClampInside(Muzzle(aim), 0f);   // 몸 바깥 1 에서 시작
         yield return ReflectLaser(from, aim, ReflectBounces, ReflectWidth, ReflectWarn, ReflectLaserTime, ReflectDamage);
     }
 
@@ -318,8 +438,9 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
 
         Vector2 mp = mirror.transform.position;
         Vector2 toMirror = mp - Pos;
-        float beamLen = toMirror.magnitude;
-        RaidLaser.Line(Pos, toMirror.normalized, beamLen, MirrorBeamWidth, MirrorBeamTime, MirrorBeamDamage, 0.5f, null, FireCore, FireEdge);
+        Vector2 beamFrom = Muzzle(toMirror.normalized);
+        float beamLen = Mathf.Max(0.05f, (mp - beamFrom).magnitude);
+        RaidLaser.Line(beamFrom, toMirror.normalized, beamLen, MirrorBeamWidth, MirrorBeamTime, MirrorBeamDamage, 0.5f, null, FireCore, FireEdge);
         Fx.Circle(mp, 1f, FireFx, MirrorBeamTime, mirror.transform);
         yield return WaitActive(MirrorFanDelay);
 
@@ -342,6 +463,231 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         CameraFollow.Shake(0.2f, 0.15f);
         yield return Wait(MirrorFanLaserTime);
         if (mirror != null) mirror.Release();   // 거울 복귀
+    }
+
+    // ---------- 특수 패턴 1: 거울 방사 레이저 (2026-11-13 사용자) ----------
+    // 거울을 맵 중앙으로 → 보스가 폭 1 레이저를 거울에 계속 발사 (패턴 끝까지)
+    // → 0.5초 뒤 1초 경고 → 15도 간격 방사 레이저 0.75초 → 0.5초 뒤 다시 경고 … 총 5회 (회마다 각도 이동)
+    // → 0.5초 뒤 1초 경고 → 10도 간격 방사 레이저가 시계 방향으로 천천히 3초 회전 후 사라짐
+    // → 0.5초 뒤 1초 경고 → 반시계 방향으로 3초 회전. 이 패턴 동안 거울 받는 최종 피해량 +200%
+    // 거울이 도중에 파괴되면 그 자리에서 끝
+    RaidLaser s1Beam;
+    readonly List<RaidLaser> s1Spin = new List<RaidLaser>();
+
+    void StopSpecial1Lasers()
+    {
+        if (s1Beam != null) Destroy(s1Beam.gameObject);
+        s1Beam = null;
+        foreach (var l in s1Spin) if (l != null) Destroy(l.gameObject);
+        s1Spin.Clear();
+    }
+
+    IEnumerator Special1Routine()
+    {
+        inSpecial1 = true;
+        yield return Special1Body();
+        inSpecial1 = false;
+        StopSpecial1Lasers();
+        if (mirror != null) mirror.Release();
+    }
+
+    IEnumerator Special1Body()
+    {
+        if (!MirrorAlive) yield break;
+        Vector2 c = Center;
+        mirror.HoldAt(c);
+        for (float t = 0f; t < S1MirrorMoveMax && MirrorAlive && !mirror.Arrived;)
+        {
+            if (Playing) t += Time.deltaTime;
+            yield return null;
+        }
+        if (!MirrorAlive) yield break;
+        c = mirror.transform.position;
+
+        // 보스 → 거울 레이저 (패턴 끝까지)
+        Vector2 toMirror = c - Pos;
+        Vector2 s1From = Muzzle(toMirror.normalized);
+        s1Beam = RaidLaser.Line(s1From, toMirror.normalized, Mathf.Max(0.05f, (c - s1From).magnitude), S1BeamWidth, 999f, S1BeamDamage, 0.5f, null, FireCore, FireEdge);
+        Fx.Circle(c, 1f, FireFx, 0.6f, mirror.transform);
+
+        // 방사 레이저 5회
+        float a0 = Random.Range(0f, S1RadialStep);
+        yield return Wait(S1FirstDelay);
+        for (int k = 0; k < S1RadialOffsets.Length; k++)
+        {
+            if (k > 0) yield return Wait(S1RadialGap);
+            if (!MirrorAlive) yield break;
+            var dirs = Radial(a0 + S1RadialOffsets[k], S1RadialStep);
+            foreach (var d in dirs) Track(BossWarning.Box(c, d, Stage.ExitDistance(c, d), S1LaserWidth, S1Warn));
+            yield return Wait(S1Warn);
+            if (!MirrorAlive) yield break;
+            foreach (var d in dirs)
+                RaidLaser.Line(c, d, Stage.ExitDistance(c, d), S1LaserWidth, S1RadialTime, S1RadialDamage, S1RadialTime + 1f, null, FireCore, FireEdge);
+            CameraFollow.Shake(0.12f, 0.1f);
+            yield return Wait(S1RadialTime);
+        }
+
+        // 회전 레이저: 시계 → 반시계
+        for (int turn = 0; turn < 2; turn++)
+        {
+            yield return Wait(S1Gap);
+            if (!MirrorAlive) yield break;
+            float start = Random.Range(0f, S1SpinStep);
+            var dirs = Radial(start, S1SpinStep);
+            foreach (var d in dirs) Track(BossWarning.Box(c, d, Stage.ExitDistance(c, d), S1LaserWidth, S1Warn));
+            yield return Wait(S1Warn);
+            if (!MirrorAlive) yield break;
+            s1Spin.Clear();
+            foreach (var d in dirs)
+                s1Spin.Add(RaidLaser.Line(c, d, Stage.ExitDistance(c, d), S1LaserWidth, S1SpinTime, S1SpinDamage, 0.5f, null, FireCore, FireEdge));
+            float sign = turn == 0 ? -1f : 1f;   // 시계 방향 = 각도 감소
+            for (float t = 0f; t < S1SpinTime;)
+            {
+                if (!MirrorAlive) yield break;
+                if (Playing)
+                {
+                    t += Time.deltaTime;
+                    float rot = sign * S1SpinSpeed * Mathf.Min(t, S1SpinTime);
+                    for (int i = 0; i < s1Spin.Count; i++)
+                    {
+                        if (s1Spin[i] == null) continue;
+                        Vector2 d = Dir(start + i * S1SpinStep + rot);
+                        s1Spin[i].SetLine(c, d, Stage.ExitDistance(c, d));
+                    }
+                }
+                yield return null;
+            }
+            s1Spin.Clear();   // 레이저는 3초 뒤 스스로 사라짐
+        }
+    }
+
+    // ---------- 특수 패턴 2: 아메노무라쿠모 난무 (2026-11-13 사용자) ----------
+    // 검이 맵을 빠져나감 → [맵 밖 무작위 각도에서 플레이어 쪽으로 맵을 꿰뚫고 돌진 → 반대쪽 맵 밖으로
+    //   → 0.5초 뒤 경고 (폭 0.5, 위치 · 각도 무작위 직선) → 1초 뒤 베기 → 1초 뒤 다시 돌진] × 5
+    // → 맵 가운데에 검이 박힘: 10초 동안 0.05초마다 검에서 무작위 방향 경고 (폭 0.5) → 1초 [임시] 뒤 베기
+    // → 검 중심 반경 12 경고 3초 → 0.2초 간격 연속 횡베기 3초 → 검 복귀. 패턴 중 검 받는 최종 피해량 +300%
+    // 검이 도중에 파괴되면 그 자리에서 끝 (이미 뜬 경고 · 베기는 그대로)
+    IEnumerator Special2Routine()
+    {
+        inSpecial2 = true;
+        blade.Control();
+        yield return Special2Body();
+        inSpecial2 = false;
+        if (blade != null) blade.Release();
+    }
+
+    IEnumerator Special2Body()
+    {
+        // 맵을 빠져나감 (보스 위쪽 맵 밖으로)
+        Vector2 outUp = new Vector2(blade.Pos.x, Center.y + Half.y + S2OutDistance + SwordLength);
+        yield return BladeTo(outUp, 90f, S2LeaveTime);
+
+        for (int k = 0; k < S2Dashes; k++)
+        {
+            if (!BladeAlive) yield break;
+            if (k > 0) yield return Wait(S2AfterCut);
+            if (!BladeAlive) yield break;
+
+            // 돌진: 무작위 각도에서 플레이어를 지나 맵을 꿰뚫음
+            Vector2 target = P != null ? P.HurtCenter : Center;
+            Vector2 u = Dir(Random.Range(0f, 360f));
+            float back = Stage.ExitDistance(Stage.ClampInside(target, 0f), -u), fwd = Stage.ExitDistance(Stage.ClampInside(target, 0f), u);
+            Vector2 entry = target - u * back;
+            Vector2 start = entry - u * (S2OutDistance + SwordLength);
+            Vector2 end = target + u * (fwd + S2OutDistance + SwordLength);
+            float ang = Mathf.Atan2(u.y, u.x) * Mathf.Rad2Deg;
+            blade.SetPose(start, ang);
+            Track(BossWarning.Box(entry, u, back + fwd, S2DashWidth, S2DashWarn));
+            yield return Wait(S2DashWarn);
+            bool hit = false;
+            Vector2 pos = start;
+            float total = (end - start).magnitude;
+            for (float d = 0f; d < total;)
+            {
+                if (!BladeAlive) yield break;
+                if (Playing)
+                {
+                    d = Mathf.Min(total, d + S2DashSpeed * Time.deltaTime);
+                    pos = start + u * d;
+                    blade.SetPose(pos, ang);
+                    var p = P;
+                    if (!hit && p != null && GaniacAI.InBox(p.HurtCenter, pos - u * (SwordLength * 0.5f), u, SwordLength, S2DashWidth, p.radius))
+                    {
+                        hit = true;
+                        p.HitByBoss(S2DashDamage, 0f, Vector2.zero, 0f);
+                    }
+                }
+                yield return null;
+            }
+
+            // 맵 밖에서 0.5초 → 무작위 직선 베기 경고 1초 → 베기
+            yield return Wait(S2CutDelay);
+            var cuts = new List<(Vector2 from, Vector2 d, float len)>();
+            for (int i = 0; i < S2CutCount; i++)
+            {
+                Vector2 c = Center + new Vector2(Random.Range(-Half.x, Half.x), Random.Range(-Half.y, Half.y)) * 0.9f;
+                Vector2 d = Dir(Random.Range(0f, 180f));
+                float b2 = Stage.ExitDistance(c, -d), f2 = Stage.ExitDistance(c, d);
+                cuts.Add((c - d * b2, d, b2 + f2));
+                Track(BossWarning.Box(c - d * b2, d, b2 + f2, S2CutWidth, S2CutWarn));
+            }
+            yield return Wait(S2CutWarn);
+            foreach (var c in cuts) RaidLaser.Line(c.from, c.d, c.len, S2CutWidth, S2CutFlash, S2CutDamage, S2CutFlash + 1f, null, SwordCore, SwordEdge);
+            CameraFollow.Shake(0.1f, 0.1f);
+        }
+
+        // 맵 가운데에 검이 박힘
+        if (!BladeAlive) yield break;
+        yield return Wait(S2AfterCut);
+        Vector2 mid = Center;
+        blade.SetPose(mid + Vector2.up * (Half.y + S2OutDistance + SwordLength), -90f);
+        yield return BladeTo(mid, -90f, S2StuckDropTime);
+        if (!BladeAlive) yield break;
+        CameraFollow.Shake(0.3f, 0.25f);
+        Fx.Circle(mid, 2f, new Color(1f, 1f, 1f, 0.8f), 0.4f);
+
+        // 10초 동안 0.05초마다 검에서 무작위 방향 경고 → 1초 뒤 베기
+        for (float t = 0f; t < S2StuckTime && BladeAlive; t += S2StuckInterval)
+        {
+            Vector2 d = Dir(Random.Range(0f, 360f));
+            float len = Stage.ExitDistance(mid, d);
+            Track(BossWarning.Box(mid, d, len, S2CutWidth, S2StuckWarn));
+            StartCoroutine(DelayedCut(mid, d, len, S2StuckWarn, S2StuckDamage));
+            yield return Wait(S2StuckInterval);
+        }
+        if (!BladeAlive) yield break;
+        yield return Wait(S2StuckWarn);   // 마지막 경고의 베기까지
+
+        // 검 중심 반경 12 경고 3초 → 0.2초 간격 연속 횡베기 3초 (사용자: 횡베기 형태)
+        // [해석] 횡베기 = 검 중심 반원 (반경 12). 매번 직전과 반대쪽 반원을 베고 각도는 ±30도 무작위 → 0.4초마다 원 전체를 한 번씩 덮음
+        Track(BossWarning.Circle(mid, S2FinalRadius, S2FinalWarn));
+        yield return Wait(S2FinalWarn);
+        float sweepAng = Random.Range(0f, 360f);
+        for (float t = 0f; t < S2FinalTime && BladeAlive; t += S2FinalInterval)
+        {
+            Vector2 d = Dir(sweepAng + Random.Range(-30f, 30f));
+            sweepAng += 180f;
+            Fx.Arc(mid, d, S2FinalRadius, SwordEdge, S2CutFlash);
+            if (PlayerInHalf(mid, d, S2FinalRadius)) P.TakeDamage(S2FinalDamage, ignoreHitInvuln: true);
+            CameraFollow.Shake(0.05f, 0.06f);
+            yield return Wait(S2FinalInterval);
+        }
+    }
+
+    IEnumerator DelayedCut(Vector2 from, Vector2 d, float len, float delay, float damage)
+    {
+        yield return Wait(delay);
+        RaidLaser.Line(from, d, len, S2CutWidth, S2CutFlash, damage, S2CutFlash + 1f, null, SwordCore, SwordEdge);
+    }
+
+    static Vector2 Dir(float deg) => new Vector2(Mathf.Cos(deg * Mathf.Deg2Rad), Mathf.Sin(deg * Mathf.Deg2Rad));
+
+    /// <summary>start 각도에서 step 간격으로 한 바퀴</summary>
+    static List<Vector2> Radial(float start, float step)
+    {
+        var list = new List<Vector2>();
+        for (float a = 0f; a < 360f - 0.01f; a += step) list.Add(Dir(start + a));
+        return list;
     }
 
     // ---------- 검 공통 (아메노무라쿠모) ----------
@@ -626,7 +972,8 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
             {
                 float a = baseAng - FanReflectArc * 0.5f + FanReflectArc * i / (FanReflectCount - 1);
                 float r = a * Mathf.Deg2Rad;
-                running.Add(StartCoroutine(ReflectLaser(Pos, new Vector2(Mathf.Cos(r), Mathf.Sin(r)), FanReflectBounces,
+                Vector2 rd = new Vector2(Mathf.Cos(r), Mathf.Sin(r));
+                running.Add(StartCoroutine(ReflectLaser(Stage.ClampInside(Muzzle(rd), 0f), rd, FanReflectBounces,
                                                          FanReflectWidth, FanReflectWarn, FanReflectLaserTime, FanReflectDamage)));
             }
             foreach (var c in running) yield return c;
@@ -702,6 +1049,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         // 5) 야타의 거울 등장
         mirror = KagutsuchiMirror.Spawn(e, MirrorGap, MirrorTurnSpeed);   // 체력 = 카구츠치 최대 체력 × 15
         blade = KagutsuchiBlade.Spawn(e, SwordHpMul);                     // 검: 보스 옆 기본 위치, 독립 체력 [임시] 보스 × 1
+        mirrorSpawned = bladeSpawned = true;
         yield return Wait(AfterMirror);
 
         // 6) 입장 끝 → 이후부터 보스 행동. 카메라는 보스전 내내 맵 전체 (2026-11-13 사용자) — 시야를 되돌리지 않음
@@ -718,10 +1066,10 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     {
         yield return Wait(NovaBeamDelay);
         Vector2 at = Center + new Vector2(0f, -NovaCenterDown);
-        Vector2 from = transform.position;
-        Vector2 d = at - from;
-        float len = d.magnitude;
-        d = len > 0.001f ? d / len : Vector2.down;
+        Vector2 d = at - Pos;
+        d = d.sqrMagnitude > 0.000001f ? d.normalized : Vector2.down;
+        Vector2 from = Muzzle(d);
+        float len = Mathf.Max(0.05f, (at - from).magnitude);
         RaidLaser.Line(from, d, len, NovaBeamWidth, NovaWarnDelay + NovaGrowTime, NovaBeamDamage, 0.5f, null, FireCore, FireEdge);
         Fx.Circle(at, 1f, FireFx, 0.4f);
         yield return Wait(NovaWarnDelay);
@@ -760,7 +1108,8 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         float baseAng = toCenter.sqrMagnitude > 0.01f ? Mathf.Atan2(toCenter.y, toCenter.x) * Mathf.Rad2Deg : -90f;
         float a = (baseAng + Random.Range(-IntroLaserFan * 0.5f, IntroLaserFan * 0.5f)) * Mathf.Deg2Rad;
         Vector2 d = new Vector2(Mathf.Cos(a), Mathf.Sin(a));
-        float len = Stage.ExitDistance(Stage.ClampInside(from, 0f), d);
+        from = Stage.ClampInside(Muzzle(d), 0f);   // 몸 바깥 1 에서 시작
+        float len = Stage.ExitDistance(from, d);
         var w = BossWarning.Box(from, d, len, IntroLaserWidth, IntroLaserWarn);
         warnings.RemoveAll(x => x == null);
         warnings.Add(w);
@@ -803,11 +1152,33 @@ public class KagutsuchiMirror : MonoBehaviour
         holdGap = gap;
     }
 
-    /// <summary>다시 플레이어 쪽 궤도로</summary>
-    public void Release() => hold = false;
+    // 특수 패턴 1: 맵 위 고정 위치 (보스 궤도를 벗어남)
+    bool fixedHold;
+    Vector2 fixedPos;
 
-    /// <summary>정면 자리에 도착했는지</summary>
-    public bool Arrived => hold && Mathf.Abs(Mathf.DeltaAngle(angle, holdAngle)) < 1f && Mathf.Abs(curRadius - RadiusFor(holdGap)) < 0.05f;
+    /// <summary>맵 위 한 지점으로 옮겨 붙잡아 둠 (특수 패턴 1: 맵 중앙)</summary>
+    public void HoldAt(Vector2 worldPos)
+    {
+        fixedHold = true;
+        fixedPos = worldPos;
+    }
+
+    /// <summary>다시 플레이어 쪽 궤도로 (고정 위치에서 풀리면 지금 위치에서 궤도로 부드럽게 돌아감)</summary>
+    public void Release()
+    {
+        if (fixedHold && boss != null)
+        {
+            Vector2 d = (Vector2)transform.position - (Vector2)boss.transform.position;
+            angle = Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
+            curRadius = d.magnitude;
+        }
+        fixedHold = false;
+        hold = false;
+    }
+
+    /// <summary>정면 자리 (또는 고정 위치) 에 도착했는지</summary>
+    public bool Arrived => fixedHold ? ((Vector2)transform.position - fixedPos).sqrMagnitude < 0.0025f
+                         : hold && Mathf.Abs(Mathf.DeltaAngle(angle, holdAngle)) < 1f && Mathf.Abs(curRadius - RadiusFor(holdGap)) < 0.05f;
 
     public static KagutsuchiMirror Spawn(Enemy boss, float gap, float turnSpeed)
     {
@@ -848,6 +1219,17 @@ public class KagutsuchiMirror : MonoBehaviour
     void LateUpdate()
     {
         if (boss == null || boss.hp <= 0) { Destroy(gameObject); return; }
+        if (fixedHold)
+        {
+            if (GameManager.I.State == GameState.Playing)
+            {
+                transform.position = Vector2.MoveTowards(transform.position, fixedPos, MoveSpeed * Time.deltaTime);
+                appear = Mathf.Min(1f, appear + Time.deltaTime / 0.3f);
+                Body.alpha = appear;
+            }
+            if (Body.Hidden != boss.Hidden) Body.SetHidden(boss.Hidden);
+            return;
+        }
         if (GameManager.I.State == GameState.Playing)
         {
             var p = Player.I;
@@ -902,9 +1284,11 @@ public class KagutsuchiBlade : MonoBehaviour
         b.Body = body;
         b.boss = boss;
         b.pos = b.RestPos; b.angle = RestAngle;
-        body.transform.localScale = new Vector3(KagutsuchiAI.SwordLength, KagutsuchiAI.SwordThick, 1f);
+        // 그림 Enemy_KagutsuchiSword (2026-11-13, 칼끝이 오른쪽 = 각도 방향인 가로 검, 1200 × 126): 손잡이 끝 ~ 칼끝 = 검 길이, 비율 그대로 (두께 약 0.5)
+        bool art = SpriteFactory.TryGet("Enemy_KagutsuchiSword") != null;
+        body.transform.localScale = art ? Vector3.one * KagutsuchiAI.SwordLength : new Vector3(KagutsuchiAI.SwordLength, KagutsuchiAI.SwordThick, 1f);
         // 은색 테두리 (도형일 때)
-        if (SpriteFactory.TryGet("Enemy_KagutsuchiSword") == null)
+        if (!art)
         {
             var rim = new GameObject("Rim");
             rim.transform.SetParent(body.transform, false);
