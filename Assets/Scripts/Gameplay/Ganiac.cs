@@ -15,8 +15,13 @@ using UnityEngine;
 /// 특수 패턴 3 (체력 90 · 60 · 30%): 맵 이탈 · 카메라 맵 전체 · 가니악의 검 3개 · 1분 안에 부수지 못하면 검마다 반경 12 전방위 베기.
 /// 피해 · 기획에 없는 값은 [임시].
 /// </summary>
-public class GaniacAI : MonoBehaviour
+public class GaniacAI : MonoBehaviour, IRaidBossAI
 {
+    // ---------- IRaidBossAI ----------
+    /// <summary>첫 등장 전 (맵 이탈 상태) 에는 체력 바 없음. 등장 후 이동 패턴으로 잠깐 이탈할 때는 그대로 표시</summary>
+    public bool HideBossBar => intro && e != null && e.Hidden;
+    void IRaidBossAI.DrawHud(float W) => DrawSwordHud(W);
+
     // ---------- 특수 패턴 1: 맵을 가로지르는 무작위 직선 ----------
     const int LineCount = 10;            // "10개 가량" (사용자)
     const float LineInterval = 0.2f;     // 경고 생성 간격 (사용자)
@@ -448,7 +453,7 @@ public class GaniacAI : MonoBehaviour
     }
 
     /// <summary>특수 패턴 3 카운트다운 · 남은 검 (화면 위 가운데, 보스 체력 바 아래). GameManager.OnGUI 에서</summary>
-    public static void DrawHud(float W)
+    static void DrawSwordHud(float W)
     {
         var g = Current;
         if (g == null || !g.swordPhase || g.swords.Count == 0) return;
@@ -919,7 +924,8 @@ public class RaidLaser : MonoBehaviour
     /// from 에서 dir 방향 레이저. safe 가 있으면 그 직사각형 안의 플레이어는 맞지 않음 (가니악 특수 패턴 4 안전 지대).
     /// 짧은 레이저(0.1초)도 진하게 보이도록 나타남 · 사라짐 시간은 지속 시간에 맞춰 줄어듦
     /// </summary>
-    public static RaidLaser Line(Vector2 from, Vector2 dir, float length, float width, float seconds, float damage, float tick, Rect? safe = null)
+    public static RaidLaser Line(Vector2 from, Vector2 dir, float length, float width, float seconds, float damage, float tick, Rect? safe = null,
+                                 Color? core = null, Color? edge = null)
     {
         dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.up;
         var go = new GameObject("RaidLaser");
@@ -932,9 +938,13 @@ public class RaidLaser : MonoBehaviour
         l.fadeOut = Mathf.Min(FadeOut, seconds * 0.35f);
         if (safe.HasValue) { l.safe = safe.Value; l.hasSafe = true; }
         // 로컬 x = 레이저 방향, 로컬 y = 폭
-        l.Part(Vector2.zero, new Vector2(length, width), Core, CoreOrder);
-        l.Part(new Vector2(0f, -width * 0.5f), new Vector2(length, EdgeWidth), EdgeGlow, EdgeOrder);
-        l.Part(new Vector2(0f, width * 0.5f), new Vector2(length, EdgeWidth), EdgeGlow, EdgeOrder);
+        // 색: 기본 = 가니악 (검정 · 보라), 카구츠치 등은 지정
+        Color c = core ?? Core, g = edge ?? EdgeGlow;
+        l.Part(Vector2.zero, new Vector2(length, width), c, CoreOrder);
+        // 테두리 빛은 폭 안쪽에 (보이는 폭 = 판정 폭 width 그대로)
+        float ew = Mathf.Min(EdgeWidth, width * 0.25f), eo = width * 0.5f - ew * 0.5f;
+        l.Part(new Vector2(0f, -eo), new Vector2(length, ew), g, EdgeOrder);
+        l.Part(new Vector2(0f, eo), new Vector2(length, ew), g, EdgeOrder);
         l.Apply(0f);
         return l;
     }

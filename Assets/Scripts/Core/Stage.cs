@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>스테이지 종류 (타이틀 메뉴에서 고름 → 캐릭터 선택 → Main 씬)</summary>
@@ -30,6 +31,45 @@ public static class Stage
     public static Vector2 Center => Vector2.zero;
 
     public static string DisplayName => IsRaid ? "레이드 보스" : "생존";
+
+    /// <summary>맵 안의 점 p 에서 dir(단위 벡터) 방향으로 맵 경계까지 거리</summary>
+    public static float ExitDistance(Vector2 p, Vector2 dir)
+    {
+        float t = float.MaxValue;
+        Vector2 min = Center - HalfSize, max = Center + HalfSize;
+        if (dir.x > 1e-4f) t = Mathf.Min(t, (max.x - p.x) / dir.x); else if (dir.x < -1e-4f) t = Mathf.Min(t, (min.x - p.x) / dir.x);
+        if (dir.y > 1e-4f) t = Mathf.Min(t, (max.y - p.y) / dir.y); else if (dir.y < -1e-4f) t = Mathf.Min(t, (min.y - p.y) / dir.y);
+        return t == float.MaxValue ? 0f : Mathf.Max(0f, t);
+    }
+
+    /// <summary>
+    /// 맵 벽에 닿으면 반사되는 직선 경로 (2026-11-13 카구츠치 반사 레이저 — 자주 쓰는 기믹).
+    /// from 에서 dir 로 출발, 벽에 닿을 때마다 입사각 = 반사각으로 꺾여 bounces 번 반사 → 꺾이는 점 목록 (처음 점 포함, 구간 수 = bounces + 1).
+    /// 모서리에 정확히 닿으면 두 축 모두 반사 (되돌아옴)
+    /// </summary>
+    public static List<Vector2> ReflectPath(Vector2 from, Vector2 dir, int bounces)
+    {
+        var pts = new List<Vector2>(bounces + 2);
+        Vector2 p = ClampInside(from, 0f);
+        Vector2 d = dir.sqrMagnitude > 1e-6f ? dir.normalized : Vector2.down;
+        Vector2 min = Center - HalfSize, max = Center + HalfSize;
+        const float eps = 1e-3f;
+        pts.Add(p);
+        for (int i = 0; i <= bounces; i++)
+        {
+            float t = ExitDistance(p, d);
+            Vector2 q = p + d * t;
+            q.x = Mathf.Clamp(q.x, min.x, max.x);
+            q.y = Mathf.Clamp(q.y, min.y, max.y);
+            pts.Add(q);
+            if (i == bounces) break;
+            // 닿은 벽에 따라 반사 (세로 벽 = x 반전, 가로 벽 = y 반전)
+            if ((q.x >= max.x - eps && d.x > 0f) || (q.x <= min.x + eps && d.x < 0f)) d.x = -d.x;
+            if ((q.y >= max.y - eps && d.y > 0f) || (q.y <= min.y + eps && d.y < 0f)) d.y = -d.y;
+            p = q;
+        }
+        return pts;
+    }
 
     /// <summary>맵 경계 안쪽으로 margin 만큼 들인 위치 (경계 없는 스테이지면 그대로)</summary>
     public static Vector2 ClampInside(Vector2 p, float margin)

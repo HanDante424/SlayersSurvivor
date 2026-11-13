@@ -123,7 +123,8 @@ public class DebugCheats : MonoBehaviour
             if (NoXpDrop) on.Add("경험치 미드랍");
             if (HitboxView.Show) on.Add("판정 표시");
             foreach (var e in SkillList()) if (disabledSkills.Contains(e.id)) on.Add($"{e.name} 금지");
-            for (int i = 0; i < NoGaniacSpecial.Length; i++) if (NoGaniacSpecial[i]) on.Add($"특수 패턴 {i + 1} 끔");
+            if (Stage.IsRaid && RaidStage.Selected == EnemyKind.Ganiac)
+                for (int i = 0; i < NoGaniacSpecial.Length; i++) if (NoGaniacSpecial[i]) on.Add($"특수 패턴 {i + 1} 끔");
             if (on.Count > 0)
             {
                 GUI.color = UIStyles.Accent;
@@ -202,7 +203,7 @@ public class DebugCheats : MonoBehaviour
 
         // ---- 레이드: 가니악 특수 패턴 비활성화 (스킬 열 오른쪽) ----
         float sx = x + w + 18, sw = 250, lw = 74;
-        if (Stage.IsRaid) DrawGaniacSpecialToggles(sx + sw + lw + 30, H, bh, gap);
+        if (Stage.IsRaid && RaidStage.Selected == EnemyKind.Ganiac) DrawGaniacSpecialToggles(sx + sw + lw + 30, H, bh, gap);
 
         // ---- 오른쪽 열: 스킬별 사용 금지 ----
         var skillsToShow = SkillList();

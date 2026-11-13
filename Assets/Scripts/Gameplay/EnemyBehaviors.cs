@@ -42,6 +42,9 @@ public partial class Enemy
             case EnemyKind.GoblinElder: return elderAI != null ? elderAI.Behave(toPlayerDir, speed * speedMul, ref face) : toPlayerDir * speed * speedMul;
             case EnemyKind.HobgoblinKnight: return knightAI != null ? knightAI.Behave(toPlayerDir, speed * speedMul, ref face) : toPlayerDir * speed * speedMul;
             case EnemyKind.GaniacSword: return Vector2.zero;   // 제자리
+            case EnemyKind.KagutsuchiMirror: return Vector2.zero;   // 위치는 KagutsuchiMirror 가 궤도로 정함
+            case EnemyKind.KagutsuchiSword: face = Vector2.right; return Vector2.zero;   // 위치 · 각도는 KagutsuchiBlade (좌우 반전 없음)
+            case EnemyKind.Kagutsuchi: return kagutsuchiAI != null ? kagutsuchiAI.Behave(toPlayerDir, speed * speedMul, ref face) : toPlayerDir * speed * speedMul;
             case EnemyKind.Ganiac: return ganiacAI != null ? ganiacAI.Behave(toPlayerDir, speed * speedMul, ref face) : toPlayerDir * speed * speedMul;
             case EnemyKind.GoblinArcher: return ArcherBehave(pos, toPlayerDir, dist, speedMul, ref face, dt);
             case EnemyKind.GoblinRider: return RiderBehave(pos, toPlayerDir, dist, speedMul, ref face, dt);
