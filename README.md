@@ -8,6 +8,8 @@ Unity 6 (6000.3.22f1) 2D 뱀서라이크 액션. 기획 기준: [Docs/Design/GDD
 Unity Hub → Add → 이 폴더 → Play (타이틀부터 시작). 타이틀 "플레이" → 캐릭터 선택 (에른 스트레이 · 레니아(외형 테스트) · 스티움 카터렉/멜 발렌티나(준비 중)).
 캐릭터 목록: `Assets/Scripts/Gameplay/CharacterRoster.cs`
 
+설정 (타이틀 "설정"): 화면 모드 전체화면 / 창화면 · 해상도 1920 × 1080 / 1280 × 720, "적용" 시 저장 · 다음 실행 때 자동 적용 (`UI/SettingsScreen.cs`, 에디터에서는 저장만)
+
 실행 파일 빌드: 메뉴 SlayersSurvivor → 빌드 → Windows 개발 빌드 (치트 포함) / 일반 빌드 (치트 없음) → `Builds/SlayersSurvivor_Win64/SlayersSurvivor.exe` (`Assets/Editor/BuildWindows.cs`, Builds 는 git 제외)
 
 ## 스테이지

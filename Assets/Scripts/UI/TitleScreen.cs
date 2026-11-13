@@ -26,9 +26,10 @@ public class TitleScreen : MonoBehaviour
     void Awake()
     {
         Time.timeScale = 1f;
+        GameSettings.ApplySavedOnce();   // 저장된 화면 설정 (게임을 켤 때 한 번)
         items.Add(new MenuItem { label = "플레이", enabled = true, action = () => OpenCharacterSelect(StageKind.Survival) });
         items.Add(new MenuItem { label = "레이드 보스", enabled = true, action = () => OpenCharacterSelect(StageKind.Raid) });
-        items.Add(new MenuItem { label = "설정", enabled = false, action = () => ShowToast("설정은 준비 중입니다.") });
+        items.Add(new MenuItem { label = "설정", enabled = true, action = OpenSettings });
         items.Add(new MenuItem { label = "게임 종료", enabled = true, action = SceneLoader.Quit });
 
         SetupCamera();
@@ -37,6 +38,18 @@ public class TitleScreen : MonoBehaviour
 
     /// <summary>열려 있는 캐릭터 선택 화면 (없으면 null). 열려 있는 동안 타이틀 메뉴는 입력 · 표시 안 함</summary>
     CharacterSelect select;
+
+    /// <summary>열려 있는 설정 화면 (없으면 null). 열려 있는 동안 타이틀 메뉴는 입력 · 표시 안 함</summary>
+    SettingsScreen settings;
+
+    void OpenSettings()
+    {
+        if (settings != null || select != null) return;
+        settings = SettingsScreen.Open(gameObject, onBack: () => settings = null);
+    }
+
+    /// <summary>캐릭터 선택 · 설정 화면이 위에 열려 있음</summary>
+    bool OverlayOpen => select != null || settings != null;
 
     /// <summary>스테이지를 정하고 캐릭터 선택 화면 열기 (시작하면 Main 씬이 그 스테이지로)</summary>
     void OpenCharacterSelect(StageKind stage)
@@ -101,7 +114,7 @@ public class TitleScreen : MonoBehaviour
             if (p.y < -9) p.y = 9; else if (p.y > 9) p.y = -9;
             deco[i].position = p;
         }
-        if (select != null) return;   // 캐릭터 선택 화면이 입력 처리
+        if (OverlayOpen) return;   // 캐릭터 선택 · 설정 화면이 입력 처리
 
         if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.W)) Move(-1);
         if (Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S)) Move(1);
@@ -124,7 +137,7 @@ public class TitleScreen : MonoBehaviour
 
     void OnGUI()
     {
-        if (select != null) return;   // 캐릭터 선택 화면이 그림
+        if (OverlayOpen) return;   // 캐릭터 선택 · 설정 화면이 그림
         UIStyles.Init();
         float W = Screen.width, H = Screen.height;
 
