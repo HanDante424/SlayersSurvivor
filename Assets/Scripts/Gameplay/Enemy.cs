@@ -86,11 +86,64 @@ public partial class Enemy : MonoBehaviour
     GoblinElderAI elderAI;
     HobgoblinKnightAI knightAI;
     GaniacAI ganiacAI;
+
+    // ---------- 4방향 동작 시트 (가니악, 2026-11-13) ----------
+    // Resources/Sprites/Ganiac_Idle (4×1) · Ganiac_Run (4×8) · Ganiac_Slash (4×8), 행 = 아래 · 왼쪽 · 오른쪽 · 위 (오른쪽 = 왼쪽 반전).
+    // 시트 규격: 정지 · 걷기 칸 384px · 베기 칸 480px, 몸 키 300px, 발끝 = 칸 아래 24 · 30px (Docs/Design/Raid_Ganiac_Plan_v0.1.md 3-2)
+    public const string SlashClip = "Slash";
+    public const float SlashFps = 14f;                       // [임시] 베기 8프레임 ≈ 0.57초
+    public const float SlashLead = 3f / SlashFps;            // 베기 4번째 프레임(칼이 지나가는 순간)까지 걸리는 시간 → 판정 순간에 맞춰 미리 재생
+    const float GaniacHeight = 2.3f;                         // [임시] 화면 키 (유닛, 플레이어 약 1.62)
+    const float GaniacPivotAboveFeet = 1.0f;                 // transform(판정 원 중심) = 발 위 1유닛 (판정 반경 약 1)
+    const float MoveAnimSpeed = 0.3f;                        // 이 속도 이상 움직이면 걷기
+    SpriteSheetAnimator anim;
+    Vector2 animLastPos, lastFace = Vector2.down;
+
+    /// <summary>방향별 동작 시트 불러오기 (시트가 없으면 기존 한 장 그림 · 도형 그대로)</summary>
+    void SetupSheets(string id, float height, float pivotAboveFeet)
+    {
+        var a = gameObject.AddComponent<SpriteSheetAnimator>();
+        float ppu = 300f / height;                                     // 시트 px / 월드 유닛
+        float s = Mathf.Max(0.0001f, baseScale);                       // 오브젝트 크기 배율로 나눠 칸 크기를 맞춤
+        float cellIdle = 384f / ppu / s, cellSlash = 480f / ppu / s;
+        float pivotIdle = (24f + ppu * pivotAboveFeet) / 384f, pivotSlash = (30f + ppu * pivotAboveFeet) / 480f;
+        var placeholder = sr.sprite;
+        sr.sprite = null;   // 첫 프레임부터 시트 그림 (도형이 한 프레임 보이지 않게)
+        if (!a.LoadClip(SpriteSheetAnimator.Run, id + "_Run", 4, 8, cellIdle, pivotIdle, 10f, true)) { sr.sprite = placeholder; Destroy(a); return; }
+        a.LoadClip(SpriteSheetAnimator.Idle, id + "_Idle", 4, 1, cellIdle, pivotIdle, 1f, true);
+        a.LoadClip(SlashClip, id + "_Slash", 4, 8, cellSlash, pivotSlash, SlashFps, false);
+        anim = a;
+        sr.color = baseColor = Color.white;   // 도형 대체 색을 지움
+        sr.flipX = false;                    // 방향은 시트 행으로
+        animLastPos = transform.position;
+    }
+
+    /// <summary>베기 동작 재생 (시트가 없으면 아무것도 안 함). 진행 중인 동작은 끊고 새로</summary>
+    public void PlayAttackAnim(Vector2 dir)
+    {
+        if (anim != null) anim.Play(SlashClip, dir, null, interrupt: true);
+    }
+
+    // 실제 위치 변화로 걷기 / 정지 (패턴이 transform 을 직접 옮기는 돌진 · 전진도 걷기로 보임). 멈춰 있으면 바라볼 방향
+    void LateUpdate()
+    {
+        if (anim == null) return;
+        Vector2 pos = transform.position;
+        float dt = Time.deltaTime;
+        Vector2 v = dt > 0f ? (pos - animLastPos) / dt : Vector2.zero;
+        animLastPos = pos;
+        if (GameManager.I != null && GameManager.I.State != GameState.Playing) return;
+        bool moving = v.sqrMagnitude > MoveAnimSpeed * MoveAnimSpeed && v.sqrMagnitude < 2500f;   // 순간이동(한 프레임 큰 이동)은 걷기 아님
+        anim.SetMove(moving ? v : Vector2.zero);
+        if (!moving) anim.Look(lastFace);
+    }
     KagutsuchiAI kagutsuchiAI;
 
     SpriteRenderer sr;
     Color baseColor;
     float flash;
+    /// <summary>일반 몹 4종 이동 속도 배율 (아래 표의 값 × 0.9). 라이더 돌진 · 궁수 화살 속도는 그대로</summary>
+    public const float MobSpeedMul = 0.9f;
     /// <summary>[임시] 이미지 적의 피격 깜빡임 색</summary>
     static readonly Color HitFlashTint = new Color(1f, 0.45f, 0.45f);
     Vector2 knockback;
@@ -214,6 +267,8 @@ public partial class Enemy : MonoBehaviour
             // [임시] 가니악의 검: 체력 미정. 그림 Enemy_GaniacSword 없으면 보라 마름모
             case EnemyKind.GaniacSword:  maxHp = 200; speed = 0f; damage = 0; xp = 0; scale = 1.6f; col = new Color(0.6f, 0.3f, 0.9f); shape = SpriteFactory.Shape.Diamond; break;
         }
+        // 일반 몹 이동 속도 -10% (2026-11-13 플레이 테스트 피드백: 피로도). 보스 · 중간보스는 그대로
+        if (k == EnemyKind.Goblin || k == EnemyKind.GoblinArcher || k == EnemyKind.Hobgoblin || k == EnemyKind.GoblinRider) speed *= MobSpeedMul;
         maxHp *= hpMul;
         hp = maxHp;
         baseScale = scale;
@@ -222,9 +277,10 @@ public partial class Enemy : MonoBehaviour
         HitboxView.Attach(transform, HitboxView.EnemyColor, () => radius);
         sr = SpriteFactory.AddRenderer(gameObject, "Enemy_" + k, shape, col, IsBoss ? 6 : 5);
         baseColor = sr.color;
+        if (IsBoss) BossOutline.Attach(gameObject, sr);   // 보스 붉은 테두리 (몹 사이에서 잘 보이게)
         if (k == EnemyKind.GoblinElder) elderAI = gameObject.AddComponent<GoblinElderAI>();
         if (k == EnemyKind.HobgoblinKnight) knightAI = gameObject.AddComponent<HobgoblinKnightAI>();
-        if (k == EnemyKind.Ganiac) ganiacAI = gameObject.AddComponent<GaniacAI>();
+        if (k == EnemyKind.Ganiac) { ganiacAI = gameObject.AddComponent<GaniacAI>(); SetupSheets("Ganiac", GaniacHeight, GaniacPivotAboveFeet); }
         if (k == EnemyKind.Kagutsuchi) kagutsuchiAI = gameObject.AddComponent<KagutsuchiAI>();
     }
 
@@ -285,7 +341,8 @@ public partial class Enemy : MonoBehaviour
         knockback = Vector2.Lerp(knockback, Vector2.zero, KnockDecay * Time.deltaTime);
         if (Stage.Bounded && !Scripted) pos = Stage.ClampInside(pos, radius);   // 제한된 맵 (레이드): 경계 밖으로 나가지 않음
         transform.position = pos;
-        if (!stunned && Mathf.Abs(face.x) > 0.01f) sr.flipX = face.x < 0;
+        if (anim != null) { if (!stunned) lastFace = face; }   // 방향은 4방향 시트가 정함
+        else if (!stunned && Mathf.Abs(face.x) > 0.01f) sr.flipX = face.x < 0;
 
         // 기절 중에는 접촉 공격 없음
         float touch = radius + p.radius;

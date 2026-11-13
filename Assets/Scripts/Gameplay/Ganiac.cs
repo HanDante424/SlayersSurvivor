@@ -347,7 +347,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
                 Destroy(s.gameObject);
                 Fx.Circle(Pos, 1.5f, new Color(0.75f, 0.4f, 1f, 0.7f), 0.3f);
                 Track(BossWarning.Circle(Pos, SwordStrikeRadius, SwordStrikeWarn));
-                yield return WaitActive(SwordStrikeWarn);
+                yield return WarnThenSlash(SwordStrikeWarn, ToPlayer);
                 Fx.Disc(Pos, SwordStrikeRadius, new Color(0.45f, 0.15f, 0.7f, 0.45f), 0.3f);
                 Fx.Circle(Pos, SwordStrikeRadius, new Color(0.8f, 0.55f, 1f, 0.8f), 0.3f);
                 CameraFollow.Shake(0.25f, 0.25f);
@@ -554,11 +554,22 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
     {
         faceDir = dir;
         Track(BossWarning.HalfDisc(Pos, dir, r, warn));
-        yield return WaitActive(warn);
+        yield return WarnThenSlash(warn, dir);
         Fx.Arc(Pos, dir, r, new Color(0.75f, 0.45f, 1f, 0.85f), 0.2f);
         CameraFollow.Shake(0.08f, 0.08f);
         if (PlayerInHalf(Pos, dir, r)) P.HitByBoss(SweepDamage, 0f, Vector2.zero, 0f);
         if (advance > 0f) yield return Move(dir * advance, AdvanceTime);
+    }
+
+    /// <summary>
+    /// 경고 warn 초 대기. 끝나기 Enemy.SlashLead 초 전에 베기 동작을 시작해서, 칼이 지나가는 프레임이 판정 순간과 맞게
+    /// </summary>
+    IEnumerator WarnThenSlash(float warn, Vector2 dir)
+    {
+        float lead = Mathf.Min(warn, Enemy.SlashLead);
+        yield return WaitActive(warn - lead);
+        e.PlayAttackAnim(dir);
+        yield return WaitActive(lead);
     }
 
     /// <summary>반경 r 반원 연속 베기: 0.1초 판정 · 0.05초 딜레이 × 10 (경고 없음 — 부르는 쪽에서). 판정마다 1번씩, 피격 무적 무시</summary>
@@ -567,6 +578,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
         faceDir = dir;
         for (int i = 0; i < FlurryHits; i++)
         {
+            if (i % 4 == 0) e.PlayAttackAnim(dir);   // 연타: 베기 동작을 4타마다 다시
             // 베기 방향을 조금씩 흔들어 연타 느낌 (판정은 같은 반원)
             float wobble = (i % 2 == 0 ? -1f : 1f) * 18f * Mathf.Deg2Rad;
             Vector2 fxDir = new Vector2(dir.x * Mathf.Cos(wobble) - dir.y * Mathf.Sin(wobble), dir.x * Mathf.Sin(wobble) + dir.y * Mathf.Cos(wobble));
@@ -622,7 +634,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
         Track(BossWarning.Circle(from, SpinRadius, SpinWarn));
         if ((to - from).sqrMagnitude > 0.01f) Track(BossWarning.Box(from, (to - from).normalized, (to - from).magnitude, SpinRadius * 2f, SpinWarn));
         Track(BossWarning.Circle(to, SpinRadius, SpinWarn));
-        yield return WaitActive(SpinWarn);
+        yield return WarnThenSlash(SpinWarn, dir);
 
         Fx.Circle(Pos, SpinRadius, new Color(0.8f, 0.55f, 1f, 0.8f), SpinAdvanceTime + 0.1f, transform);   // 보스를 따라가는 회전 베기
         Fx.Disc(Pos, SpinRadius, new Color(0.5f, 0.2f, 0.8f, 0.35f), 0.2f);
@@ -774,6 +786,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
             Fx.Disc(Pos, SummonSpinRadius, new Color(0.45f, 0.15f, 0.7f, 0.45f), 0.25f);
             Fx.Circle(Pos, SummonSpinRadius, new Color(0.8f, 0.55f, 1f, 0.8f), 0.25f);
             CameraFollow.Shake(0.12f, 0.12f);
+            e.PlayAttackAnim(ToPlayer);
             if (PlayerInCircle(Pos, SummonSpinRadius)) P.HitByBoss(SpinDamage, 0f, Vector2.zero, 0f);
         }
         foreach (var m in marks) if (m != null) Destroy(m);
@@ -947,6 +960,24 @@ public class RaidLaser : MonoBehaviour
         l.Part(new Vector2(0f, eo), new Vector2(length, ew), g, EdgeOrder);
         l.Apply(0f);
         return l;
+    }
+
+    /// <summary>레이저 위치 · 방향 · 길이를 바꿈 (회전하는 레이저). 판정도 같이 바뀜</summary>
+    public void SetLine(Vector2 from, Vector2 dir, float length)
+    {
+        dir = dir.sqrMagnitude > 0.0001f ? dir.normalized : Vector2.up;
+        this.from = from; this.dir = dir;
+        transform.position = from + dir * length * 0.5f;
+        transform.rotation = Quaternion.Euler(0, 0, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
+        if (!Mathf.Approximately(length, this.length))
+        {
+            foreach (var sr in parts)
+            {
+                var s = sr.transform.localScale;
+                sr.transform.localScale = new Vector3(length, s.y, 1f);
+            }
+            this.length = length;
+        }
     }
 
     void Part(Vector2 offset, Vector2 size, Color c, int order)

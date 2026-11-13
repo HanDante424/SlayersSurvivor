@@ -93,6 +93,12 @@ public class SpriteSheetAnimator : MonoBehaviour
         Facing = ToFacing(dir);
     }
 
+    /// <summary>멈춰 있을 때 바라볼 방향 (동작 재생 중에는 무시 — 휘두르는 도중 돌아보지 않게)</summary>
+    public void Look(Vector2 dir)
+    {
+        if (oneShot == null && dir.sqrMagnitude > 0.01f) Facing = ToFacing(dir);
+    }
+
     /// <summary>
     /// 클립을 한 번 재생합니다. 재생 중 이동하면 그 방향으로 돌아보고, 끝나면 이동/정지 애니메이션으로 돌아갑니다.
     /// 이미 다른 동작이 재생 중이면 무시하고 false 를 돌려줍니다 (interrupt=true 면 끊고 새로 시작).

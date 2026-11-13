@@ -592,9 +592,12 @@ public class GameManager : MonoBehaviour
     void DrawSkillBar(Player p, float W, float H)
     {
         var T = Tuning.Skills;
-        slotKey ??= new GUIStyle(UIStyles.Label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperLeft };
+        // 키 · 배지 글자: 기본 라벨 여백(위아래 3px) 때문에 칸 아래가 잘리던 것 → 여백 0 · 잘림 없음 (2026-11-13 피드백)
+        slotKey ??= new GUIStyle(UIStyles.Label) { fontSize = 15, fontStyle = FontStyle.Bold, alignment = TextAnchor.UpperLeft,
+                                                   padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Overflow };
         slotName ??= new GUIStyle(UIStyles.Small) { fontSize = 12, alignment = TextAnchor.LowerCenter, wordWrap = true };
-        slotBadge ??= new GUIStyle(UIStyles.Label) { fontSize = 14, alignment = TextAnchor.UpperRight };
+        slotBadge ??= new GUIStyle(UIStyles.Label) { fontSize = 14, alignment = TextAnchor.UpperRight,
+                                                     padding = new RectOffset(0, 0, 0, 0), clipping = TextClipping.Overflow };
 
         int manualCount = Mathf.Min(T.manualSlots, T.manualKeys.Length);
         int n = manualCount + 2;
@@ -650,7 +653,7 @@ public class GameManager : MonoBehaviour
                 if (s.Badge != null) GUI.Label(new Rect(r.x, r.y + 2, r.width - 4, 20), s.Badge, slotBadge);
             }
             GUI.color = text;
-            GUI.Label(new Rect(r.x + 5, r.y + 2, 40, 20), key, slotKey);
+            GUI.Label(new Rect(r.x + 5, r.y + 3, 50, 22), key, slotKey);
             GUI.color = Color.white;
         }
     }
