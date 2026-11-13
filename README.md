@@ -8,6 +8,8 @@ Unity 6 (6000.3.22f1) 2D 뱀서라이크 액션. 기획 기준: [Docs/Design/GDD
 Unity Hub → Add → 이 폴더 → Play (타이틀부터 시작). 타이틀 "플레이" → 캐릭터 선택 (에른 스트레이 · 레니아(외형 테스트) · 스티움 카터렉/멜 발렌티나(준비 중)).
 캐릭터 목록: `Assets/Scripts/Gameplay/CharacterRoster.cs`
 
+실행 파일 빌드: 메뉴 SlayersSurvivor → 빌드 → Windows 개발 빌드 (치트 포함) / 일반 빌드 (치트 없음) → `Builds/SlayersSurvivor_Win64/SlayersSurvivor.exe` (`Assets/Editor/BuildWindows.cs`, Builds 는 git 제외)
+
 ## 스테이지
 - **생존** (타이틀 "플레이"): 무한 맵 · 일반 몹 · 3분마다 중간보스 · 10분 생존 시 승리
 - **레이드 보스** (타이틀 "레이드 보스"): 맵 36 × 24 로 제한 (경계 밖으로 플레이어 · 적 · 카메라가 못 나감), 레이드 보스 1마리만, 처치 시 "레이드 성공!".
