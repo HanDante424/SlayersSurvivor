@@ -26,6 +26,12 @@ public enum EnemyKind
     Ganiac,
     /// <summary>가니악의 검 (특수 패턴 3): 움직이지 않는 파괴 대상 · 접촉 피해 없음 · 경험치 없음</summary>
     GaniacSword,
+    /// <summary>카구츠치: 레이드 보스 (레이드 스테이지 전용, KagutsuchiAI · Docs/Design/Raid_Kagutsuchi_Plan_v0.1.md)</summary>
+    Kagutsuchi,
+    /// <summary>야타의 거울 (카구츠치 주변 궤도, KagutsuchiMirror): 체력 = 카구츠치 × 15 · 접촉 피해 없음 · 경험치 없음</summary>
+    KagutsuchiMirror,
+    /// <summary>아메노무라쿠모 (카구츠치의 검, KagutsuchiBlade): 독립 체력 · 접촉 피해 없음 · 경험치 없음</summary>
+    KagutsuchiSword,
 }
 
 /// <summary>적 1마리. 종류별 행동(궁수 사격 · 라이더 돌진)은 EnemyBehaviors.cs (partial)</summary>
@@ -55,23 +61,32 @@ public partial class Enemy : MonoBehaviour
         EnemyKind.HobgoblinKnight => "홉 고블린 기사",
         EnemyKind.Ganiac => "가니악 벤데스트라",
         EnemyKind.GaniacSword => "가니악의 검",
+        EnemyKind.Kagutsuchi => "카구츠치",
+        EnemyKind.KagutsuchiMirror => "야타의 거울",
+        EnemyKind.KagutsuchiSword => "아메노무라쿠모",
         _ => "보스",
     };
 
     /// <summary>보스급 (중간보스 포함): 넉백 · 뇌진탕 없음, 소각 보스 비율</summary>
-    public bool IsBoss => kind == EnemyKind.Boss || kind == EnemyKind.GoblinElder || kind == EnemyKind.HobgoblinKnight || kind == EnemyKind.Ganiac;
+    public bool IsBoss => kind == EnemyKind.Boss || kind == EnemyKind.GoblinElder || kind == EnemyKind.HobgoblinKnight || kind == EnemyKind.Ganiac || kind == EnemyKind.Kagutsuchi;
     /// <summary>맵에서 이탈 중 (홉 고블린 기사 뛰어오르기): 맞지 않음 · 조준 안 됨 · 접촉 피해 없음</summary>
     public bool Hidden { get; private set; }
     public void SetHidden(bool on) { Hidden = on; if (sr != null) sr.enabled = !on; }
+    /// <summary>
+    /// 연출 중 (카구츠치 입장 등): 보이지만 맞지 않음 · 조준 안 됨 · 기절 안 됨 · 접촉 피해 없음 · 맵 경계 무시 (맵 밖에서 걸어 들어올 수 있음)
+    /// </summary>
+    public bool Scripted { get; private set; }
+    public void SetScripted(bool on) => Scripted = on;
     /// <summary>그림 투명도 배율 (가니악 맵 이탈 · 등장 시 흐려짐). 1 = 보통</summary>
     public float alpha = 1f;
     /// <summary>중간보스 포위 고블린 (움직이지 않는 벽, MidBossArena)</summary>
     public bool IsWall { get; private set; }
     /// <summary>밀리지 않음 (넉백 · 밀어내기 · 적끼리 밀기)</summary>
-    bool Immovable => IsBoss || IsWall || kind == EnemyKind.GaniacSword;
+    bool Immovable => IsBoss || IsWall || kind == EnemyKind.GaniacSword || kind == EnemyKind.KagutsuchiMirror || kind == EnemyKind.KagutsuchiSword;
     GoblinElderAI elderAI;
     HobgoblinKnightAI knightAI;
     GaniacAI ganiacAI;
+    KagutsuchiAI kagutsuchiAI;
 
     SpriteRenderer sr;
     Color baseColor;
@@ -103,7 +118,7 @@ public partial class Enemy : MonoBehaviour
     /// <param name="indirect">'간접 사용'에서 나온 기절 (터렛 공격 · 추가 투사체 · 충격파 · 범위 충격). 범위 충격 연쇄 방지용</param>
     public void Stun(float seconds, bool indirect = false)
     {
-        if (seconds <= 0f || Hidden) return;
+        if (seconds <= 0f || Hidden || Scripted) return;
         bool was = IsStunned;
         seconds *= CombatMods.StunDurationMul();               // 충격 역학 '기절' '지속 시간' +%
         if (was) seconds += CombatMods.StunReapplyAdd();       // 재기절
@@ -189,7 +204,13 @@ public partial class Enemy : MonoBehaviour
             case EnemyKind.HobgoblinKnight: maxHp = 900; speed = 0.9f; damage = 20; xp = 60; scale = 1.8f; col = new Color(0.35f, 0.45f, 0.55f); shape = SpriteFactory.Shape.Square; break;
             case EnemyKind.Boss:         maxHp = 900; speed = 1.8f; damage = 25; xp = 60; scale = 2.2f; col = new Color(0.9f, 0.1f, 0.15f); break;
             // [임시] 가니악 (레이드 보스): 수치 미정 · 이동 속도 느림 (사용자). 그림 Enemy_Ganiac 없으면 짙은 보라 원
-            case EnemyKind.Ganiac:       maxHp = 3000; speed = 1.0f; damage = 20; xp = 100; scale = 3.0f; col = new Color(0.35f, 0.12f, 0.45f); break;
+            case EnemyKind.Ganiac:       maxHp = 3000; speed = 1.0f; damage = 20; xp = 100; scale = 2.25f; col = new Color(0.35f, 0.12f, 0.45f); break;   // 크기 3 → 2.25 (사용자: 0.75배)
+            // [임시] 카구츠치: 수치 전부 미정 (가니악 값을 확정으로 쓰지 않음 — 테스트용 임시). 그림 Enemy_Kagutsuchi 없으면 주황 원
+            case EnemyKind.Kagutsuchi:   maxHp = 3000; speed = 1.0f; damage = 20; xp = 100; scale = 2.25f; col = new Color(0.9f, 0.4f, 0.15f); break;   // 크기 3 → 2.25 (사용자: 0.75배)
+            // 야타의 거울: 체력은 생성 때 카구츠치 최대 체력 × 15 로 덮어씀. [임시] 크기 1.1, 그림 Enemy_KagutsuchiMirror 없으면 밝은 원
+            // 아메노무라쿠모: 체력은 생성 때 덮어씀. 크기 (길이 · 두께) 는 KagutsuchiBlade 가 정함. 흰색 · 은색 (사용자)
+            case EnemyKind.KagutsuchiSword: maxHp = 1; speed = 0f; damage = 0; xp = 0; scale = 1f; col = new Color(0.92f, 0.94f, 0.98f, 0.97f); shape = SpriteFactory.Shape.Square; break;
+            case EnemyKind.KagutsuchiMirror: maxHp = 1; speed = 0f; damage = 0; xp = 0; scale = 1.1f; col = new Color(0.85f, 0.92f, 1f, 0.95f); break;
             // [임시] 가니악의 검: 체력 미정. 그림 Enemy_GaniacSword 없으면 보라 마름모
             case EnemyKind.GaniacSword:  maxHp = 200; speed = 0f; damage = 0; xp = 0; scale = 1.6f; col = new Color(0.6f, 0.3f, 0.9f); shape = SpriteFactory.Shape.Diamond; break;
         }
@@ -204,6 +225,7 @@ public partial class Enemy : MonoBehaviour
         if (k == EnemyKind.GoblinElder) elderAI = gameObject.AddComponent<GoblinElderAI>();
         if (k == EnemyKind.HobgoblinKnight) knightAI = gameObject.AddComponent<HobgoblinKnightAI>();
         if (k == EnemyKind.Ganiac) ganiacAI = gameObject.AddComponent<GaniacAI>();
+        if (k == EnemyKind.Kagutsuchi) kagutsuchiAI = gameObject.AddComponent<KagutsuchiAI>();
     }
 
     /// <summary>중간보스 포위 고블린 1마리: 고블린 모습 · 체력 hp · 움직이지 않음</summary>
@@ -261,13 +283,13 @@ public partial class Enemy : MonoBehaviour
         else vel = Behave(pos, dir, dist, speedMul, ref face);
         pos += (vel + knockback) * Time.deltaTime;
         knockback = Vector2.Lerp(knockback, Vector2.zero, KnockDecay * Time.deltaTime);
-        if (Stage.Bounded) pos = Stage.ClampInside(pos, radius);   // 제한된 맵 (레이드): 경계 밖으로 나가지 않음
+        if (Stage.Bounded && !Scripted) pos = Stage.ClampInside(pos, radius);   // 제한된 맵 (레이드): 경계 밖으로 나가지 않음
         transform.position = pos;
         if (!stunned && Mathf.Abs(face.x) > 0.01f) sr.flipX = face.x < 0;
 
         // 기절 중에는 접촉 공격 없음
         float touch = radius + p.radius;
-        if (damage > 0f && !stunned && !Hidden && (p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);   // 접촉 피해 0 = 닿아도 피격 무적이 생기지 않음
+        if (damage > 0f && !stunned && !Hidden && !Scripted &&(p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);   // 접촉 피해 0 = 닿아도 피격 무적이 생기지 않음
 
         // 너무 멀어지면 플레이어 근처로 재배치 (뱀서 방식)
         // 기준은 카메라 시야에 맞춰 자동 (화면 밖 생성 거리 + 6 넘으면 화면 밖 생성 거리로)
@@ -335,7 +357,7 @@ public partial class Enemy : MonoBehaviour
     /// </summary>
     public void Hit(DamageInfo info, Vector2 fromDir, float knock = 3f)
     {
-        if (hp <= 0 || Hidden) return;   // 맵 이탈 중에는 맞지 않음
+        if (hp <= 0 || Hidden || Scripted) return;   // 맵 이탈 · 연출 중에는 맞지 않음
         float dmg = DamageMath.Target(this, info);
         if (knightAI != null && !info.isFixed) dmg = Mathf.Floor(dmg * knightAI.DamageMul(fromDir) + 1e-4f);   // 방패 막기 (고정 피해 제외)
         if (DebugCheats.OneHitKill) dmg = Mathf.Max(dmg, hp);   // 테스트: 한 방에 처치

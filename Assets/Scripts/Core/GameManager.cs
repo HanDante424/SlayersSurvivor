@@ -669,7 +669,7 @@ public class GameManager : MonoBehaviour
         var b = MidBossArena.Boss ?? RaidStage.Boss;
         if (b == null) return;
         // 레이드 보스 첫 등장 전 (맵 이탈 상태)에는 체력 바 없음. 등장 후 이동 패턴으로 잠깐 이탈할 때는 그대로 표시
-        if (Stage.IsRaid && b.Hidden && b.TryGetComponent<GaniacAI>(out var g) && g.InIntro) return;
+        if (Stage.IsRaid && b.TryGetComponent<IRaidBossAI>(out var ai) && ai.HideBossBar) return;
         if (bossNameStyle == null)
         {
             bossNameStyle = new GUIStyle(UIStyles.Label) { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
@@ -705,7 +705,7 @@ public class GameManager : MonoBehaviour
         GUI.Label(new Rect(W - 160, 18, 150, 30), $"처치 {Kills}", UIStyles.Label);
 
         DrawBossBar(W);
-        GaniacAI.DrawHud(W);   // 가니악 특수 패턴 3 카운트다운
+        RaidStage.BossAI?.DrawHud(W);   // 레이드 보스 전용 표시 (가니악 특수 패턴 3 카운트다운 등)
 
         // 체력 바 (플레이어 아래)
         var sp = Camera.main.WorldToScreenPoint(p.transform.position + Vector3.down * p.HealthBarOffset);
