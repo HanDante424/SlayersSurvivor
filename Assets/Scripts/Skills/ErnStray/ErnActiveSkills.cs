@@ -190,7 +190,7 @@ public class FireStream : Skill
     public override bool TryActivate()
     {
         if (CheatDisabled) return false;   // 치트: 스킬별 사용 금지
-        if (stacks <= 0 || P.IsBusy) return false;
+        if (stacks <= 0 || P.IsBusy || P.IsStunned) return false;
         if (stacks == MaxStacks) recharge = StackCooldown;
         stacks--;
         BeginCast();
@@ -230,7 +230,7 @@ public class BlazingStorm : Skill
     public override bool TryActivate()
     {
         if (CheatDisabled) return false;   // 치트: 스킬별 사용 금지
-        if (running || P.IsBusy || !GameManager.I.UltimateReady) return false;
+        if (running || P.IsBusy || P.IsStunned || !GameManager.I.UltimateReady) return false;
         GameManager.I.ConsumeUltimateGauge();
         BeginCast();
         StartCoroutine(Run());

@@ -346,7 +346,7 @@ public abstract class ActiveSkill : Skill
 
     public override bool TryActivate()
     {
-        if (casting || cdLeft > 0 || P.IsBusy || CheatDisabled) return false;
+        if (casting || cdLeft > 0 || P.IsBusy || P.IsStunned || CheatDisabled) return false;
         cdLeft = CooldownSeconds;
         BeginCast();
         Activate();
@@ -374,6 +374,8 @@ public abstract class AutoSkill : Skill
         if (DebugCheats.NoCooldown && timer > 0f) timer = 0f;   // 치트 F6
         timer -= dt;
         if (timer > 0) return;
+        // 기절은 새 공격만 봉인. 쿨타임·기존 공격 및 후속 효과의 수명은 계속 진행.
+        if (P == null || P.IsStunned) return;
         // 발동할 대상이 없으면 쿨타임을 소모하지 않고 다음 프레임에 다시 확인
         BeginCast();
         if (!Fire()) { timer = 0f; return; }

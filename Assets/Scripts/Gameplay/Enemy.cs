@@ -45,6 +45,7 @@ public partial class Enemy : MonoBehaviour
     /// </summary>
     public static event Action<Enemy> Killed;
     bool dead;
+    bool raidBossContactDisabled;
 
     public EnemyKind kind;
     public float hp, maxHp, speed, damage, radius;
@@ -256,6 +257,7 @@ public partial class Enemy : MonoBehaviour
     void Setup(EnemyKind k, float hpMul)
     {
         kind = k;
+        raidBossContactDisabled = RaidBossRoster.Find(k) != null;
         Color col; float scale; SpriteFactory.Shape shape = SpriteFactory.Shape.Circle;
         switch (k)
         {
@@ -358,9 +360,9 @@ public partial class Enemy : MonoBehaviour
         else if (kind == EnemyKind.Kagutsuchi) { }   // 카구츠치 = 정면 그림만 (2026-11-13 사용자) → 좌우 반전 없음
         else if (!stunned && Mathf.Abs(face.x) > 0.01f) sr.flipX = face.x < 0;
 
-        // 기절 중에는 접촉 공격 없음
+        // 레이드 보스는 접촉 피해 없음. 일반 몹·중간보스는 기존 기절 조건 유지.
         float touch = radius + p.radius;
-        if (damage > 0f && !stunned && !Hidden && !Scripted &&(p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);   // 접촉 피해 0 = 닿아도 피격 무적이 생기지 않음
+        if (damage > 0f && !raidBossContactDisabled && !stunned && !Hidden && !Scripted && (p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);   // 접촉 피해 0 = 닿아도 피격 무적이 생기지 않음
 
         // 너무 멀어지면 플레이어 근처로 재배치 (뱀서 방식)
         // 기준은 카메라 시야에 맞춰 자동 (화면 밖 생성 거리 + 6 넘으면 화면 밖 생성 거리로)

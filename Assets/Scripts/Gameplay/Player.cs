@@ -19,7 +19,17 @@ public class Player : MonoBehaviour
 
     // 감각 조정 값은 설정 파일에서 (Assets/Resources/Config/ErnStrayConfig.asset)
     static PlayerConfig Cfg => Tuning.ErnStray;
-    public float moveSpeed => Cfg.moveSpeed * moveSpeedMul * ZoneSlowMul;
+    public float moveSpeed => Cfg.moveSpeed * moveSpeedMul * (bossSlowLeft > 0f ? bossSlowMul : ZoneSlowMul);
+
+    float bossSlowLeft, bossSlowMul = 1f;
+
+    /// <summary>기간형 보스 감속. 새 효과가 배율·남은 시간을 덮어쓰며 부여 후 수명은 Player가 소유.</summary>
+    public void ApplySlowByBoss(float multiplier, float seconds)
+    {
+        if (DebugCheats.God || IsInvulnerable || GameManager.I.State != GameState.Playing || seconds <= 0f) return;
+        bossSlowMul = Mathf.Clamp01(multiplier);
+        bossSlowLeft = seconds;
+    }
 
     // 장판 감속 (얼음 지대): 장판이 매 프레임 다시 걸어 줌, 안 걸리면 다음 프레임에 풀림
     float zoneSlowMul = 1f;
@@ -58,12 +68,128 @@ public class Player : MonoBehaviour
     System.Action dashStep, dashEnd;
 
     /// <summary>돌진 중이거나 이동 불가 상태 → 다른 수동 스킬 사용 불가</summary>
-    public bool IsBusy => dashLeft > 0 || rootLeft > 0 || bossMoveLeft > 0;
+    public bool IsBusy => bossHoldOwner != null || dashLeft > 0 || rootLeft > 0 || bossMoveLeft > 0;
     public bool IsInvulnerable => skillInvuln > 0 || dashLeft > 0 && dashInvuln;
     bool dashInvuln;
 
     public void SetInvulnerable(float seconds) => skillInvuln = Mathf.Max(skillInvuln, seconds);
     public void Root(float seconds) => rootLeft = Mathf.Max(rootLeft, seconds);
+
+    // 홀드는 발동자가 소유하며, 높이는 표시 자식에만 적용한다.
+    object bossHoldOwner;
+    GameObject bossHoldVisual;
+    SpriteRenderer bossHoldRenderer;
+    bool beforeHoldEnabled;
+    float bossHoldHeight;
+    Vector2 bossHoldVisualOffset;
+    float bossHoldOffsetWeight = 1f;
+    public Transform BossHoldVisual => bossHoldVisual != null ? bossHoldVisual.transform : transform;
+    // 정렬된 캐릭터 시트: 칸 256px·발 아래 16px·몸 200px (CharacterVisual 규격).
+    const float VisualCellPixels = 256f, VisualBodyPixels = 200f, VisualFeetMarginPixels = 16f;
+    public Vector2 BossHoldHeadPosition
+    {
+        get
+        {
+            float headY = anim != null
+                ? Visual.cell * ((VisualFeetMarginPixels + VisualBodyPixels) / VisualCellPixels - Visual.pivotY)
+                : (sr != null && sr.sprite != null ? sr.sprite.bounds.max.y : 0f);
+            return BossHoldVisual.TransformPoint(Vector3.up * headY);
+        }
+    }
+    public bool IsHeldByBoss(object owner) => bossHoldOwner == owner && owner != null;
+
+    public bool TryBeginBossHold(object owner)
+    {
+        if (owner == null || bossHoldOwner != null || hp <= 0f || DebugCheats.God || IsInvulnerable
+            || GameManager.I == null || GameManager.I.State != GameState.Playing) return false;
+        bossHoldOwner = owner;
+        bossHoldVisualOffset = Vector2.zero;
+        bossHoldOffsetWeight = 1f;
+        bossMoveLeft = 0f;
+        knockVel = Vector2.zero;
+        dashLeft = 0f;
+        var end = dashEnd;
+        dashStep = dashEnd = null;
+        end?.Invoke();
+        beforeHoldEnabled = sr.enabled;
+        bossHoldVisual = new GameObject("BossHeldPlayerVisual");
+        bossHoldVisual.transform.SetParent(transform, false);
+        bossHoldRenderer = bossHoldVisual.AddComponent<SpriteRenderer>();
+        bossHoldRenderer.sharedMaterial = sr.sharedMaterial;
+        bossHoldRenderer.sortingLayerID = sr.sortingLayerID;
+        bossHoldRenderer.sortingOrder = sr.sortingOrder;
+        sr.enabled = false;
+        UpdateBossHoldVisual();
+        return true;
+    }
+
+    public void SetBossHoldHeight(object owner, float height)
+    {
+        if (!IsHeldByBoss(owner)) return;
+        bossHoldHeight = Mathf.Max(0f, height);
+        UpdateBossHoldVisual();
+    }
+
+    /// <summary>지면 판정은 유지하면서 홀드된 그림의 머리를 월드 접촉점에 맞춘다.</summary>
+    public void AlignBossHoldHead(object owner, Vector2 contactWorld)
+    {
+        if (!IsHeldByBoss(owner)) return;
+        bossHoldOffsetWeight = 1f;
+        bossHoldVisualOffset += contactWorld - BossHoldHeadPosition;
+        UpdateBossHoldVisual();
+    }
+
+    public void SetBossHoldOffsetWeight(object owner, float weight)
+    {
+        if (!IsHeldByBoss(owner)) return;
+        bossHoldOffsetWeight = Mathf.Clamp01(weight);
+        UpdateBossHoldVisual();
+    }
+
+    public void SetBossHoldPosition(object owner, Vector2 position)
+    {
+        if (!IsHeldByBoss(owner)) return;
+        Vector2 hurtOffset = HurtCenter - (Vector2)transform.position;
+        transform.position = Stage.Bounded ? Stage.ClampInside(position + hurtOffset, radius) - hurtOffset : position;
+    }
+
+    public void EndBossHold(object owner)
+    {
+        if (!IsHeldByBoss(owner)) return;
+        bossHoldOwner = null;
+        bossHoldHeight = 0f;
+        bossHoldVisualOffset = Vector2.zero;
+        bossHoldOffsetWeight = 1f;
+        if (sr != null) sr.enabled = beforeHoldEnabled;
+        if (bossHoldVisual != null) { bossHoldVisual.SetActive(false); Destroy(bossHoldVisual); }
+        bossHoldVisual = null;
+        bossHoldRenderer = null;
+    }
+
+    void UpdateBossHoldVisual()
+    {
+        if (bossHoldRenderer == null || sr == null) return;
+        bossHoldRenderer.sprite = sr.sprite;
+        bossHoldRenderer.color = sr.color;
+        bossHoldRenderer.flipX = sr.flipX;
+        bossHoldRenderer.flipY = sr.flipY;
+        bossHoldVisual.transform.localPosition = Vector3.up * (bossHoldHeight / Mathf.Max(0.0001f, Mathf.Abs(transform.lossyScale.y)))
+            + transform.InverseTransformVector((Vector3)(bossHoldVisualOffset * bossHoldOffsetWeight));
+    }
+
+    void LateUpdate() => UpdateBossHoldVisual();
+    void OnDisable()
+    {
+        if (bossHoldOwner != null) EndBossHold(bossHoldOwner);
+    }
+
+    public void StunByBoss(float seconds)
+    {
+        if (DebugCheats.God || IsInvulnerable || GameManager.I == null
+            || GameManager.I.State != GameState.Playing || seconds <= 0f) return;
+        stunLeft = Mathf.Max(stunLeft, seconds);
+        Root(seconds);
+    }
 
     // ---------- 보스 공격: 기절 · 밀려남 ----------
     float stunLeft;
@@ -80,8 +206,8 @@ public class Player : MonoBehaviour
         knockVel = Vector2.zero;
         Root(seconds);
     }
-    /// <summary>기절: 이동 · 수동 스킬 사용 불가 (자동 스킬은 계속)</summary>
-    public bool IsStunned => stunLeft > 0f;
+    /// <summary>기절: 이동·새 공격 발동 봉인. 이미 발동한 공격은 유지.</summary>
+    public bool IsStunned => bossHoldOwner != null || stunLeft > 0f;
 
     /// <summary>
     /// 보스 공격 적중: 피해 + 기절(초) + 밀려남(거리, 방향). 무적(치트 · 스킬 무적) 중이면 아무 효과 없음.
@@ -304,6 +430,7 @@ public class Player : MonoBehaviour
             anim.SetClipFps(Slash, Cfg.attackFps);
 
         float dt = Time.deltaTime;
+        if (bossSlowLeft > 0f) bossSlowLeft = Mathf.Max(0f, bossSlowLeft - dt);
         if (skillInvuln > 0) skillInvuln -= dt;
         if (rootLeft > 0) rootLeft -= dt;
         if (stunLeft > 0) stunLeft -= dt;
@@ -311,7 +438,11 @@ public class Player : MonoBehaviour
         var input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
         if (input.sqrMagnitude > 1f) input.Normalize();
 
-        if (bossMoveLeft > 0f)
+        if (bossHoldOwner != null)
+        {
+            if (anim != null) anim.SetMove(Vector2.zero);
+        }
+        else if (bossMoveLeft > 0f)
         {
             float step = Mathf.Min(dt, bossMoveLeft);
             transform.position = Vector3.Lerp(transform.position, bossMoveTarget, step / bossMoveLeft);

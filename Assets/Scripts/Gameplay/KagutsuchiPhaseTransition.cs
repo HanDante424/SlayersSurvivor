@@ -123,7 +123,7 @@ public class KagutsuchiPhaseTransition : MonoBehaviour
         visual.enabled = false;
         CameraFollow.SetTransitionView(-1f, Vector2.zero);
         CameraFollow.ClearFocus();
-        CameraFollow.ZoomToFullMap();
+        CameraFollow.FollowMap(KagutsuchiAI.BattleViewScale, KagutsuchiAI.FullMapCameraMargin);
         warning = BossWarning.Circle(Stage.Center, 0f, 0f);
     }
 
@@ -210,7 +210,7 @@ public class KagutsuchiPhaseTransition : MonoBehaviour
         if (visualRoot != null) { visualRoot.SetActive(false); Destroy(visualRoot); visualRoot = null; }
         CameraFollow.ClearTransitionView();
         CameraFollow.ClearFocus();
-        CameraFollow.ZoomToFullMap();
+        CameraFollow.FollowMap(KagutsuchiAI.BattleViewScale, KagutsuchiAI.FullMapCameraMargin);
     }
 
     void OnDisable()

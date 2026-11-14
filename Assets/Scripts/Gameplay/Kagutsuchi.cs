@@ -12,11 +12,19 @@ using UnityEngine;
 ///   → 카구츠치에서 부채꼴 무작위 방향으로 맵 끝까지 레이저 경고 (폭 1.5) 1초 → 레이저 0.2초, 경고는 0.05초마다 총 20회
 ///   → 난사 끝 1초 뒤 보스가 중앙 조금 아래로 레이저 (폭 0.5) → 0.5초 뒤 반경 14 까지 커지는 경고 → 5초 뒤 원 안 피해
 ///   → 야타의 거울이 나타나 보스 주변을 돌며 항상 플레이어 쪽에 위치 (체력 = 카구츠치 × 15, 때릴 수 있음 · 방어 판정은 아직 없음)
-///   → 입장 끝: 맞을 수 있게 됨. 카메라는 보스전 내내 맵 전체 (입장 때 걸어 들어오는 동안만 확대). 고정형 보스 — 멈춘 자리 (맵 중앙 위) 에서 움직이지 않음 (공격 패턴 미설계)
+///   → 입장 공격 시작부터 피격 가능, 입장 끝에 일반 패턴 시작. 카메라는 보스전 내내 맵 전체 (입장 때 걸어 들어오는 동안만 확대). 고정형 보스 — 멈춘 자리 (맵 중앙 위) 에서 움직이지 않음 (공격 패턴 미설계)
 /// 기획에 없는 값은 [임시].
 /// </summary>
 public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
 {
+    public const float FullMapCameraMargin = 0f; // [임시] 전체 맵 보기의 바깥 여백 1→0으로 확대
+    public const float BattleViewScale = 0.6f; // 사용자: 기존 시야에서 40% 축소해 확대
+
+    // [임시] 보조 체력 바 배치. 우측 여백은 GameManager의 처치 표시 우측 끝과 동일.
+    const float SubHudRight = 10f, SubHudTop = 52f, SubHudRow = 38f;
+    const float SubHudWidthRatio = 0.25f, SubHudMinWidth = 180f, SubHudMaxWidth = 360f;
+    const float SubHudBelowBoss = 108f; // 좁은 화면에서 중앙 보스 체력 바와 겹치면 그 아래로
+
     // ---------- 입장: 걸어 들어오기 ----------
     const float EnterStartOutside = 3f;  // [임시] 맵 위쪽 경계 밖 이만큼에서 시작
     const float EnterStopInside = 3f;    // [임시] 맵 위쪽 경계에서 이만큼 안쪽에서 멈춤 = 기본 위치 (맵 중심 기준 y = 9, 사용자: 더 위로 — 5 → 3)
@@ -245,6 +253,9 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     public void OnPhaseEnd()
     {
         StopAllCoroutines();
+        // 입장 공격 도중 체력 소진이어도 입장 완료를 기다리지 않고 전환.
+        intro = false;
+        entering = false;
         phase2?.Dispose();
         phase2 = null;
         busy = false;
@@ -288,20 +299,23 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         special1Next = 0;
         special2Next = 0;
     }
-    /// <summary>야타의 거울 · 검 체력 바 (보스 체력 바 아래, 살아 있는 것만 차례로)</summary>
+    /// <summary>야타의 거울 · 검 체력 바: 처치 표시 아래 우측 정렬, 살아 있는 것만 차례로.</summary>
     public void DrawHud(float W)
     {
-        float by = 108f;
-        if (mirror != null && mirror.Body != null && mirror.Body.hp > 0) { SubBar(W, by, "야타의 거울", mirror.Body, new Color(0.75f, 0.85f, 1f)); by += 38f; }
-        if (blade != null && blade.Body != null && blade.Body.hp > 0) SubBar(W, by, "아메노무라쿠모", blade.Body, new Color(0.88f, 0.9f, 0.95f));
+        float bw = Mathf.Min(Mathf.Clamp(W * SubHudWidthRatio, SubHudMinWidth, SubHudMaxWidth), Mathf.Max(0f, W - SubHudRight * 2f - 4f));
+        float bx = W - SubHudRight - bw - 2f;
+        // GameManager.DrawBossBar의 중앙 바 영역과 겹치는 작은 화면은 기존 높이 아래로 배치.
+        float bossRight = (W + Mathf.Clamp(W * 0.42f, 360f, 760f)) * 0.5f;
+        float by = bx - 2f > bossRight + 2f ? SubHudTop : SubHudBelowBoss;
+        if (mirror != null && mirror.Body != null && mirror.Body.hp > 0) { SubBar(bx, by, bw, "야타의 거울", mirror.Body, new Color(0.75f, 0.85f, 1f)); by += SubHudRow; }
+        if (blade != null && blade.Body != null && blade.Body.hp > 0) SubBar(bx, by, bw, "아메노무라쿠모", blade.Body, new Color(0.88f, 0.9f, 0.95f));
     }
 
-    static void SubBar(float W, float by, string label, Enemy b, Color fill)
+    static void SubBar(float bx, float by, float bw, string label, Enemy b, Color fill)
     {
-        subStyle ??= new GUIStyle(UIStyles.Label) { fontSize = 14, alignment = TextAnchor.MiddleCenter };
-        float bw = Mathf.Clamp(W * 0.3f, 260f, 520f), bh = 12f;
-        float bx = (W - bw) / 2f;
-        GUI.Label(new Rect(bx, by - 2, bw, 18), label, subStyle);
+        subStyle ??= new GUIStyle(UIStyles.Label) { fontSize = 14, alignment = TextAnchor.MiddleRight };
+        const float bh = 12f;
+        GUI.Label(new Rect(bx - 2f, by - 2f, bw + 4f, 18f), label, subStyle);
         GUI.color = new Color(0, 0, 0, 0.8f);
         GUI.DrawTexture(new Rect(bx - 2, by + 16, bw + 4, bh + 4), UIStyles.White);
         GUI.color = Color.white;
@@ -315,7 +329,8 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     void Awake()
     {
         e = GetComponent<Enemy>();
-        e.SetScripted(true);   // 입장 중: 맞지 않음 · 접촉 피해 없음 · 맵 밖에 있어도 됨
+        CameraFollow.ConstrainToMap();
+        e.SetScripted(true);   // 걸어 들어오는 동안 무적. 입장 공격 시작 시 해제
         transform.position = Center + new Vector2(0f, Half.y + EnterStartOutside);
     }
 
@@ -1093,11 +1108,13 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
 
         // 2) 멈추면 카메라가 맵 전체를 비춤
         CameraFollow.ClearFocus();
-        CameraFollow.ZoomToFullMap();
+        CameraFollow.FollowMap(BattleViewScale, FullMapCameraMargin);
         yield return Wait(StopPause);
 
-        // 3) 보스에서 부채꼴 무작위 방향 레이저: 0.05초마다 경고 (1초) → 레이저 0.2초, 총 20회
-        //    간격이 프레임보다 짧을 수 있어 시간표대로 (밀린 경고는 같은 프레임에 몰아서)
+        // 3) 입장 공격 시작부터 피격 가능. intro는 유지해 일반 패턴과 겹치지 않게 함.
+        e.SetScripted(false);
+        // 보스에서 부채꼴 무작위 방향 레이저: 0.05초마다 경고 (1초) → 레이저 0.2초, 총 20회
+        // 간격이 프레임보다 짧을 수 있어 시간표대로 (밀린 경고는 같은 프레임에 몰아서)
         int spawned = 0;
         float elapsed = 0f;
         while (spawned < IntroLaserCount)
@@ -1124,8 +1141,8 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         mirrorSpawned = bladeSpawned = true;
         yield return Wait(AfterMirror);
 
-        // 6) 입장 끝 → 이후부터 보스 행동. 카메라는 보스전 내내 맵 전체 (2026-11-13 사용자) — 시야를 되돌리지 않음
-        e.SetScripted(false);
+        // 6) 입장 끝 → 일반 패턴 허용. 피격은 이미 입장 공격 시작 시 해제됨.
+        // 카메라는 보스전 내내 맵 전체 (2026-11-13 사용자) — 시야를 되돌리지 않음.
         intro = false;
     }
 

@@ -22,6 +22,41 @@ public class CameraFollow : MonoBehaviour
         inst.transitionView = false;
         inst.transitionOffset = Vector2.zero;
     }
+    object outsideMapOwner;
+    Transform beforeOutsideFocus;
+    bool beforeOutsideFullMap;
+    float beforeOutsideZoom, outsideBaseSize;
+
+    /// <summary>소유자가 있는 임시 추적. 종료·중단 시 원래 대상과 맵 제한으로 복귀.</summary>
+    public static void BeginOutsideMapFollow(object owner, Transform target, float magnification = 1f)
+    {
+        if (inst == null || owner == null) return;
+        if (inst.outsideMapOwner != null && inst.outsideMapOwner != owner) return;
+        if (inst.outsideMapOwner == null)
+        {
+            inst.beforeOutsideFocus = inst.focus;
+            inst.beforeOutsideFullMap = inst.fullMap;
+            inst.beforeOutsideZoom = inst.zoomTarget;
+            var cam = inst.GetComponent<Camera>();
+            inst.outsideBaseSize = cam != null ? cam.orthographicSize : GameManager.ViewSize;
+        }
+        inst.zoomTarget = magnification > 1f ? inst.outsideBaseSize / magnification : inst.beforeOutsideZoom;
+        inst.outsideMapOwner = owner;
+        inst.focus = target;
+        inst.fullMap = false;
+    }
+
+    public static void EndOutsideMapFollow(object owner)
+    {
+        if (inst == null || inst.outsideMapOwner != owner || owner == null) return;
+        inst.outsideMapOwner = null;
+        inst.focus = inst.beforeOutsideFocus;
+        inst.fullMap = inst.beforeOutsideFullMap;
+        inst.zoomTarget = inst.beforeOutsideZoom;
+        inst.beforeOutsideFocus = null;
+        inst.blendLeft = BlendTime;
+        inst.lastPos = inst.transform.position;
+    }
     Transform ground;
     float tile;
 
@@ -54,7 +89,8 @@ public class CameraFollow : MonoBehaviour
         var cam = GetComponent<Camera>();
         float h = cam != null ? cam.orthographicSize : GameManager.ViewSize;
         float w = h * (cam != null ? cam.aspect : 16f / 9f);
-        Vector2 c = Stage.Center, room = Stage.HalfSize + Vector2.one * BoundsMargin - new Vector2(w, h);
+        float margin = limitViewportToMap ? 0f : BoundsMargin;
+        Vector2 c = Stage.Center, room = Stage.HalfSize + Vector2.one * margin - new Vector2(w, h);
         p.x = room.x > 0f ? Mathf.Clamp(p.x, c.x - room.x, c.x + room.x) : c.x;
         p.y = room.y > 0f ? Mathf.Clamp(p.y, c.y - room.y, c.y + room.y) : c.y;
         return p;
@@ -69,23 +105,51 @@ public class CameraFollow : MonoBehaviour
     // 화면 높이 비율. 위 = 경험치 바 · 시간 · 보스 이름 · 체력 바 3줄 (약 175px / 1080), 아래 = 스킬 슬롯 (약 80px / 1080)
     const float HudTop = 0.17f, HudBottom = 0.08f;
     bool fullMap;
+    bool limitViewportToMap;
     float fullMapOffsetY;   // 맵 전체 보기 때 카메라 중심을 맵 중심에서 위로 (위쪽 UI 가 맵 밖에 오도록)
 
     /// <summary>
     /// 제한된 맵 전체가 화면에 들어오게 축소 (경계 없는 스테이지는 무시).
     /// 화면 위 · 아래 UI (체력 바 · 스킬 슬롯) 를 뺀 영역에 맵이 들어오도록 시야와 중심을 맞춤
     /// </summary>
-    public static void ZoomToFullMap()
+    public static void ZoomToFullMap() => ZoomToFullMap(FullMapMargin);
+
+    /// <summary>맵 전체와 HUD 공간을 유지하면서 보스별 바깥 여백을 지정.</summary>
+    public static void ZoomToFullMap(float margin)
     {
         if (inst == null || !Stage.Bounded) return;
         var cam = inst.GetComponent<Camera>();
         float aspect = cam != null ? cam.aspect : 16f / 9f;
-        Vector2 h = Stage.HalfSize + Vector2.one * FullMapMargin;
-        float usable = 1f - HudTop - HudBottom;
-        float size = Mathf.Max(h.y / usable, h.x / aspect);
+        float size = FullMapViewSize(aspect, margin);
         inst.zoomTarget = size;
         inst.fullMap = true;
         inst.fullMapOffsetY = (HudTop - HudBottom) * size;
+        inst.blendLeft = BlendTime;
+        inst.lastPos = inst.transform.position;
+    }
+
+    static float FullMapViewSize(float aspect, float margin)
+    {
+        Vector2 h = Stage.HalfSize + Vector2.one * Mathf.Max(0f, margin);
+        return Mathf.Max(h.y / (1f - HudTop - HudBottom), h.x / aspect);
+    }
+
+    /// <summary>집중 연출·흔들림을 포함한 화면 전체를 맵 안에 제한.</summary>
+    public static void ConstrainToMap()
+    {
+        if (inst != null && Stage.Bounded) inst.limitViewportToMap = true;
+    }
+
+    /// <summary>전체 맵 시야의 비율만큼 확대하고 플레이어를 따라감.</summary>
+    public static void FollowMap(float viewScale, float margin)
+    {
+        if (inst == null || !Stage.Bounded) return;
+        var cam = inst.GetComponent<Camera>();
+        float aspect = cam != null ? cam.aspect : 16f / 9f;
+        inst.zoomTarget = FullMapViewSize(aspect, margin) * Mathf.Max(0.0001f, viewScale);
+        inst.limitViewportToMap = true;
+        inst.fullMap = false;
+        inst.focus = null;
         inst.blendLeft = BlendTime;
         inst.lastPos = inst.transform.position;
     }
@@ -103,7 +167,14 @@ public class CameraFollow : MonoBehaviour
         var cam = GetComponent<Camera>();
         if (cam == null) return;
         float target = zoomTarget > 0f ? zoomTarget : GameManager.ViewSize;
-        cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, target, 1f - Mathf.Exp(-ZoomSpeed * Time.unscaledDeltaTime));
+        float limit = float.MaxValue;
+        if (limitViewportToMap && outsideMapOwner == null && Stage.Bounded)
+        {
+            // 넓은 화면 비율에서도 화면 전체가 맵 안에 들어가는 최대 시야.
+            limit = Mathf.Min(Stage.HalfSize.y, Stage.HalfSize.x / Mathf.Max(0.0001f, cam.aspect));
+            target = Mathf.Min(target, limit);
+        }
+        cam.orthographicSize = Mathf.Min(limit, Mathf.Lerp(cam.orthographicSize, target, 1f - Mathf.Exp(-ZoomSpeed * Time.unscaledDeltaTime)));
         if (Mathf.Abs(cam.orthographicSize - target) < 0.01f) cam.orthographicSize = target;
     }
 
@@ -154,17 +225,19 @@ public class CameraFollow : MonoBehaviour
         }
         if (Stage.Bounded)
         {
-            // 대상을 비추는 중이면 경계 무시, 아니면 맵 경계 안
+            // 보스별 화면 제한이 켜져 있으면 집중 연출도 최종 위치에서 경계 적용.
             Vector3 want = focus != null ? new Vector3(p.x, p.y, -10f)
                          : fullMap ? new Vector3(Stage.Center.x, Stage.Center.y + fullMapOffsetY, -10f)   // 맵 전체: 고정 (UI 자리만큼 위로)
-                         : ClampToBounds(new Vector3(p.x, p.y, -10f));
+                         : outsideMapOwner != null ? new Vector3(p.x, p.y, -10f) : ClampToBounds(new Vector3(p.x, p.y, -10f));
             if (blendLeft > 0f)
             {
                 blendLeft -= Time.unscaledDeltaTime;
                 want = Vector3.Lerp(lastPos, want, 1f - Mathf.Exp(-BlendSpeed * Time.unscaledDeltaTime));
             }
+            if (limitViewportToMap && outsideMapOwner == null) want = ClampToBounds(want);
             lastPos = want;
-            transform.position = want + offset;
+            // 보간·화면 흔들림 이후에도 재검사해 경계 바깥이 노출되지 않게 함.
+            transform.position = limitViewportToMap && outsideMapOwner == null ? ClampToBounds(want + offset) : want + offset;
             return;   // 바닥 고정
         }
         transform.position = new Vector3(p.x, p.y, -10f) + offset;
