@@ -436,6 +436,7 @@ public partial class Enemy : MonoBehaviour
     void Die()
     {
         if (dead) return;   // 사망 처리는 한 번만 (메아리 무한 재발동 방지)
+        if (RaidStage.TryNextPhase(this)) return;   // 레이드 보스: 남은 페이즈가 있으면 죽지 않고 다음 페이즈 (체력 회복 연출)
         dead = true;
         GameManager.I.OnEnemyKilled(this);
         Killed?.Invoke(this);

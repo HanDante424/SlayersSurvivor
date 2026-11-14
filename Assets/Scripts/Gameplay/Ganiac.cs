@@ -22,6 +22,36 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
     public bool HideBossBar => intro && e != null && e.Hidden;
     void IRaidBossAI.DrawHud(float W) => DrawSwordHud(W);
 
+    /// <summary>페이즈 체력 소진: 진행 중인 패턴 · 경고 · 가니악의 검 · 어둠의 검 · 화면 축소를 즉시 정리 (특수 패턴 3 카운트다운도 끝)</summary>
+    public void OnPhaseEnd()
+    {
+        StopAllCoroutines();
+        busy = false;
+        foreach (var w in warnings) if (w != null) Destroy(w.gameObject);
+        warnings.Clear();
+        foreach (var s in swords) if (s != null) Destroy(s.gameObject);
+        swords.Clear();
+        foreach (var d in darkSwords) if (d != null) Destroy(d);
+        darkSwords.Clear();
+        if (swordPhase || stormPhase) CameraFollow.ResetZoom();
+        swordPhase = false;
+        stormPhase = false;
+        swordTimeLeft = 0f;
+        e.alpha = 1f;
+        if (e.Hidden) e.SetHidden(false);
+    }
+
+    /// <summary>
+    /// 다음 페이즈 시작: [임시] 2 · 3페이즈 전용 패턴이 아직 없어 1페이즈 패턴을 그대로 쓰고,
+    /// 체력 문턱 특수 패턴 3 · 4 를 페이즈마다 처음부터 다시 (해금된 공격 패턴 5 · 6 · 7 은 유지)
+    /// </summary>
+    public void OnPhaseBegin(int phase)
+    {
+        nextThreshold = 0;
+        nextStormThreshold = 0;
+        gapLeft = PatternGap;
+    }
+
     // ---------- 특수 패턴 1: 맵을 가로지르는 무작위 직선 ----------
     const int LineCount = 10;            // "10개 가량" (사용자)
     const float LineInterval = 0.2f;     // 경고 생성 간격 (사용자)
@@ -229,7 +259,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
     public Vector2 Behave(Vector2 toPlayer, float moveSpeed, ref Vector2 face)
     {
         face = busy && faceDir.sqrMagnitude > 0f ? faceDir : toPlayer;
-        if (intro) return Vector2.zero;
+        if (intro || RaidStage.InTransition) return Vector2.zero;   // 페이즈 전환 (체력 회복 연출) 중에는 아무것도 안 함
         // 특수 패턴 3: 체력 90 · 60 · 30% 아래로 내려가면 진행 중인 패턴이 끝난 뒤 바로 (공통 쿨타임 무시)
         if (!busy && !swordPhase && !DebugCheats.NoGaniacSpecial[2] && nextThreshold < SwordThresholds.Length && e.hp <= e.maxHp * SwordThresholds[nextThreshold])
         {

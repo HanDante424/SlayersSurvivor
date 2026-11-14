@@ -51,17 +51,27 @@ public class TitleScreen : MonoBehaviour
     /// <summary>열려 있는 레이드 보스 선택 화면 (없으면 null)</summary>
     RaidSelectScreen raidSelect;
 
-    /// <summary>레이드 보스 선택 → 고르면 그 보스로 캐릭터 선택</summary>
+    /// <summary>열려 있는 레이드 난이도 선택 화면 (없으면 null)</summary>
+    RaidDifficultyScreen raidDifficulty;
+
+    /// <summary>레이드 보스 선택 → 난이도 선택 → 캐릭터 선택. 난이도에서 뒤로 = 보스 선택으로</summary>
     void OpenRaidSelect()
     {
         if (OverlayOpen) return;
         raidSelect = RaidSelectScreen.Open(gameObject,
-            onPick: b => { raidSelect = null; RaidStage.Selected = b.kind; OpenCharacterSelect(StageKind.Raid); },
+            onPick: b => { raidSelect = null; RaidStage.Selected = b.kind; OpenRaidDifficulty(b); },
             onBack: () => raidSelect = null);
     }
 
-    /// <summary>캐릭터 선택 · 설정 · 레이드 선택 화면이 위에 열려 있음</summary>
-    bool OverlayOpen => select != null || settings != null || raidSelect != null;
+    void OpenRaidDifficulty(RaidBossInfo b)
+    {
+        raidDifficulty = RaidDifficultyScreen.Open(gameObject, b,
+            onPick: d => { raidDifficulty = null; RaidStage.Difficulty = d.difficulty; OpenCharacterSelect(StageKind.Raid); },
+            onBack: () => { raidDifficulty = null; OpenRaidSelect(); });
+    }
+
+    /// <summary>캐릭터 선택 · 설정 · 레이드 선택 · 난이도 선택 화면이 위에 열려 있음</summary>
+    bool OverlayOpen => select != null || settings != null || raidSelect != null || raidDifficulty != null;
 
     /// <summary>스테이지를 정하고 캐릭터 선택 화면 열기 (시작하면 Main 씬이 그 스테이지로)</summary>
     void OpenCharacterSelect(StageKind stage)

@@ -240,6 +240,32 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     // ---------- IRaidBossAI ----------
     /// <summary>걸어 들어오는 동안은 체력 바 없음 (멈춘 뒤부터 표시)</summary>
     public bool HideBossBar => intro && entering;
+
+    /// <summary>페이즈 체력 소진: 진행 중인 패턴 · 경고 · 레이저 · 화염 벽을 즉시 정리, 거울 · 검은 제자리로 (부서진 상태는 유지)</summary>
+    public void OnPhaseEnd()
+    {
+        StopAllCoroutines();
+        busy = false;
+        special1Pending = special2Pending = false;
+        inSpecial1 = inSpecial2 = false;
+        StopSpecial1Lasers();
+        foreach (var w in warnings) if (w != null) Destroy(w.gameObject);
+        warnings.Clear();
+        foreach (var w in fireWalls) if (w != null) Destroy(w);
+        fireWalls.Clear();
+        if (mirror != null) mirror.Release();
+        if (blade != null) blade.Release();
+    }
+
+    /// <summary>
+    /// 다음 페이즈 시작: [임시] 2 · 3페이즈 전용 패턴이 아직 없어 1페이즈 패턴을 그대로 쓰고,
+    /// 체력 문턱 특수 패턴 1 · 2 를 페이즈마다 처음부터 다시
+    /// </summary>
+    public void OnPhaseBegin(int phase)
+    {
+        special1Next = 0;
+        special2Next = 0;
+    }
     /// <summary>야타의 거울 · 검 체력 바 (보스 체력 바 아래, 살아 있는 것만 차례로)</summary>
     public void DrawHud(float W)
     {
@@ -299,6 +325,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     public Vector2 Behave(Vector2 toPlayer, float moveSpeed, ref Vector2 face)
     {
         face = intro ? Vector2.down : toPlayer;
+        if (RaidStage.InTransition) return Vector2.zero;   // 페이즈 전환 (체력 회복 연출) 중에는 아무것도 안 함
         if (!intro) { CheckSpecial1(); CheckSpecial2(); }
         if (!intro && !busy && special1Pending)
         {
