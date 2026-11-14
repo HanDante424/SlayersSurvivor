@@ -682,6 +682,14 @@ public class GameManager : MonoBehaviour
         float bw = Mathf.Clamp(W * 0.42f, 360f, 760f), bh = 20f;
         float bx = (W - bw) / 2f, ny = 46f, by = ny + 32f;
         GUI.Label(new Rect(bx, ny, bw, 30), b.DisplayName, bossNameStyle);
+        if (Stage.IsRaid && b == RaidStage.Boss)
+        {
+            // 난이도 · 페이즈 (이름 오른쪽 위), 페이즈 전환 중이면 가운데에 크게
+            GUI.Label(new Rect(bx, ny + 4, bw, 24), $"{RaidStage.DifficultyInfo.name}   {RaidStage.Phase} / {RaidStage.MaxPhase} 페이즈",
+                      new GUIStyle(bossHpStyle) { alignment = TextAnchor.MiddleRight });
+            if (RaidStage.InTransition)
+                GUI.Label(new Rect(0, Screen.height * 0.3f, W, 60), $"{RaidStage.Phase} 페이즈", UIStyles.Big);
+        }
         GUI.color = new Color(0, 0, 0, 0.8f);
         GUI.DrawTexture(new Rect(bx - 2, by - 2, bw + 4, bh + 4), UIStyles.White);   // 테두리
         GUI.color = Color.white;
