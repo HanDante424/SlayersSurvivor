@@ -4,6 +4,24 @@ public class CameraFollow : MonoBehaviour
 {
     static CameraFollow inst;
     float shakeTime, shakeAmp;
+    bool transitionView;
+    Vector2 transitionOffset;
+
+    /// <summary>전환 연출의 시야·진동 갱신. Focus를 반복 호출해 위치 보간을 재시작하지 않음.</summary>
+    public static void SetTransitionView(float size, Vector2 offset)
+    {
+        if (inst == null) return;
+        inst.transitionView = true;
+        if (size > 0f) inst.zoomTarget = size;
+        inst.transitionOffset = offset;
+    }
+
+    public static void ClearTransitionView()
+    {
+        if (inst == null) return;
+        inst.transitionView = false;
+        inst.transitionOffset = Vector2.zero;
+    }
     Transform ground;
     float tile;
 
@@ -124,13 +142,14 @@ public class CameraFollow : MonoBehaviour
     void LateUpdate()
     {
         if (Player.I == null) return;
+        if (transitionView && GameManager.I != null && GameManager.I.State != GameState.Playing) return;
         UpdateZoom();
         Vector3 p = focus != null ? focus.position : Player.I.transform.position;
-        Vector3 offset = Vector3.zero;
+        Vector3 offset = transitionOffset;
         if (shakeTime > 0)
         {
             shakeTime -= Time.unscaledDeltaTime;
-            offset = (Vector3)Random.insideUnitCircle * shakeAmp;
+            offset += (Vector3)Random.insideUnitCircle * shakeAmp;
             if (shakeTime <= 0) shakeAmp = 0;
         }
         if (Stage.Bounded)

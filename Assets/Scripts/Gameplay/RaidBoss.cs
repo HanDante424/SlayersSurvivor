@@ -47,13 +47,13 @@ public class RaidDifficultyInfo
 
     /// <summary>
     /// 이지 = 1페 · 노말 = 1 · 2페 · 하드 = 1 · 2 · 3페 · 익스트림 = 특수 (사용자). 각 페이즈 체력을 모두 깎으면 체력이 다시 차는 연출과 함께 다음 페이즈.
-    /// [임시] 익스트림은 내용 미정 → 잠금. 난이도별 체력 · 피해 배율 없음 (페이즈 수만 다름)
+    /// 하드 · 익스트림은 진입 불가 (2026-11-14 사용자). 난이도별 체력 · 피해 배율 없음 (페이즈 수만 다름)
     /// </summary>
     public static readonly List<RaidDifficultyInfo> All = new List<RaidDifficultyInfo>
     {
         new RaidDifficultyInfo { difficulty = RaidDifficulty.Easy,    name = "이지",     nameEn = "Easy",    phases = 1, note = "1페이즈만" },
         new RaidDifficultyInfo { difficulty = RaidDifficulty.Normal,  name = "노말",     nameEn = "Normal",  phases = 2, note = "2페이즈 해금" },
-        new RaidDifficultyInfo { difficulty = RaidDifficulty.Hard,    name = "하드",     nameEn = "Hard",    phases = 3, note = "3페이즈 해금" },
+        new RaidDifficultyInfo { difficulty = RaidDifficulty.Hard,    name = "하드",     nameEn = "Hard",    phases = 3, note = "3페이즈 준비 중", locked = true },
         new RaidDifficultyInfo { difficulty = RaidDifficulty.Extreme, name = "익스트림", nameEn = "Extreme", phases = 1, note = "특수 — 내용 미정", locked = true },
     };
 
@@ -72,6 +72,12 @@ public interface IRaidBossAI
     bool HideBossBar { get; }
     /// <summary>보스 전용 화면 표시 (카운트다운 등). GameManager.OnGUI 에서 체력 바 다음에</summary>
     void DrawHud(float W);
+}
+
+/// <summary>보스 전용 전환 연출. true면 해당 보스가 EndTransition까지 진행을 소유.</summary>
+public interface IRaidPhaseTransition
+{
+    bool TryBeginPhaseTransition(int phase);
 }
 
 /// <summary>
@@ -136,15 +142,16 @@ public static class RaidStage
         e.hp = 0.01f;            // 살아 있음 (Boss != null) · 체력 바는 0 에서 다시 참
         e.SetScripted(true);
         e.GetComponent<IRaidBossAI>()?.OnPhaseEnd();
-        RaidPhaseTransition.Begin(e);
+        var transition = e.GetComponent<IRaidPhaseTransition>();
+        if (transition == null || !transition.TryBeginPhaseTransition(Phase)) RaidPhaseTransition.Begin(e);
         return true;
     }
 
     /// <summary>체력 회복 연출 끝 (RaidPhaseTransition)</summary>
     public static void EndTransition(Enemy e)
     {
+        if (e == null || e != boss || !InTransition) return;
         InTransition = false;
-        if (e == null) return;
         e.SetScripted(false);
         e.GetComponent<IRaidBossAI>()?.OnPhaseBegin(Phase);
     }

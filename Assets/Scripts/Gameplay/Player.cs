@@ -58,7 +58,7 @@ public class Player : MonoBehaviour
     System.Action dashStep, dashEnd;
 
     /// <summary>돌진 중이거나 이동 불가 상태 → 다른 수동 스킬 사용 불가</summary>
-    public bool IsBusy => dashLeft > 0 || rootLeft > 0;
+    public bool IsBusy => dashLeft > 0 || rootLeft > 0 || bossMoveLeft > 0;
     public bool IsInvulnerable => skillInvuln > 0 || dashLeft > 0 && dashInvuln;
     bool dashInvuln;
 
@@ -68,6 +68,18 @@ public class Player : MonoBehaviour
     // ---------- 보스 공격: 기절 · 밀려남 ----------
     float stunLeft;
     Vector2 knockVel;
+    Vector2 bossMoveTarget;
+    float bossMoveLeft;
+
+    /// <summary>보스 제어 효과: 지정 시간에 목적지까지 이동. 스킬 무적은 제어도 막음.</summary>
+    public void MoveByBoss(Vector2 destination, float seconds)
+    {
+        if (DebugCheats.God || IsInvulnerable || GameManager.I.State != GameState.Playing || seconds <= 0f) return;
+        bossMoveTarget = destination;
+        bossMoveLeft = seconds;
+        knockVel = Vector2.zero;
+        Root(seconds);
+    }
     /// <summary>기절: 이동 · 수동 스킬 사용 불가 (자동 스킬은 계속)</summary>
     public bool IsStunned => stunLeft > 0f;
 
@@ -299,7 +311,14 @@ public class Player : MonoBehaviour
         var input = new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
         if (input.sqrMagnitude > 1f) input.Normalize();
 
-        if (dashLeft > 0)
+        if (bossMoveLeft > 0f)
+        {
+            float step = Mathf.Min(dt, bossMoveLeft);
+            transform.position = Vector3.Lerp(transform.position, bossMoveTarget, step / bossMoveLeft);
+            bossMoveLeft -= step;
+            if (anim != null) anim.SetMove(Vector2.zero);
+        }
+        else if (dashLeft > 0)
         {
             // 돌진 중: 입력 무시하고 정해진 속도로 이동
             float step = Mathf.Min(dt, dashLeft);

@@ -153,6 +153,17 @@ public partial class Enemy : MonoBehaviour
     float stunLeft;
     float slowLeft, slowMul = 1f;
     public bool IsStunned => stunLeft > 0;
+    /// <summary>보스 2페이즈 등 명시적으로 지정한 상태의 기절·감속 면역.</summary>
+    public bool ControlImmune { get; set; }
+
+    public void ClearControlEffects()
+    {
+        bool wasStunned = IsStunned;
+        stunLeft = slowLeft = concussLeft = StunTotal = 0f;
+        slowMul = statusSpeedMul = 1f;
+        knockback = Vector2.zero;
+        if (wasStunned) StunEnded?.Invoke(this);
+    }
 
     // 뇌진탕 (솔라 슬래시 S5-B): 넉백된 뒤 window 동안 다른 적과 부딪히면 기절
     float concussLeft, concussStun;
@@ -171,7 +182,7 @@ public partial class Enemy : MonoBehaviour
     /// <param name="indirect">'간접 사용'에서 나온 기절 (터렛 공격 · 추가 투사체 · 충격파 · 범위 충격). 범위 충격 연쇄 방지용</param>
     public void Stun(float seconds, bool indirect = false)
     {
-        if (seconds <= 0f || Hidden || Scripted) return;
+        if (seconds <= 0f || Hidden || Scripted || ControlImmune) return;
         bool was = IsStunned;
         seconds *= CombatMods.StunDurationMul();               // 충격 역학 '기절' '지속 시간' +%
         if (was) seconds += CombatMods.StunReapplyAdd();       // 재기절
@@ -198,7 +209,7 @@ public partial class Enemy : MonoBehaviour
     /// </summary>
     public void Slow(float mul, float seconds)
     {
-        if (seconds <= 0f) return;
+        if (seconds <= 0f || ControlImmune) return;
         if (slowLeft > 0) { slowMul *= mul; slowLeft += seconds; }
         else { slowMul = mul; slowLeft = seconds; }
     }
@@ -209,6 +220,7 @@ public partial class Enemy : MonoBehaviour
     /// </summary>
     public void SustainSlow(float mul, float seconds)
     {
+        if (ControlImmune) return;
         if (slowLeft <= 0 || mul < slowMul) slowMul = Mathf.Min(slowLeft > 0 ? slowMul : 1f, mul);
         slowLeft = Mathf.Max(slowLeft, seconds);
     }

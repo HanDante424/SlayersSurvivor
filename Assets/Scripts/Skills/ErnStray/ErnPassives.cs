@@ -90,6 +90,12 @@ public class FlameSword : Skill
         I != null && e != null && I.burns.TryGetValue(e, out var b) ? b.stacks : 0;
     public static bool IsBurning(Enemy e) => StacksOn(e) > 0;
 
+    /// <summary>페이즈 변경 등 명시적인 상태 초기화. 처치·확산 이벤트는 발생시키지 않음.</summary>
+    public static void RemoveBurn(Enemy e)
+    {
+        if (I != null && e != null && I.burns.TryGetValue(e, out var burn)) I.Clear(burn, true);
+    }
+
     /// <summary>
     /// 강제 발화용: 이 적의 화상이 **전체 지속시간** 동안 줄 총 피해 = 틱 수 × 내림한 1틱 피해 (실제 화상과 같은 내림, 결정 2026-11-10).
     /// 1틱 = 공격자 단계까지 (화상 강화 · 옥염 반영, 받는 최종 피해량은 고정 피해라 미반영).
@@ -291,7 +297,7 @@ public class FlameSword : Skill
             var e = b.e;
             if (e == null || e.hp <= 0 || b.stacks <= 0) { Clear(b, removeFromMap: true); continue; }
             // 끈적한 화염: 다른 상태 효과와 곱연산 → 자기 몫만 곱하고 끝날 때 나눔
-            if (sticky && !b.slowed) { e.statusSpeedMul *= StickyMul; b.slowed = true; }
+            if (sticky && !e.ControlImmune && !b.slowed) { e.statusSpeedMul *= StickyMul; b.slowed = true; }
 
             if (!Permanent) b.left -= dt;
             if (b.tickIn > interval) b.tickIn = interval;   // 간격이 줄면(가속 연소) 예약된 다음 틱도 새 간격 안으로

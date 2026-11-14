@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -15,7 +15,7 @@ using UnityEngine;
 ///   → 입장 끝: 맞을 수 있게 됨. 카메라는 보스전 내내 맵 전체 (입장 때 걸어 들어오는 동안만 확대). 고정형 보스 — 멈춘 자리 (맵 중앙 위) 에서 움직이지 않음 (공격 패턴 미설계)
 /// 기획에 없는 값은 [임시].
 /// </summary>
-public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
+public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
 {
     // ---------- 입장: 걸어 들어오기 ----------
     const float EnterStartOutside = 3f;  // [임시] 맵 위쪽 경계 밖 이만큼에서 시작
@@ -245,24 +245,46 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     public void OnPhaseEnd()
     {
         StopAllCoroutines();
+        phase2?.Dispose();
+        phase2 = null;
         busy = false;
         special1Pending = special2Pending = false;
         inSpecial1 = inSpecial2 = false;
         StopSpecial1Lasers();
         foreach (var w in warnings) if (w != null) Destroy(w.gameObject);
         warnings.Clear();
-        foreach (var w in fireWalls) if (w != null) Destroy(w);
+        foreach (var w in fireWalls) if (w != null) { w.SetActive(false); Destroy(w); }
         fireWalls.Clear();
-        if (mirror != null) mirror.Release();
-        if (blade != null) blade.Release();
+        if (RaidStage.Phase == 2)
+        {
+            // 1페이즈 소환물과 받는 피해 증가 효과를 2페이즈로 넘기지 않음.
+            if (mirror != null) { mirror.gameObject.SetActive(false); Destroy(mirror.gameObject); }
+            if (blade != null) { blade.gameObject.SetActive(false); Destroy(blade.gameObject); }
+            mirror = null; blade = null;
+            if (mod != null) CombatMods.Remove(mod);
+        }
+        else
+        {
+            if (mirror != null) mirror.Release();
+            if (blade != null) blade.Release();
+        }
+        ClearLasers();
     }
 
-    /// <summary>
-    /// 다음 페이즈 시작: [임시] 2 · 3페이즈 전용 패턴이 아직 없어 1페이즈 패턴을 그대로 쓰고,
-    /// 체력 문턱 특수 패턴 1 · 2 를 페이즈마다 처음부터 다시
-    /// </summary>
+    public bool TryBeginPhaseTransition(int phase)
+    {
+        if (phase != 2) return false;
+        gameObject.AddComponent<KagutsuchiPhaseTransition>().Begin(e);
+        return true;
+    }
+
+    KagutsuchiPhase2 phase2;
+
+    /// <summary>전용 전환 종료 후 2페이즈 패턴을 시작. 다른 페이즈는 기존 체력 문턱 초기화.</summary>
     public void OnPhaseBegin(int phase)
     {
+        phase2?.Dispose();
+        phase2 = phase == 2 ? new KagutsuchiPhase2(e) : null;
         special1Next = 0;
         special2Next = 0;
     }
@@ -301,13 +323,16 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
 
     void OnDisable()
     {
+        phase2?.Dispose();
+        phase2 = null;
         if (mod != null) CombatMods.Remove(mod);
         StopSpecial1Lasers();
+        ClearLasers();
         foreach (var w in warnings) if (w != null) Destroy(w.gameObject);
         warnings.Clear();
         if (mirror != null) Destroy(mirror.gameObject);
         if (blade != null) Destroy(blade.gameObject);
-        foreach (var w in fireWalls) if (w != null) Destroy(w);
+        foreach (var w in fireWalls) if (w != null) { w.SetActive(false); Destroy(w); }
         fireWalls.Clear();
         if (intro) { CameraFollow.ClearFocus(); CameraFollow.ResetZoom(); }
     }
@@ -325,7 +350,9 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     public Vector2 Behave(Vector2 toPlayer, float moveSpeed, ref Vector2 face)
     {
         face = intro ? Vector2.down : toPlayer;
-        if (RaidStage.InTransition) return Vector2.zero;   // 페이즈 전환 (체력 회복 연출) 중에는 아무것도 안 함
+        if (RaidStage.InTransition) return Vector2.zero;   // 전환 연출이 진행을 소유
+        if (RaidStage.Phase == 2)
+            return phase2 != null ? phase2.Tick(Time.deltaTime, toPlayer) : Vector2.zero;
         if (!intro) { CheckSpecial1(); CheckSpecial2(); }
         if (!intro && !busy && special1Pending)
         {
@@ -434,6 +461,24 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         }
     }
 
+    readonly List<RaidLaser> lasers = new List<RaidLaser>();
+
+    RaidLaser SpawnLaser(Vector2 from, Vector2 dir, float length, float width, float seconds,
+                         float damage, float tick, Rect? safe = null, Color? core = null, Color? edge = null)
+    {
+        lasers.RemoveAll(x => x == null);
+        var laser = RaidLaser.Line(from, dir, length, width, seconds, damage, tick, safe, core, edge);
+        lasers.Add(laser);
+        return laser;
+    }
+
+    void ClearLasers()
+    {
+        foreach (var laser in lasers)
+            if (laser != null) { laser.gameObject.SetActive(false); Destroy(laser.gameObject); }
+        lasers.Clear();
+    }
+
     BossWarning Track(BossWarning w) { warnings.RemoveAll(x => x == null); warnings.Add(w); return w; }
 
     // ---------- 공격 패턴 1: 반사 레이저 ----------
@@ -467,7 +512,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         Vector2 toMirror = mp - Pos;
         Vector2 beamFrom = Muzzle(toMirror.normalized);
         float beamLen = Mathf.Max(0.05f, (mp - beamFrom).magnitude);
-        RaidLaser.Line(beamFrom, toMirror.normalized, beamLen, MirrorBeamWidth, MirrorBeamTime, MirrorBeamDamage, 0.5f, null, FireCore, FireEdge);
+        SpawnLaser(beamFrom, toMirror.normalized, beamLen, MirrorBeamWidth, MirrorBeamTime, MirrorBeamDamage, 0.5f, null, FireCore, FireEdge);
         Fx.Circle(mp, 1f, FireFx, MirrorBeamTime, mirror.transform);
         yield return WaitActive(MirrorFanDelay);
 
@@ -486,7 +531,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         }
         yield return WaitActive(fanWarn);
         foreach (var r in rays)
-            RaidLaser.Line(origin, r.d, r.len, MirrorFanWidth, MirrorFanLaserTime, MirrorFanDamage, MirrorFanLaserTime + 1f, null, FireCore, FireEdge);
+            SpawnLaser(origin, r.d, r.len, MirrorFanWidth, MirrorFanLaserTime, MirrorFanDamage, MirrorFanLaserTime + 1f, null, FireCore, FireEdge);
         CameraFollow.Shake(0.2f, 0.15f);
         yield return Wait(MirrorFanLaserTime);
         if (mirror != null) mirror.Release();   // 거울 복귀
@@ -534,7 +579,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         // 보스 → 거울 레이저 (패턴 끝까지)
         Vector2 toMirror = c - Pos;
         Vector2 s1From = Muzzle(toMirror.normalized);
-        s1Beam = RaidLaser.Line(s1From, toMirror.normalized, Mathf.Max(0.05f, (c - s1From).magnitude), S1BeamWidth, 999f, S1BeamDamage, 0.5f, null, FireCore, FireEdge);
+        s1Beam = SpawnLaser(s1From, toMirror.normalized, Mathf.Max(0.05f, (c - s1From).magnitude), S1BeamWidth, 999f, S1BeamDamage, 0.5f, null, FireCore, FireEdge);
         Fx.Circle(c, 1f, FireFx, 0.6f, mirror.transform);
 
         // 방사 레이저 5회
@@ -549,7 +594,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
             yield return Wait(S1Warn);
             if (!MirrorAlive) yield break;
             foreach (var d in dirs)
-                RaidLaser.Line(c, d, Stage.ExitDistance(c, d), S1LaserWidth, S1RadialTime, S1RadialDamage, S1RadialTime + 1f, null, FireCore, FireEdge);
+                SpawnLaser(c, d, Stage.ExitDistance(c, d), S1LaserWidth, S1RadialTime, S1RadialDamage, S1RadialTime + 1f, null, FireCore, FireEdge);
             CameraFollow.Shake(0.12f, 0.1f);
             yield return Wait(S1RadialTime);
         }
@@ -566,7 +611,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
             if (!MirrorAlive) yield break;
             s1Spin.Clear();
             foreach (var d in dirs)
-                s1Spin.Add(RaidLaser.Line(c, d, Stage.ExitDistance(c, d), S1LaserWidth, S1SpinTime, S1SpinDamage, 0.5f, null, FireCore, FireEdge));
+                s1Spin.Add(SpawnLaser(c, d, Stage.ExitDistance(c, d), S1LaserWidth, S1SpinTime, S1SpinDamage, 0.5f, null, FireCore, FireEdge));
             float sign = turn == 0 ? -1f : 1f;   // 시계 방향 = 각도 감소
             for (float t = 0f; t < S1SpinTime;)
             {
@@ -659,7 +704,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
                 Track(BossWarning.Box(c - d * b2, d, b2 + f2, S2CutWidth, S2CutWarn));
             }
             yield return Wait(S2CutWarn);
-            foreach (var c in cuts) RaidLaser.Line(c.from, c.d, c.len, S2CutWidth, S2CutFlash, S2CutDamage, S2CutFlash + 1f, null, SwordCore, SwordEdge);
+            foreach (var c in cuts) SpawnLaser(c.from, c.d, c.len, S2CutWidth, S2CutFlash, S2CutDamage, S2CutFlash + 1f, null, SwordCore, SwordEdge);
             CameraFollow.Shake(0.1f, 0.1f);
         }
 
@@ -704,7 +749,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
     IEnumerator DelayedCut(Vector2 from, Vector2 d, float len, float delay, float damage)
     {
         yield return Wait(delay);
-        RaidLaser.Line(from, d, len, S2CutWidth, S2CutFlash, damage, S2CutFlash + 1f, null, SwordCore, SwordEdge);
+        SpawnLaser(from, d, len, S2CutWidth, S2CutFlash, damage, S2CutFlash + 1f, null, SwordCore, SwordEdge);
     }
 
     static Vector2 Dir(float deg) => new Vector2(Mathf.Cos(deg * Mathf.Deg2Rad), Mathf.Sin(deg * Mathf.Deg2Rad));
@@ -827,7 +872,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         }
         yield return WaitActive(SwordCutWarn);
         foreach (var c in cuts)
-            RaidLaser.Line(c.from, c.d, c.len, SwordCutWidth, SwordCutFlash, SwordCutDamage, SwordCutFlash + 1f, null, SwordCore, SwordEdge);
+            SpawnLaser(c.from, c.d, c.len, SwordCutWidth, SwordCutFlash, SwordCutDamage, SwordCutFlash + 1f, null, SwordCore, SwordEdge);
         CameraFollow.Shake(0.2f, 0.18f);
         yield return Wait(SwordCutFlash);
         if (BladeAlive) blade.Release();   // 검 복귀
@@ -1026,7 +1071,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         {
             Vector2 seg = pts[i + 1] - pts[i];
             if (seg.sqrMagnitude < 1e-4f) continue;
-            RaidLaser.Line(pts[i], seg.normalized, seg.magnitude, width, laserTime, damage, laserTime + 1f, null, FireCore, FireEdge);
+            SpawnLaser(pts[i], seg.normalized, seg.magnitude, width, laserTime, damage, laserTime + 1f, null, FireCore, FireEdge);
         }
         CameraFollow.Shake(0.15f, 0.12f);
         yield return Wait(laserTime);
@@ -1097,7 +1142,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         d = d.sqrMagnitude > 0.000001f ? d.normalized : Vector2.down;
         Vector2 from = Muzzle(d);
         float len = Mathf.Max(0.05f, (at - from).magnitude);
-        RaidLaser.Line(from, d, len, NovaBeamWidth, NovaWarnDelay + NovaGrowTime, NovaBeamDamage, 0.5f, null, FireCore, FireEdge);
+        SpawnLaser(from, d, len, NovaBeamWidth, NovaWarnDelay + NovaGrowTime, NovaBeamDamage, 0.5f, null, FireCore, FireEdge);
         Fx.Circle(at, 1f, FireFx, 0.4f);
         yield return Wait(NovaWarnDelay);
 
@@ -1141,7 +1186,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI
         warnings.RemoveAll(x => x == null);
         warnings.Add(w);
         yield return Wait(IntroLaserWarn);
-        RaidLaser.Line(from, d, len, IntroLaserWidth, IntroLaserTime, IntroLaserDamage, IntroLaserTime + 1f, null, FireCore, FireEdge);
+        SpawnLaser(from, d, len, IntroLaserWidth, IntroLaserTime, IntroLaserDamage, IntroLaserTime + 1f, null, FireCore, FireEdge);
         CameraFollow.Shake(0.06f, 0.08f);
     }
 }

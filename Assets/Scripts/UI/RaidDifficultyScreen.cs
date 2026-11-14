@@ -3,7 +3,7 @@ using UnityEngine;
 
 /// <summary>
 /// 레이드 난이도 선택 화면 (레이드 보스 선택 → 이 화면 → 캐릭터 선택). 목록은 RaidDifficultyInfo.All.
-/// 잠긴 난이도 (익스트림, 준비 중) 는 보이지만 고를 수 없음.
+/// 잠긴 난이도 (하드 · 익스트림, 준비 중) 는 보이지만 고를 수 없음.
 /// 키보드: ↑/↓ (W/S) 이동, Enter/Space 선택, Esc/Backspace 뒤로. 마우스: 올리면 선택, 클릭 = 결정.
 /// </summary>
 public class RaidDifficultyScreen : MonoBehaviour

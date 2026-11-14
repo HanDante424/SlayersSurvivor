@@ -332,6 +332,9 @@ public class BossWarning : MonoBehaviour
 {
     static readonly Color Red = new Color(1f, 0.2f, 0.15f, 0.32f);
 
+    const int SectorTextureSize = 128; // 부채꼴 경고의 표시 해상도
+    Sprite ownedSprite;
+    Texture2D ownedTexture;
     SpriteRenderer sr;
     float life;
     Color color;
@@ -347,6 +350,39 @@ public class BossWarning : MonoBehaviour
 
     public static BossWarning Box(Vector2 from, Vector2 dir, float length, float width, float seconds) =>
         Make(SpriteFactory.Shape.Square, from + dir.normalized * length * 0.5f, new Vector2(length, width), Angle(dir), seconds, Red);
+
+    /// <summary>dir을 중심으로 totalAngle도인 부채꼴. 생성한 표시 자원은 경고와 함께 정리.</summary>
+    public static BossWarning Sector(Vector2 at, Vector2 dir, float radius, float totalAngle, float seconds)
+    {
+        var w = Make(SpriteFactory.Shape.Circle, at, new Vector2(radius * 2f, radius * 2f), Angle(dir), seconds, Red);
+        int size = SectorTextureSize;
+        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        texture.filterMode = FilterMode.Bilinear;
+        texture.wrapMode = TextureWrapMode.Clamp;
+        var pixels = new Color[size * size];
+        float center = (size - 1) * 0.5f;
+        float cos = Mathf.Cos(Mathf.Clamp(totalAngle, 0f, 360f) * 0.5f * Mathf.Deg2Rad);
+        for (int y = 0; y < size; y++)
+        for (int x = 0; x < size; x++)
+        {
+            float dx = (x - center) / center, dy = (y - center) / center;
+            float distance = Mathf.Sqrt(dx * dx + dy * dy);
+            float alpha = dx >= distance * cos ? Mathf.Clamp01((1f - distance) * center) : 0f;
+            pixels[y * size + x] = new Color(1f, 1f, 1f, alpha);
+        }
+        texture.SetPixels(pixels);
+        texture.Apply();
+        w.ownedTexture = texture;
+        w.ownedSprite = Sprite.Create(texture, new Rect(0f, 0f, size, size), new Vector2(0.5f, 0.5f), size, 0, SpriteMeshType.FullRect);
+        w.sr.sprite = w.ownedSprite;
+        return w;
+    }
+
+    void OnDestroy()
+    {
+        if (ownedSprite != null) Destroy(ownedSprite);
+        if (ownedTexture != null) Destroy(ownedTexture);
+    }
 
     static float Angle(Vector2 d) => Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg;
 
