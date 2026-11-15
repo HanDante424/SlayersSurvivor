@@ -14,6 +14,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
     const float UppercutDistance = 6f, AirHeight = 6f, UppercutTime = 0.25f;
     const float DiveDistance = 6f, DiveTime = 0.5f, GroundSmashTime = 1f;
     const float StompTime = 0.25f, StompReadyTime = 0.25f;
+    const float LiftTime = 0.1f; // 사용자: 눕힌 후 중앙 전방으로 끌어올림 이동 시간.
     const float FinalKickDistance = 5f, FinalMoveTime = 0.2f, FinalKickPoseTime = 2f, FinalStun = 1f;
     const float DamagePerHit = 5f, CameraMagnification = 1.5f;
     const float ReadyFrontDistance = 0.5f;
@@ -80,6 +81,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
     void LateUpdate()
     {
         if (Finished || player == null || !player.IsHeldByBoss(this)) return;
+        player.SetBossHoldFacing(this, !bodyVisual.flipX);
         // Enemy.Update의 지면 이동이 적용된 뒤 정렬해야 돌진·순간이동 프레임에도 일치한다.
         if (step == Step.Hold) showContactPose(currentPose, grabDash, poseHeight, GrabFingertip);
         else if (step == Step.Dive) showContactPose(currentPose, diveReady, poseHeight, DiveFingertip);
@@ -164,6 +166,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
                 if (elapsed >= StompTime)
                 {
                     step = Step.StompReady; elapsed = 0f;
+                    player.SetBossHoldProne(this, false);
                     moveStart = player.transform.position;
                     Vector2 hurtOffset = player.HurtCenter - moveStart;
                     moveEnd = Stage.ClampInside(bossGround + new Vector2(attackSign * ReadyFrontDistance, 0f), player.radius) - hurtOffset;
@@ -171,8 +174,8 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
                 }
                 break;
             case Step.StompReady:
-                // 기존 준비 시간 안에 주먹 아래에서 중앙 전방으로 끌어올린다.
-                float liftProgress = Mathf.Clamp01(elapsed / StompReadyTime);
+                // 지면 이동과 주먹 아래 표시 보정을 함께0.1초에 완료. 준비 자세 시간은 유지.
+                float liftProgress = Mathf.Clamp01(elapsed / LiftTime);
                 MoveHeld(liftProgress, 0f);
                 player.SetBossHoldOffsetWeight(this, 1f - liftProgress);
                 if (elapsed >= StompReadyTime && AtMoveEnd())
@@ -180,6 +183,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
                     step = Step.FinalKick; elapsed = 0f;
                     SetMove(FinalKickDistance);
                     Show(kick, 0f);
+                    body.GetComponent<KagutsuchiSonicBoomFx>()?.Play(bossGround, bodyVisual.flipX);
                     Hit();
                 }
                 break;
@@ -212,6 +216,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
         float horizontal = player.HurtCenter.x - contact.x;
         if (Mathf.Abs(horizontal) > Epsilon) attackSign = horizontal < 0f ? -1f : 1f;
         Show(grabDash, 0f);
+        player.SetBossHoldFacing(this, !bodyVisual.flipX);
         CameraFollow.BeginOutsideMapFollow(this, player.BossHoldVisual, CameraMagnification);
         return true;
     }
@@ -229,6 +234,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
         step = Step.Punch; elapsed = 0f;
         SetMove(PunchDistance);
         Show(punch, 0f);
+        body.GetComponent<KagutsuchiSonicBoomFx>()?.Play(bossGround, bodyVisual.flipX);
         Hit();
     }
 
@@ -239,6 +245,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
         bossGround = BesidePlayer();
         SetMove(KickDistance);
         Show(kick, 0f);
+        body.GetComponent<KagutsuchiSonicBoomFx>()?.Play(bossGround, bodyVisual.flipX);
         Hit();
     }
 
@@ -249,6 +256,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
         bossGround = BesidePlayer();
         SetMove(UppercutDistance);
         Show(uppercut, 0f);
+        body.GetComponent<KagutsuchiUppercutFx>()?.Play(bossGround, bodyVisual.flipX);
         Hit();
     }
 

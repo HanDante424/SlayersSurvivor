@@ -1,0 +1,133 @@
+{
+  "provider": "built-in image_gen",
+  "asset": "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\Kagutsuchi_P1_Fx_BackFire_Loop.png",
+  "frameCount": 8,
+  "columns": 4,
+  "rows": 2,
+  "cellWidth": 384,
+  "cellHeight": 512,
+  "order": "left-to-right, then top-to-bottom",
+  "suggestedGroundPivot": [
+    0.5,
+    0.078125
+  ],
+  "alphaBaselineYFromTop": 472,
+  "previewFrameMs": 80,
+  "previewFps": 12.5,
+  "previewTimingStatus": "preview only, runtime speed not finalized",
+  "loop": true,
+  "runtimeConnected": true,
+  "alpha": "source RGBA preserved unchanged",
+  "qa": [
+    {
+      "frame": 0,
+      "alphaAbove16Bounds": [
+        14,
+        20,
+        376,
+        472
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 1,
+      "alphaAbove16Bounds": [
+        13,
+        11,
+        375,
+        472
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 2,
+      "alphaAbove16Bounds": [
+        14,
+        10,
+        376,
+        472
+      ],
+      "alphaRange": [
+        0,
+        254
+      ]
+    },
+    {
+      "frame": 3,
+      "alphaAbove16Bounds": [
+        17,
+        6,
+        375,
+        472
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 4,
+      "alphaAbove16Bounds": [
+        16,
+        8,
+        375,
+        472
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 5,
+      "alphaAbove16Bounds": [
+        15,
+        14,
+        375,
+        472
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 6,
+      "alphaAbove16Bounds": [
+        13,
+        21,
+        375,
+        472
+      ],
+      "alphaRange": [
+        0,
+        254
+      ]
+    },
+    {
+      "frame": 7,
+      "alphaAbove16Bounds": [
+        13,
+        22,
+        375,
+        472
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    }
+  ],
+  "runtimeOwner": "KagutsuchiAI / KagutsuchiBackFireFx",
+  "runtimeFps": 12.5,
+  "runtimeHeightRatio": 1.25,
+  "runtimeVisualValuesStatus": "provisional: preview fps and 125 percent body height",
+  "runtimeSortingOffset": -2,
+  "runtimePhase": 1
+}

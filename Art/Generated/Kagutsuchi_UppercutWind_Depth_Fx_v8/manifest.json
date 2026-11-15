@@ -1,0 +1,248 @@
+{
+  "usageStatus": "제작본·연결 대기",
+  "runtimeConnected": false,
+  "revision": "전방 작은 바람 파편 대폭 증가",
+  "backPixelIdenticalTo": "v7 all6frames",
+  "frames": 6,
+  "columns": 6,
+  "rows": 1,
+  "cell": [
+    512,
+    768
+  ],
+  "sheet": [
+    3072,
+    768
+  ],
+  "groundAnchor": [
+    256,
+    652
+  ],
+  "layerOrder": [
+    "Back",
+    "Boss",
+    "Front"
+  ],
+  "previewFps": 12,
+  "previewTiming": "임시 검수용",
+  "uniformFrontSourceScale": 1.3,
+  "anchors": [
+    {
+      "frame": 0,
+      "sourceGround": [
+        254.5036931010003,
+        423
+      ],
+      "placement": [
+        43,
+        504
+      ]
+    },
+    {
+      "frame": 1,
+      "sourceGround": [
+        230.3657728491491,
+        424
+      ],
+      "placement": [
+        72,
+        294
+      ]
+    },
+    {
+      "frame": 2,
+      "sourceGround": [
+        250.1838857706068,
+        423
+      ],
+      "placement": [
+        36,
+        250
+      ]
+    },
+    {
+      "frame": 3,
+      "sourceGround": [
+        261.73409146424905,
+        412
+      ],
+      "placement": [
+        47,
+        163
+      ]
+    },
+    {
+      "frame": 4,
+      "sourceGround": [
+        234.74140476463523,
+        414
+      ],
+      "placement": [
+        63,
+        193
+      ]
+    },
+    {
+      "frame": 5,
+      "sourceGround": [
+        219.1480021604879,
+        407
+      ],
+      "placement": [
+        82,
+        294
+      ]
+    }
+  ],
+  "alphaCleanup": {
+    "floor": 16,
+    "edge_px": 2,
+    "pixels": 1572864,
+    "faint_fraction_before": 0.43813196818033856,
+    "faint_fraction_after": 0.042989095052083336,
+    "haze_fraction_before": 0.3951428731282552,
+    "haze_fraction_after": 0.0,
+    "cleared_pixels": 621506,
+    "changed_solid_pixels": 0,
+    "changed_edge_pixels": 0
+  },
+  "qa": {
+    "Back": [
+      {
+        "frame": 0,
+        "visiblePixels": 22340,
+        "bbox": [
+          40,
+          531,
+          467,
+          660
+        ],
+        "centralMeanAlpha": 13.23422987616099
+      },
+      {
+        "frame": 1,
+        "visiblePixels": 50300,
+        "bbox": [
+          36,
+          380,
+          490,
+          660
+        ],
+        "centralMeanAlpha": 93.45584365325077
+      },
+      {
+        "frame": 2,
+        "visiblePixels": 84097,
+        "bbox": [
+          46,
+          205,
+          478,
+          661
+        ],
+        "centralMeanAlpha": 172.96635061919505
+      },
+      {
+        "frame": 3,
+        "visiblePixels": 98709,
+        "bbox": [
+          38,
+          198,
+          494,
+          660
+        ],
+        "centralMeanAlpha": 192.69293730650153
+      },
+      {
+        "frame": 4,
+        "visiblePixels": 50160,
+        "bbox": [
+          43,
+          210,
+          495,
+          660
+        ],
+        "centralMeanAlpha": 74.96091331269349
+      },
+      {
+        "frame": 5,
+        "visiblePixels": 14237,
+        "bbox": [
+          65,
+          392,
+          480,
+          661
+        ],
+        "centralMeanAlpha": 9.110178018575851
+      }
+    ],
+    "Front": [
+      {
+        "frame": 0,
+        "visiblePixels": 20532,
+        "bbox": [
+          44,
+          505,
+          488,
+          663
+        ],
+        "centralMeanAlpha": 4.769407894736842
+      },
+      {
+        "frame": 1,
+        "visiblePixels": 35731,
+        "bbox": [
+          73,
+          295,
+          496,
+          662
+        ],
+        "centralMeanAlpha": 13.297232972136223
+      },
+      {
+        "frame": 2,
+        "visiblePixels": 54189,
+        "bbox": [
+          37,
+          251,
+          460,
+          662
+        ],
+        "centralMeanAlpha": 21.984810371517028
+      },
+      {
+        "frame": 3,
+        "visiblePixels": 66289,
+        "bbox": [
+          48,
+          164,
+          496,
+          662
+        ],
+        "centralMeanAlpha": 28.01437693498452
+      },
+      {
+        "frame": 4,
+        "visiblePixels": 54882,
+        "bbox": [
+          64,
+          194,
+          498,
+          663
+        ],
+        "centralMeanAlpha": 20.6625
+      },
+      {
+        "frame": 5,
+        "visiblePixels": 13000,
+        "bbox": [
+          83,
+          295,
+          471,
+          662
+        ],
+        "centralMeanAlpha": 4.207275541795665
+      }
+    ]
+  },
+  "postprocessing": "Front native3x2 extraction, engine alpha-floor cleanup, uniform scale and measured ground anchors; back unchanged."
+}

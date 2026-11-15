@@ -1,0 +1,128 @@
+{
+  "ok": true,
+  "engine": "component-row",
+  "engine_revision": "db8ab1c245df",
+  "extract_args": {
+    "decontam": "off",
+    "segmentation": "projection"
+  },
+  "run_dir": "C:\\Users\\hanho\\.codex\\visualizations\\2026\\11\\14\\01a1d824-c400-7441-a07e-917bf0593926\\uppercut-wind-v2",
+  "cell": {
+    "shape": "rect",
+    "width": 512,
+    "height": 768,
+    "safe_margin_x": 24,
+    "safe_margin_y": 24
+  },
+  "chroma_key": {
+    "name": "magenta",
+    "hex": "#FF00FF",
+    "rgb": [
+      255,
+      0,
+      255
+    ],
+    "selection": "fallback",
+    "background": {
+      "mode": "absent"
+    },
+    "selection_reason": "no base reference to sample"
+  },
+  "rows": [
+    {
+      "state": "uppercut",
+      "frames": 6,
+      "method": "components",
+      "files": [
+        "frames/uppercut/frame-0.png",
+        "frames/uppercut/frame-1.png",
+        "frames/uppercut/frame-2.png",
+        "frames/uppercut/frame-3.png",
+        "frames/uppercut/frame-4.png",
+        "frames/uppercut/frame-5.png"
+      ],
+      "frame_records": [
+        {
+          "index": 0,
+          "nontransparent_pixels": 9678,
+          "bbox": [
+            155,
+            647,
+            351,
+            744
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "nontransparent_pixels": 31300,
+          "bbox": [
+            99,
+            501,
+            410,
+            744
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "nontransparent_pixels": 64639,
+          "bbox": [
+            63,
+            365,
+            448,
+            744
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "nontransparent_pixels": 89085,
+          "bbox": [
+            72,
+            272,
+            454,
+            744
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "nontransparent_pixels": 24688,
+          "bbox": [
+            103,
+            473,
+            421,
+            744
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "nontransparent_pixels": 4903,
+          "bbox": [
+            130,
+            660,
+            382,
+            744
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ],
+      "ok": true,
+      "engine_revision": "db8ab1c245df"
+    }
+  ],
+  "errors": [],
+  "warnings": [
+    "uppercut: frame 00 is much smaller than median (9678 vs 27994)",
+    "uppercut: frame 03 is much larger than median (89085 vs 27994)",
+    "uppercut: frame 05 is much smaller than median (4903 vs 27994)"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "Kagutsuchi_UppercutWind",
+    "description": "Ground-origin spiraling wind uppercut rising vertically, exploding at apex, dissipating. Six distinct sequential frames, no character, no fire.",
+    "base_image": null
+  },
+  "cell": {
+    "shape": "rect",
+    "width": 384,
+    "height": 768,
+    "safe_margin_x": 24,
+    "safe_margin_y": 24
+  },
+  "chroma_key": {
+    "name": "magenta",
+    "hex": "#FF00FF",
+    "rgb": [
+      255,
+      0,
+      255
+    ],
+    "selection": "fallback",
+    "background": {
+      "mode": "absent"
+    },
+    "selection_reason": "no base reference to sample"
+  },
+  "states": {
+    "uppercut": {
+      "frames": 6,
+      "fps": 12,
+      "loop": true,
+      "action": "uppercut"
+    }
+  },
+  "style": "smooth hand-painted anime game combat VFX, ivory white and pale cool gray translucent wind",
+  "subject": "effect",
+  "layout": "taxonomy/v1",
+  "fit": {
+    "align_y": "center",
+    "ground_frames": false,
+    "pixel_unfake": false
+  },
+  "chroma": {
+    "mode": "rgb",
+    "unmix_reach": 4,
+    "spill_max_fraction": 0.005
+  }
+}

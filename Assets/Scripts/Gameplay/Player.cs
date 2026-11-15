@@ -79,7 +79,9 @@ public class Player : MonoBehaviour
     object bossHoldOwner;
     GameObject bossHoldVisual;
     SpriteRenderer bossHoldRenderer;
-    bool beforeHoldEnabled;
+    bool beforeHoldEnabled, bossHoldProne;
+    Facing4? bossHoldFacing;
+    const float BossHoldProneRotation = -90f; // 사용자: 왼쪽 보기=시계방향90도, 오른쪽 보기=반시계방향90도.
     float bossHoldHeight;
     Vector2 bossHoldVisualOffset;
     float bossHoldOffsetWeight = 1f;
@@ -103,6 +105,8 @@ public class Player : MonoBehaviour
         if (owner == null || bossHoldOwner != null || hp <= 0f || DebugCheats.God || IsInvulnerable
             || GameManager.I == null || GameManager.I.State != GameState.Playing) return false;
         bossHoldOwner = owner;
+        bossHoldProne = false;
+        bossHoldFacing = null;
         bossHoldVisualOffset = Vector2.zero;
         bossHoldOffsetWeight = 1f;
         bossMoveLeft = 0f;
@@ -139,6 +143,22 @@ public class Player : MonoBehaviour
         UpdateBossHoldVisual();
     }
 
+    /// <summary>잡기 소유자가 표시 방향을 지정한다. 원본 Facing/애니메이터 상태는 유지.</summary>
+    public void SetBossHoldFacing(object owner, bool faceRight)
+    {
+        if (!IsHeldByBoss(owner)) return;
+        bossHoldFacing = faceRight ? Facing4.Right : Facing4.Left;
+        UpdateBossHoldVisual();
+    }
+
+    /// <summary>홀드 표시를 눕히고 표시 방향에 따라 수평으로 마주 보게 한다.</summary>
+    public void SetBossHoldProne(object owner, bool prone)
+    {
+        if (!IsHeldByBoss(owner)) return;
+        bossHoldProne = prone;
+        UpdateBossHoldVisual();
+    }
+
     public void SetBossHoldOffsetWeight(object owner, float weight)
     {
         if (!IsHeldByBoss(owner)) return;
@@ -157,6 +177,8 @@ public class Player : MonoBehaviour
     {
         if (!IsHeldByBoss(owner)) return;
         bossHoldOwner = null;
+        bossHoldProne = false;
+        bossHoldFacing = null;
         bossHoldHeight = 0f;
         bossHoldVisualOffset = Vector2.zero;
         bossHoldOffsetWeight = 1f;
@@ -169,10 +191,16 @@ public class Player : MonoBehaviour
     void UpdateBossHoldVisual()
     {
         if (bossHoldRenderer == null || sr == null) return;
-        bossHoldRenderer.sprite = sr.sprite;
+        bool overrideFacing = bossHoldFacing.HasValue || bossHoldProne;
+        Facing4 heldFacing = bossHoldFacing ?? Facing4.Left;
+        var heldSprite = overrideFacing && anim != null ? anim.GetIdleFrame(heldFacing) : null;
+        bossHoldRenderer.sprite = heldSprite != null ? heldSprite : sr.sprite;
         bossHoldRenderer.color = sr.color;
-        bossHoldRenderer.flipX = sr.flipX;
-        bossHoldRenderer.flipY = sr.flipY;
+        bossHoldRenderer.flipX = overrideFacing ? anim == null && heldFacing == Facing4.Left : sr.flipX;
+        bossHoldRenderer.flipY = overrideFacing ? false : sr.flipY;
+        // 반대 방향에서는 원화 방향과 회전 부호를 함께 바꿔 누운 결과도 좌우 반전.
+        float proneRotation = heldFacing == Facing4.Left ? BossHoldProneRotation : -BossHoldProneRotation;
+        bossHoldVisual.transform.localRotation = Quaternion.Euler(0f, 0f, bossHoldProne ? proneRotation : 0f);
         bossHoldVisual.transform.localPosition = Vector3.up * (bossHoldHeight / Mathf.Max(0.0001f, Mathf.Abs(transform.lossyScale.y)))
             + transform.InverseTransformVector((Vector3)(bossHoldVisualOffset * bossHoldOffsetWeight));
     }

@@ -1,0 +1,126 @@
+{
+  "version": 2,
+  "usageStatus": "제작본·연결 대기",
+  "runtimeConnected": false,
+  "frames": 6,
+  "columns": 6,
+  "rows": 1,
+  "cell": [
+    512,
+    768
+  ],
+  "sheet": [
+    3072,
+    768
+  ],
+  "previewFps": 12,
+  "previewTiming": "임시 검수용",
+  "sourceSize": [
+    2172,
+    724
+  ],
+  "scale": 0.994475138121547,
+  "groundAnchorApprox": [
+    256,
+    646
+  ],
+  "records": [
+    {
+      "frame": 0,
+      "sourceRange": [
+        0,
+        296
+      ],
+      "bbox": [
+        157,
+        555,
+        355,
+        655
+      ],
+      "visiblePixels": 9558
+    },
+    {
+      "frame": 1,
+      "sourceRange": [
+        296,
+        664
+      ],
+      "bbox": [
+        101,
+        411,
+        413,
+        655
+      ],
+      "visiblePixels": 30799
+    },
+    {
+      "frame": 2,
+      "sourceRange": [
+        664,
+        1072
+      ],
+      "bbox": [
+        64,
+        275,
+        449,
+        656
+      ],
+      "visiblePixels": 63936
+    },
+    {
+      "frame": 3,
+      "sourceRange": [
+        1072,
+        1484
+      ],
+      "bbox": [
+        66,
+        183,
+        447,
+        655
+      ],
+      "visiblePixels": 87962
+    },
+    {
+      "frame": 4,
+      "sourceRange": [
+        1484,
+        1824
+      ],
+      "bbox": [
+        97,
+        193,
+        414,
+        656
+      ],
+      "visiblePixels": 34767
+    },
+    {
+      "frame": 5,
+      "sourceRange": [
+        1824,
+        2172
+      ],
+      "bbox": [
+        128,
+        234,
+        395,
+        655
+      ],
+      "visiblePixels": 6270
+    }
+  ],
+  "alphaCleanup": {
+    "floor": 64,
+    "edge_px": 2,
+    "pixels": 1572528,
+    "faint_fraction_before": 0.1899362046335582,
+    "faint_fraction_after": 0.02199452092426971,
+    "haze_fraction_before": 0.16794168370928847,
+    "haze_fraction_after": 0.0,
+    "cleared_pixels": 264093,
+    "changed_solid_pixels": 0,
+    "changed_edge_pixels": 0
+  },
+  "manualCorrection": "Restored intentional detached wind arcs removed by canonical extractor (13 satellite components), using engine-measured projection boundaries, uniform scale and common ground-band anchor. Automatic frames retained for comparison."
+}

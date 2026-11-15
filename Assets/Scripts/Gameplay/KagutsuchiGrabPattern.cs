@@ -14,6 +14,7 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
     const float PlayerRiseHeight = 10f, PlayerRiseTime = 2f;
     const float UppercutPoseTime = 1f, BossRiseTime = 0.5f, BossHeightAbovePlayer = 2.5f;
     const float FallTime = 0.1f, SlamPoseTime = 1f, KickPrepareTime = 1f, KickPoseTime = 1f;
+    const float LiftTime = 0.1f; // 사용자: 눕힌 후 끌어올림 이동 시간.
     const float ThrowTime = 0.1f; // [임시] 사용자 지정 맵 끝 이동 시간
     const float DamagePerHit = 10f; // [임시] 사용자 지정 각 단계 피해
     const float ThrowStun = 2f, UppercutShakeTime = 0.2f, SlamShakeTime = 0.5f;
@@ -79,8 +80,9 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
 
     void LateUpdate()
     {
-        if (step == Step.Slam && player != null && player.IsHeldByBoss(this))
-            alignStompFoot(StompFootBottom);
+        if (player == null || !player.IsHeldByBoss(this)) return;
+        player.SetBossHoldFacing(this, !bodyVisual.flipX);
+        if (step == Step.Slam) alignStompFoot(StompFootBottom);
     }
 
     public Vector2 Tick(float dt)
@@ -108,6 +110,7 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
                 {
                     step = Step.Uppercut; elapsed = 0f;
                     showPose(uppercut, 0f);
+                    body.GetComponent<KagutsuchiUppercutFx>()?.Play(body.transform.position, bodyVisual.flipX);
                     CameraFollow.Shake(UppercutShakeTime, ShakeAmplitude);
                     player.TakeDamage(DamagePerHit);
                 }
@@ -134,11 +137,11 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
                 break;
             case Step.Slam:
                 if (elapsed >= SlamPoseTime)
-                { step = Step.KickPrepare; elapsed = 0f; showPose(stompReady, 0f); }
+                { step = Step.KickPrepare; elapsed = 0f; player.SetBossHoldProne(this, false); showPose(stompReady, 0f); }
                 break;
             case Step.KickPrepare:
-                // 발 아래 표시 보정은 기존 발차기 준비 시간 동안 복구한다.
-                player.SetBossHoldOffsetWeight(this, 1f - Mathf.Clamp01(elapsed / KickPrepareTime));
+                // 끌어올림만0.1초에 완료하고 나머지 발차기 준비 시간은 유지.
+                player.SetBossHoldOffsetWeight(this, 1f - Mathf.Clamp01(elapsed / LiftTime));
                 if (elapsed >= KickPrepareTime) BeginKick();
                 break;
             case Step.Kick:
@@ -226,6 +229,7 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
         ClearWarning();
         step = Step.Hold; elapsed = 0f;
         showPose(ready, 0f);
+        player.SetBossHoldFacing(this, !bodyVisual.flipX);
         CameraFollow.BeginOutsideMapFollow(this, cameraTarget(), GrabCameraMagnification);
         player.TakeDamage(DamagePerHit);
         if (player.hp <= 0f) Cancel();
@@ -236,6 +240,7 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
     {
         step = Step.Kick; elapsed = 0f;
         showPose(kick, 0f);
+        body.GetComponent<KagutsuchiSonicBoomFx>()?.Play(body.transform.position, bodyVisual.flipX);
         player.SetBossHoldHeight(this, 0f);
         throwStart = player.transform.position;
         Vector2 away = player.HurtCenter - (Vector2)body.transform.position;

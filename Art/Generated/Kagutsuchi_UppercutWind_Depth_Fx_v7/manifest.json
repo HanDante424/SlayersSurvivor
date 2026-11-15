@@ -1,0 +1,272 @@
+{
+  "usageStatus": "제작본·연결 대기",
+  "runtimeConnected": false,
+  "revision": "후방 전체 신규 제작; 얇은 바람결이 겹치는 상승 폭풍, 흐름 자체가 위로 풀리는 피크",
+  "frontPixelIdenticalTo": "v6 all6frames",
+  "frames": 6,
+  "columns": 6,
+  "rows": 1,
+  "cell": [
+    512,
+    768
+  ],
+  "sheet": [
+    3072,
+    768
+  ],
+  "groundAnchor": [
+    256,
+    652
+  ],
+  "layerOrder": [
+    "Back",
+    "Boss",
+    "Front"
+  ],
+  "previewFps": 12,
+  "previewTiming": "임시 검수용",
+  "uniformBackSourceScale": 1.7,
+  "anchors": [
+    {
+      "frame": 0,
+      "sourceVisibleBBox": [
+        148,
+        334,
+        399,
+        410
+      ],
+      "sourceGround": [
+        275.11572050515696,
+        405
+      ],
+      "placement": [
+        40,
+        531
+      ]
+    },
+    {
+      "frame": 1,
+      "sourceVisibleBBox": [
+        119,
+        245,
+        386,
+        410
+      ],
+      "sourceGround": [
+        248.37113072918635,
+        405
+      ],
+      "placement": [
+        36,
+        380
+      ]
+    },
+    {
+      "frame": 2,
+      "sourceVisibleBBox": [
+        106,
+        142,
+        360,
+        410
+      ],
+      "sourceGround": [
+        229.25136268714826,
+        405
+      ],
+      "placement": [
+        46,
+        205
+      ]
+    },
+    {
+      "frame": 3,
+      "sourceVisibleBBox": [
+        145,
+        110,
+        413,
+        382
+      ],
+      "sourceGround": [
+        273.23650483362036,
+        377
+      ],
+      "placement": [
+        38,
+        198
+      ]
+    },
+    {
+      "frame": 4,
+      "sourceVisibleBBox": [
+        121,
+        116,
+        387,
+        381
+      ],
+      "sourceGround": [
+        246.54852051647597,
+        376
+      ],
+      "placement": [
+        43,
+        210
+      ]
+    },
+    {
+      "frame": 5,
+      "sourceVisibleBBox": [
+        114,
+        224,
+        358,
+        382
+      ],
+      "sourceGround": [
+        226.15299495984092,
+        377
+      ],
+      "placement": [
+        65,
+        392
+      ]
+    }
+  ],
+  "alphaCleanup": {
+    "floor": 64,
+    "edge_px": 2,
+    "pixels": 1572864,
+    "faint_fraction_before": 0.15287208557128906,
+    "faint_fraction_after": 0.023581822713216145,
+    "haze_fraction_before": 0.1292902628580729,
+    "haze_fraction_after": 0.0,
+    "cleared_pixels": 203356,
+    "changed_solid_pixels": 0,
+    "changed_edge_pixels": 0
+  },
+  "qa": {
+    "Back": [
+      {
+        "frame": 0,
+        "visiblePixels": 22340,
+        "bbox": [
+          40,
+          531,
+          467,
+          660
+        ]
+      },
+      {
+        "frame": 1,
+        "visiblePixels": 50300,
+        "bbox": [
+          36,
+          380,
+          490,
+          660
+        ]
+      },
+      {
+        "frame": 2,
+        "visiblePixels": 84097,
+        "bbox": [
+          46,
+          205,
+          478,
+          661
+        ]
+      },
+      {
+        "frame": 3,
+        "visiblePixels": 98709,
+        "bbox": [
+          38,
+          198,
+          494,
+          660
+        ]
+      },
+      {
+        "frame": 4,
+        "visiblePixels": 50160,
+        "bbox": [
+          43,
+          210,
+          495,
+          660
+        ]
+      },
+      {
+        "frame": 5,
+        "visiblePixels": 14237,
+        "bbox": [
+          65,
+          392,
+          480,
+          661
+        ]
+      }
+    ],
+    "Front": [
+      {
+        "frame": 0,
+        "visiblePixels": 11246,
+        "bbox": [
+          84,
+          542,
+          421,
+          666
+        ]
+      },
+      {
+        "frame": 1,
+        "visiblePixels": 15628,
+        "bbox": [
+          70,
+          310,
+          433,
+          665
+        ]
+      },
+      {
+        "frame": 2,
+        "visiblePixels": 24958,
+        "bbox": [
+          80,
+          255,
+          459,
+          665
+        ]
+      },
+      {
+        "frame": 3,
+        "visiblePixels": 24523,
+        "bbox": [
+          80,
+          206,
+          504,
+          662
+        ]
+      },
+      {
+        "frame": 4,
+        "visiblePixels": 24620,
+        "bbox": [
+          118,
+          252,
+          497,
+          666
+        ]
+      },
+      {
+        "frame": 5,
+        "visiblePixels": 4533,
+        "bbox": [
+          158,
+          357,
+          453,
+          662
+        ]
+      }
+    ]
+  },
+  "postprocessing": "Native3x2 frame extraction; engine alpha-floor cleanup; one uniform scale and measured ground-ribbon anchors. Front unchanged."
+}

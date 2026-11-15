@@ -1,0 +1,263 @@
+{
+  "usageStatus": "사용 중",
+  "runtimeConnected": true,
+  "revision": "전방을 후방의 섬세한 바람결·색감·나선 흐름에 맞춤, 큰 덩어리는 짧은 바람 조각으로 분리",
+  "backPixelIdenticalTo": "v8/v7 all6frames",
+  "frames": 6,
+  "columns": 6,
+  "rows": 1,
+  "cell": [
+    512,
+    768
+  ],
+  "sheet": [
+    3072,
+    768
+  ],
+  "groundAnchor": [
+    256,
+    652
+  ],
+  "layerOrder": [
+    "Back",
+    "Boss",
+    "Front"
+  ],
+  "previewFps": 12,
+  "previewTiming": "임시 검수용",
+  "uniformFrontSourceScale": 1.2,
+  "anchors": [
+    {
+      "frame": 0,
+      "sourceGround": [
+        223.1732363746217,
+        427
+      ],
+      "placement": [
+        70,
+        542
+      ]
+    },
+    {
+      "frame": 1,
+      "sourceGround": [
+        237.8030089293505,
+        427
+      ],
+      "placement": [
+        67,
+        350
+      ]
+    },
+    {
+      "frame": 2,
+      "sourceGround": [
+        214.33839061570436,
+        427
+      ],
+      "placement": [
+        73,
+        213
+      ]
+    },
+    {
+      "frame": 3,
+      "sourceGround": [
+        250.76589102442625,
+        423
+      ],
+      "placement": [
+        73,
+        198
+      ]
+    },
+    {
+      "frame": 4,
+      "sourceGround": [
+        230.67316499734994,
+        422
+      ],
+      "placement": [
+        64,
+        212
+      ]
+    },
+    {
+      "frame": 5,
+      "sourceGround": [
+        209.0724475613124,
+        422
+      ],
+      "placement": [
+        76,
+        365
+      ]
+    }
+  ],
+  "alphaCleanup": {
+    "floor": 16,
+    "edge_px": 2,
+    "pixels": 1572864,
+    "faint_fraction_before": 0.2023951212565104,
+    "faint_fraction_after": 0.03565661112467448,
+    "haze_fraction_before": 0.16673851013183594,
+    "haze_fraction_after": 0.0,
+    "cleared_pixels": 262257,
+    "changed_solid_pixels": 0,
+    "changed_edge_pixels": 0
+  },
+  "qa": {
+    "Back": [
+      {
+        "frame": 0,
+        "visiblePixels": 22340,
+        "bbox": [
+          40,
+          531,
+          467,
+          660
+        ],
+        "centralMeanAlpha": 13.23422987616099
+      },
+      {
+        "frame": 1,
+        "visiblePixels": 50300,
+        "bbox": [
+          36,
+          380,
+          490,
+          660
+        ],
+        "centralMeanAlpha": 93.45584365325077
+      },
+      {
+        "frame": 2,
+        "visiblePixels": 84097,
+        "bbox": [
+          46,
+          205,
+          478,
+          661
+        ],
+        "centralMeanAlpha": 172.96635061919505
+      },
+      {
+        "frame": 3,
+        "visiblePixels": 98709,
+        "bbox": [
+          38,
+          198,
+          494,
+          660
+        ],
+        "centralMeanAlpha": 192.69293730650153
+      },
+      {
+        "frame": 4,
+        "visiblePixels": 50160,
+        "bbox": [
+          43,
+          210,
+          495,
+          660
+        ],
+        "centralMeanAlpha": 74.96091331269349
+      },
+      {
+        "frame": 5,
+        "visiblePixels": 14237,
+        "bbox": [
+          65,
+          392,
+          480,
+          661
+        ],
+        "centralMeanAlpha": 9.110178018575851
+      }
+    ],
+    "Front": [
+      {
+        "frame": 0,
+        "visiblePixels": 12437,
+        "bbox": [
+          71,
+          543,
+          479,
+          662
+        ],
+        "centralMeanAlpha": 2.451064241486068
+      },
+      {
+        "frame": 1,
+        "visiblePixels": 21902,
+        "bbox": [
+          68,
+          351,
+          469,
+          662
+        ],
+        "centralMeanAlpha": 14.508068885448916
+      },
+      {
+        "frame": 2,
+        "visiblePixels": 30396,
+        "bbox": [
+          74,
+          214,
+          497,
+          662
+        ],
+        "centralMeanAlpha": 23.90514705882353
+      },
+      {
+        "frame": 3,
+        "visiblePixels": 30263,
+        "bbox": [
+          74,
+          199,
+          493,
+          661
+        ],
+        "centralMeanAlpha": 22.304315015479876
+      },
+      {
+        "frame": 4,
+        "visiblePixels": 21070,
+        "bbox": [
+          65,
+          213,
+          466,
+          662
+        ],
+        "centralMeanAlpha": 14.528076625386998
+      },
+      {
+        "frame": 5,
+        "visiblePixels": 7370,
+        "bbox": [
+          77,
+          366,
+          469,
+          662
+        ],
+        "centralMeanAlpha": 3.807217492260062
+      }
+    ]
+  },
+  "postprocessing": "Front native3x2 extraction, engine alpha-floor cleanup, uniform scale and measured ground anchors; back unchanged.",
+  "runtimeDurationSeconds": 0.5,
+  "runtimeFramesPerSecond": 12,
+  "runtimeBossHeightReferencePixels": 420,
+  "runtimeGroundPixelY": 652,
+  "runtimeSortOffsets": {
+    "back": -2,
+    "front": 1
+  },
+  "runtimeHooks": [
+    "공격3 Uppercut",
+    "공격5 ComboUppercut",
+    "잡기6 Uppercut",
+    "잡기7 Uppercut"
+  ],
+  "runtimeVisualScale": 3
+}

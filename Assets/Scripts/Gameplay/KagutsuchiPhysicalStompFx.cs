@@ -1,69 +1,109 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-/// <summary>2페이즈 실행기 소유 지면 충격 표시. 재생 슬롯 재사용, 전투 판정 없음.</summary>
+/// <summary>2페이즈 지면 충격의 뒤/앞 동기 표시. 실행기 소유 슬롯 재사용, 전투 판정 없음.</summary>
 public sealed class KagutsuchiPhysicalStompFx : MonoBehaviour
 {
-    const int FrameCount = 6, CellWidth = 512, CellHeight = 256, SortingOrder = 2;
-    const float VisibleWidth = 383f, Fps = 12f; // [임시] 원화 미리보기 속도, 0.5초 한 번 재생.
-    sealed class Slot { public SpriteRenderer Visual; public float Age; public bool Active; }
+    const int FrameCount = 6, Columns = 3, Rows = 2, CellWidth = 512, CellHeight = 256;
+    const float VisibleWidth = 491f; // 새 원화6프레임 alpha>16 최대 가시폭. 기존 판정 지름에 표시 폭을 맞춤.
+    const float Fps = 12f; // [임시] 기존 스톰프의0.5초 재생 유지.
+    const float VerticalOffset = -1.5f; // 사용자: 기존 Y-2.5 위치에서 1 올림.
+    sealed class Slot
+    {
+        public GameObject Root;
+        public SpriteRenderer Back, Front;
+        public float Age;
+        public bool Active;
+    }
     readonly List<Slot> slots = new List<Slot>();
-    Sprite[] frames;
+    Sprite[] backFrames, frontFrames;
+    SpriteRenderer bodyVisual;
 
     void Awake()
     {
-        var texture = Resources.Load<Texture2D>("Sprites/Kagutsuchi_P2_Fx_PhysicalStomp");
-        if (texture == null || texture.width != CellWidth * FrameCount || texture.height != CellHeight) return;
-        frames = new Sprite[FrameCount];
+        bodyVisual = GetComponent<SpriteRenderer>();
+        var back = Resources.Load<Texture2D>("Sprites/Kagutsuchi_P2_Fx_PhysicalStompDepth_Back");
+        var front = Resources.Load<Texture2D>("Sprites/Kagutsuchi_P2_Fx_PhysicalStompDepth_Front");
+        if (back == null || front == null || back.width != Columns * CellWidth || front.width != Columns * CellWidth
+            || back.height != Rows * CellHeight || front.height != Rows * CellHeight)
+        {
+            Debug.LogError("앞뒤 분리용 스톰프 시트가 없거나 각1536×512 규격과 다릅니다.");
+            return;
+        }
+        backFrames = new Sprite[FrameCount];
+        frontFrames = new Sprite[FrameCount];
         for (int i = 0; i < FrameCount; i++)
-            frames[i] = Sprite.Create(texture, new Rect(i * CellWidth, 0f, CellWidth, CellHeight),
-                                      new Vector2(0.5f, 0.5f), VisibleWidth, 0, SpriteMeshType.FullRect);
+        {
+            var rect = new Rect(i % Columns * CellWidth, (Rows - 1 - i / Columns) * CellHeight, CellWidth, CellHeight);
+            // 절단선이 공통 지면 원점에 정확히 만남: 뒤는 아래쪽 피벗, 앞은 위쪽 피벗.
+            backFrames[i] = Sprite.Create(back, rect, new Vector2(0.5f, 0f), VisibleWidth, 0, SpriteMeshType.FullRect);
+            frontFrames[i] = Sprite.Create(front, rect, new Vector2(0.5f, 1f), VisibleWidth, 0, SpriteMeshType.FullRect);
+        }
     }
 
     public void Play(Vector2 ground, float radius)
     {
-        if (frames == null || radius <= 0f) return;
+        if (backFrames == null || bodyVisual == null || radius <= 0f) return;
         Slot slot = slots.Find(item => !item.Active);
         if (slot == null)
         {
-            var go = new GameObject("PhysicalStompImpact");
-            slot = new Slot { Visual = go.AddComponent<SpriteRenderer>() };
-            slot.Visual.sortingOrder = SortingOrder;
+            var root = new GameObject("PhysicalStompImpact");
+            slot = new Slot { Root = root };
+            var back = new GameObject("BackDust");
+            back.transform.SetParent(root.transform, false);
+            slot.Back = back.AddComponent<SpriteRenderer>();
+            var front = new GameObject("FrontDust");
+            front.transform.SetParent(root.transform, false);
+            slot.Front = front.AddComponent<SpriteRenderer>();
             slots.Add(slot);
         }
-        slot.Age = 0f;
-        slot.Active = true;
-        slot.Visual.transform.position = ground;
-        slot.Visual.transform.rotation = Quaternion.identity;
-        slot.Visual.transform.localScale = Vector3.one * (radius * 2f);
-        slot.Visual.color = Color.white;
-        slot.Visual.sprite = frames[0];
-        slot.Visual.gameObject.SetActive(true);
+        slot.Age = 0f; slot.Active = true;
+        slot.Root.transform.position = ground + Vector2.up * VerticalOffset;
+        slot.Root.transform.rotation = Quaternion.identity;
+        slot.Root.transform.localScale = Vector3.one * (radius * 2f);
+        slot.Back.sortingLayerID = slot.Front.sortingLayerID = bodyVisual.sortingLayerID;
+        slot.Back.sortingOrder = bodyVisual.sortingOrder - 2; // 보스 외곽선보다도 뒤.
+        slot.Front.sortingOrder = bodyVisual.sortingOrder + 1;
+        slot.Back.color = slot.Front.color = Color.white;
+        slot.Back.flipX = slot.Front.flipX = false;
+        slot.Back.flipY = slot.Front.flipY = false;
+        SetFrame(slot, 0);
+        slot.Root.SetActive(true);
+    }
+
+    void SetFrame(Slot slot, int frame)
+    {
+        slot.Back.sprite = backFrames[frame];
+        slot.Front.sprite = frontFrames[frame];
     }
 
     void Update()
     {
-        if (GameManager.I == null || GameManager.I.State != GameState.Playing) return;
+        if (GameManager.I == null) return;
+        if (GameManager.I.State == GameState.GameOver || GameManager.I.State == GameState.Victory) { Clear(); return; }
+        if (GameManager.I.State != GameState.Playing) return;
         foreach (var slot in slots)
         {
             if (!slot.Active) continue;
             slot.Age += Time.deltaTime;
             int frame = (int)(slot.Age * Fps);
-            if (frame >= FrameCount) { slot.Active = false; slot.Visual.gameObject.SetActive(false); }
-            else slot.Visual.sprite = frames[frame];
+            if (frame >= FrameCount) { slot.Active = false; slot.Root.SetActive(false); }
+            else SetFrame(slot, frame);
         }
     }
 
     public void Clear()
     {
         foreach (var slot in slots)
-        { slot.Active = false; slot.Age = 0f; if (slot.Visual != null) slot.Visual.gameObject.SetActive(false); }
+        { slot.Active = false; slot.Age = 0f; if (slot.Root != null) slot.Root.SetActive(false); }
     }
     void OnDisable() => Clear();
     void OnDestroy()
     {
-        foreach (var slot in slots) if (slot.Visual != null) Destroy(slot.Visual.gameObject);
+        Clear();
+        foreach (var slot in slots) if (slot.Root != null) Destroy(slot.Root);
         slots.Clear();
-        if (frames != null) foreach (var frame in frames) if (frame != null) Destroy(frame);
+        if (backFrames != null) foreach (var frame in backFrames) if (frame != null) Destroy(frame);
+        if (frontFrames != null) foreach (var frame in frontFrames) if (frame != null) Destroy(frame);
     }
 }

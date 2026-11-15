@@ -1,0 +1,93 @@
+{
+  "frames": 6,
+  "cell": [
+    384,
+    768
+  ],
+  "sheet": [
+    2304,
+    768
+  ],
+  "runtimeConnected": false,
+  "status": "제작본·연결 대기",
+  "previewFps": 12,
+  "previewTiming": "임시 검수용, 실제 게임 재생시간 미확정",
+  "groundAnchor": [
+    192,
+    701
+  ],
+  "sourceProjectionBoundaries": [
+    0,
+    384,
+    758,
+    1066,
+    1458,
+    1822,
+    2172
+  ],
+  "uniformSourceScale": 0.8571428571428571,
+  "manualCorrection": "Canonical extractor removed 19 intentional disconnected wind components and centered phases. Restored original alpha using its measured projection boundaries and one uniform scale/common vertical origin. Canonical output retained as comparison.",
+  "checks": [
+    {
+      "frame": 0,
+      "visiblePixels": 8796,
+      "alphaBBox": [
+        88,
+        599,
+        271,
+        703
+      ]
+    },
+    {
+      "frame": 1,
+      "visiblePixels": 21224,
+      "alphaBBox": [
+        70,
+        449,
+        268,
+        703
+      ]
+    },
+    {
+      "frame": 2,
+      "visiblePixels": 45250,
+      "alphaBBox": [
+        76,
+        270,
+        288,
+        703
+      ]
+    },
+    {
+      "frame": 3,
+      "visiblePixels": 64340,
+      "alphaBBox": [
+        41,
+        152,
+        350,
+        703
+      ]
+    },
+    {
+      "frame": 4,
+      "visiblePixels": 21290,
+      "alphaBBox": [
+        49,
+        164,
+        327,
+        703
+      ]
+    },
+    {
+      "frame": 5,
+      "visiblePixels": 4332,
+      "alphaBBox": [
+        64,
+        214,
+        322,
+        702
+      ]
+    }
+  ],
+  "alphaCleanup": "sprite_gen.frames.alpha_floor.clear_haze floor64 edge2; original source retained"
+}

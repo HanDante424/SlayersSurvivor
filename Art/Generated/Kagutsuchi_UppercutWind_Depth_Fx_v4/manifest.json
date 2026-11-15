@@ -1,0 +1,203 @@
+{
+  "usageStatus": "제작본·연결 대기",
+  "runtimeConnected": false,
+  "revision": "앞뒤 바람 파편 증가, 후방의 대칭 밧줄 같은 띠를 유기적인 나선 흐름으로 개선",
+  "frames": 6,
+  "columns": 6,
+  "rows": 1,
+  "cell": [
+    512,
+    768
+  ],
+  "sheet": [
+    3072,
+    768
+  ],
+  "groundAnchor": [
+    256,
+    652
+  ],
+  "layerOrder": [
+    "Back",
+    "Boss",
+    "Front"
+  ],
+  "previewFps": 12,
+  "previewTiming": "임시 검수용",
+  "sourceSize": [
+    2172,
+    724
+  ],
+  "uniformScale": 1.4143646408839778,
+  "sourceGroundRows": {
+    "Back": 310,
+    "Front": 317
+  },
+  "qa": {
+    "Back": {
+      "alphaCleanup": {
+        "floor": 64,
+        "edge_px": 2,
+        "pixels": 786264,
+        "faint_fraction_before": 0.4233603471607501,
+        "faint_fraction_after": 0.0501841620626151,
+        "haze_fraction_before": 0.373176185098135,
+        "haze_fraction_after": 0.0,
+        "cleared_pixels": 293415,
+        "changed_solid_pixels": 0,
+        "changed_edge_pixels": 0
+      },
+      "frames": [
+        {
+          "frame": 0,
+          "visiblePixels": 28049,
+          "visibleBBox": [
+            83,
+            540,
+            431,
+            688
+          ],
+          "centralMeanAlpha": 27.571168730650154
+        },
+        {
+          "frame": 1,
+          "visiblePixels": 65319,
+          "visibleBBox": [
+            64,
+            361,
+            437,
+            688
+          ],
+          "centralMeanAlpha": 89.44709752321981
+        },
+        {
+          "frame": 2,
+          "visiblePixels": 88141,
+          "visibleBBox": [
+            61,
+            274,
+            470,
+            688
+          ],
+          "centralMeanAlpha": 127.75510835913313
+        },
+        {
+          "frame": 3,
+          "visiblePixels": 106419,
+          "visibleBBox": [
+            39,
+            252,
+            497,
+            690
+          ],
+          "centralMeanAlpha": 167.1720007739938
+        },
+        {
+          "frame": 4,
+          "visiblePixels": 67540,
+          "visibleBBox": [
+            84,
+            274,
+            463,
+            689
+          ],
+          "centralMeanAlpha": 92.69616873065016
+        },
+        {
+          "frame": 5,
+          "visiblePixels": 22045,
+          "visibleBBox": [
+            91,
+            421,
+            436,
+            688
+          ],
+          "centralMeanAlpha": 6.403192724458204
+        }
+      ]
+    },
+    "Front": {
+      "alphaCleanup": {
+        "floor": 16,
+        "edge_px": 2,
+        "pixels": 786264,
+        "faint_fraction_before": 0.37289510902190615,
+        "faint_fraction_after": 0.028269130978907847,
+        "haze_fraction_before": 0.34462597804299827,
+        "haze_fraction_after": 0.0,
+        "cleared_pixels": 270967,
+        "changed_solid_pixels": 0,
+        "changed_edge_pixels": 0
+      },
+      "frames": [
+        {
+          "frame": 0,
+          "visiblePixels": 7257,
+          "visibleBBox": [
+            94,
+            559,
+            419,
+            663
+          ],
+          "centralMeanAlpha": 0.8152283281733747
+        },
+        {
+          "frame": 1,
+          "visiblePixels": 11035,
+          "visibleBBox": [
+            80,
+            337,
+            420,
+            664
+          ],
+          "centralMeanAlpha": 0.9145704334365325
+        },
+        {
+          "frame": 2,
+          "visiblePixels": 16138,
+          "visibleBBox": [
+            97,
+            261,
+            452,
+            660
+          ],
+          "centralMeanAlpha": 2.9843653250773996
+        },
+        {
+          "frame": 3,
+          "visiblePixels": 16615,
+          "visibleBBox": [
+            94,
+            239,
+            474,
+            660
+          ],
+          "centralMeanAlpha": 5.118266253869969
+        },
+        {
+          "frame": 4,
+          "visiblePixels": 15344,
+          "visibleBBox": [
+            111,
+            261,
+            452,
+            661
+          ],
+          "centralMeanAlpha": 11.665692724458204
+        },
+        {
+          "frame": 5,
+          "visiblePixels": 3512,
+          "visibleBBox": [
+            120,
+            367,
+            410,
+            658
+          ],
+          "centralMeanAlpha": 1.3021671826625387
+        }
+      ]
+    }
+  },
+  "postprocessing": "AI edit then native cell separation, uniform scale and ground alignment; engine alpha-floor cleanup. Original retained."
+}

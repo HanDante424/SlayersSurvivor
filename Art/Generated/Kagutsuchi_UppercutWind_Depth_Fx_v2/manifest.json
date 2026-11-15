@@ -1,0 +1,189 @@
+{
+  "usageStatus": "제작본·연결 대기",
+  "runtimeConnected": false,
+  "shapeChange": "상단을 하단 너비로 넓힌 원기둥형 소용돌이",
+  "frames": 6,
+  "columns": 6,
+  "rows": 1,
+  "cell": [
+    512,
+    768
+  ],
+  "sheet": [
+    3072,
+    768
+  ],
+  "groundAnchor": [
+    256,
+    652
+  ],
+  "layers": [
+    "Back < Boss < Front"
+  ],
+  "previewFps": 12,
+  "previewTiming": "임시 검수용",
+  "sourceSize": [
+    2172,
+    724
+  ],
+  "uniformScale": 1.4143646408839778,
+  "sourceGroundRows": {
+    "Back": 310,
+    "Front": 308
+  },
+  "postprocessing": "Native 6x2 layer atlas separated into paired cells, uniform scale and shared per-layer ground anchor; engine alpha-floor cleanup. No painted edits after image generation.",
+  "qa": {
+    "Back": {
+      "alphaCleanup": {
+        "floor": 64,
+        "edge_px": 2,
+        "pixels": 786264,
+        "faint_fraction_before": 0.17627412675640752,
+        "faint_fraction_after": 0.027494581972467264,
+        "haze_fraction_before": 0.14877954478394026,
+        "haze_fraction_after": 0.0,
+        "cleared_pixels": 116980,
+        "changed_solid_pixels": 0,
+        "changed_edge_pixels": 0
+      },
+      "frames": [
+        {
+          "frame": 0,
+          "visiblePixels": 20893,
+          "bbox": [
+            100,
+            563,
+            399,
+            683
+          ]
+        },
+        {
+          "frame": 1,
+          "visiblePixels": 64112,
+          "bbox": [
+            87,
+            403,
+            427,
+            683
+          ]
+        },
+        {
+          "frame": 2,
+          "visiblePixels": 94179,
+          "bbox": [
+            80,
+            307,
+            442,
+            683
+          ]
+        },
+        {
+          "frame": 3,
+          "visiblePixels": 112140,
+          "bbox": [
+            73,
+            280,
+            450,
+            683
+          ]
+        },
+        {
+          "frame": 4,
+          "visiblePixels": 65005,
+          "bbox": [
+            86,
+            284,
+            440,
+            683
+          ]
+        },
+        {
+          "frame": 5,
+          "visiblePixels": 13966,
+          "bbox": [
+            91,
+            409,
+            412,
+            684
+          ]
+        }
+      ]
+    },
+    "Front": {
+      "alphaCleanup": {
+        "floor": 16,
+        "edge_px": 2,
+        "pixels": 786264,
+        "faint_fraction_before": 0.07464032436942299,
+        "faint_fraction_after": 0.01416063815715841,
+        "haze_fraction_before": 0.060479686212264586,
+        "haze_fraction_after": 0.0,
+        "cleared_pixels": 47553,
+        "changed_solid_pixels": 0,
+        "changed_edge_pixels": 0
+      },
+      "frames": [
+        {
+          "frame": 0,
+          "visiblePixels": 2538,
+          "bbox": [
+            111,
+            595,
+            390,
+            659
+          ]
+        },
+        {
+          "frame": 1,
+          "visiblePixels": 4778,
+          "bbox": [
+            107,
+            397,
+            404,
+            659
+          ]
+        },
+        {
+          "frame": 2,
+          "visiblePixels": 6637,
+          "bbox": [
+            101,
+            306,
+            423,
+            661
+          ]
+        },
+        {
+          "frame": 3,
+          "visiblePixels": 7105,
+          "bbox": [
+            94,
+            309,
+            418,
+            658
+          ]
+        },
+        {
+          "frame": 4,
+          "visiblePixels": 5097,
+          "bbox": [
+            120,
+            307,
+            404,
+            659
+          ]
+        },
+        {
+          "frame": 5,
+          "visiblePixels": 2024,
+          "bbox": [
+            134,
+            371,
+            377,
+            658
+          ]
+        }
+      ]
+    }
+  }
+}

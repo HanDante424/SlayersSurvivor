@@ -211,6 +211,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     static readonly Color FireFx = new Color(1f, 0.55f, 0.2f, 0.75f);
 
     Enemy e;
+    KagutsuchiBackFireFx backFire;
     bool intro = true;
     KagutsuchiMirror mirror;
     KagutsuchiBlade blade;
@@ -264,6 +265,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     /// <summary>페이즈 체력 소진: 진행 중인 패턴 · 경고 · 레이저 · 화염 벽을 즉시 정리, 거울 · 검은 제자리로 (부서진 상태는 유지)</summary>
     public void OnPhaseEnd()
     {
+        StopBackFire();
         StopAllCoroutines();
         // 입장 공격 도중 체력 소진이어도 입장 완료를 기다리지 않고 전환.
         intro = false;
@@ -342,6 +344,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     void Awake()
     {
         e = GetComponent<Enemy>();
+        backFire = KagutsuchiBackFireFx.Attach(e);
         CameraFollow.ConstrainToMap();
         e.SetScripted(true);   // 걸어 들어오는 동안 무적. 입장 공격 시작 시 해제
         transform.position = Center + new Vector2(0f, Half.y + EnterStartOutside);
@@ -349,8 +352,17 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
 
     void Start() => StartCoroutine(Intro());
 
+    void StopBackFire()
+    {
+        if (backFire == null) return;
+        backFire.Dispose();
+        Destroy(backFire);
+        backFire = null;
+    }
+
     void OnDisable()
     {
+        StopBackFire();
         phase2?.Dispose();
         phase2 = null;
         if (mod != null) CombatMods.Remove(mod);

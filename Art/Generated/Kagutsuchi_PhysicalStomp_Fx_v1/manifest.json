@@ -92,5 +92,8 @@
         }
       ]
     }
-  }
+  },
+  "runtimeConnected": false,
+  "usageStatus": "보류용",
+  "usageDecision": "새 앞뒤 분리 스톰프로 교체 후 추후 활용을 위해 보류용 보존."
 }

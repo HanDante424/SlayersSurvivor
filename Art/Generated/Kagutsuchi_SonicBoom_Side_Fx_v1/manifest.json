@@ -1,0 +1,105 @@
+{
+  "provider": "built-in image_gen edit",
+  "reference": "Kagutsuchi_SonicBoom_Fx_v1/sprite-sheet-alpha.png",
+  "asset": "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\Kagutsuchi_P2_Fx_SonicBoomSide.png",
+  "frameCount": 6,
+  "columns": 3,
+  "rows": 2,
+  "cellWidth": 512,
+  "cellHeight": 512,
+  "order": "left-to-right, then top-to-bottom",
+  "orientation": "rightward blast, side-view vertical elliptical pressure shell",
+  "pivotProposal": [
+    0.5,
+    0.5
+  ],
+  "previewFrameMs": 50,
+  "previewGapMs": 400,
+  "previewTimingStatus": "preview only",
+  "runtimeConnected": false,
+  "alpha": "source RGBA preserved unchanged",
+  "qa": [
+    {
+      "frame": 0,
+      "alphaAbove16Bounds": [
+        116,
+        137,
+        346,
+        350
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 1,
+      "alphaAbove16Bounds": [
+        81,
+        74,
+        383,
+        428
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 2,
+      "alphaAbove16Bounds": [
+        40,
+        8,
+        443,
+        488
+      ],
+      "alphaRange": [
+        0,
+        254
+      ]
+    },
+    {
+      "frame": 3,
+      "alphaAbove16Bounds": [
+        37,
+        10,
+        431,
+        509
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 4,
+      "alphaAbove16Bounds": [
+        51,
+        16,
+        406,
+        490
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 5,
+      "alphaAbove16Bounds": [
+        73,
+        19,
+        409,
+        475
+      ],
+      "alphaRange": [
+        0,
+        245
+      ]
+    }
+  ],
+  "usageStatus": "구버전·참고용",
+  "intendedRoles": [],
+  "usageDecision": "내부에 불투명한 검정/회색이 남은 이전 버전. 실제 사용은 보정된 측면 v2를 기준으로 함.",
+  "supersededBy": "Kagutsuchi_SonicBoom_Side_Fx_v2"
+}

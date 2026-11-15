@@ -78,6 +78,14 @@ public class SpriteSheetAnimator : MonoBehaviour
 
     public bool HasClip(string key) => clips.ContainsKey(key);
 
+    /// <summary>애니메이터 상태를 바꾸지 않고 지정 방향의 정지 표시 프레임을 빌려준다.</summary>
+    public Sprite GetIdleFrame(Facing4 facing)
+    {
+        if (!clips.TryGetValue(Idle, out var clip) && !clips.TryGetValue(Run, out clip)) return null;
+        int row = Mathf.Clamp((int)facing, 0, clip.frames.GetLength(0) - 1);
+        return clip.frames[row, 0];
+    }
+
     /// <summary>클립 재생 속도 변경 (실행 중 조정용)</summary>
     public void SetClipFps(string key, float fps)
     {

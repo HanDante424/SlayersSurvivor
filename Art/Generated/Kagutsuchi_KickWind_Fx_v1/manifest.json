@@ -1,0 +1,103 @@
+{
+  "provider": "built-in image_gen",
+  "asset": "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\Kagutsuchi_P2_Fx_KickWind.png",
+  "frameCount": 6,
+  "columns": 3,
+  "rows": 2,
+  "cellWidth": 512,
+  "cellHeight": 512,
+  "order": "left-to-right, then top-to-bottom",
+  "orientation": "rightward kick pressure burst",
+  "suggestedOriginPivot": [
+    0.171875,
+    0.5
+  ],
+  "previewFrameMs": 80,
+  "previewGapMs": 320,
+  "previewTimingStatus": "preview only, not a game timing specification",
+  "runtimeConnected": false,
+  "alpha": "original RGBA preserved unchanged",
+  "qa": [
+    {
+      "frame": 0,
+      "alphaAbove16Bounds": [
+        85,
+        179,
+        226,
+        320
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 1,
+      "alphaAbove16Bounds": [
+        87,
+        93,
+        387,
+        431
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 2,
+      "alphaAbove16Bounds": [
+        87,
+        38,
+        482,
+        478
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 3,
+      "alphaAbove16Bounds": [
+        85,
+        40,
+        490,
+        476
+      ],
+      "alphaRange": [
+        0,
+        252
+      ]
+    },
+    {
+      "frame": 4,
+      "alphaAbove16Bounds": [
+        86,
+        53,
+        478,
+        446
+      ],
+      "alphaRange": [
+        0,
+        237
+      ]
+    },
+    {
+      "frame": 5,
+      "alphaAbove16Bounds": [
+        87,
+        69,
+        447,
+        447
+      ],
+      "alphaRange": [
+        0,
+        229
+      ]
+    }
+  ],
+  "usageStatus": "보류용",
+  "intendedRoles": [],
+  "usageDecision": "현재 발차기·주먹 역할에는 채택하지 않고 추후 다른 적합한 용도로 사용하기 위해 보존."
+}

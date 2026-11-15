@@ -18,3 +18,7 @@
 ## 생성 프롬프트
 
 Six-frame purely physical ground stomp impact for a 2D action game. Reference is only a powerful foot hitting earth; no character or feet. No fire, flames, lava, embers, magic, aura or golden glow. Charcoal-grey angular stone chips and neutral grey/grey-brown painted dust. Slight top-down low ground-hugging blast and elliptical dust shockwave. Exactly six distinct temporal phases in one horizontal row on true transparent alpha, same impact center and world scale: small sharp grey-white dust impact; strong low radial dust spikes throwing embedded rock chips; peak dense low dust crown; expanding dust ring with center clearing and rocks dropping; thin low dissipating dust ring; faint last dust residue. Rocks overlap main dust silhouette, no far satellites. Generous transparent gutters and margins. No terrain tile, solid crater disk, persistent cracks, floor texture, scenery, text, grid, checkerboard or opaque matte. Smooth painted game VFX, not photoreal or pixel art.
+
+## [ACTIVE UPDATE] 보류용 전환
+
+새 앞뒤 분리 버전(Kagutsuchi_PhysicalStomp_Depth_Fx_v1)이 현재 게임 표시를 대체. 이 원화는 추후 적합한 용도에 사용하기 위해 보류용으로 보존하며 삭제하지 않음. runtimeConnected=false.

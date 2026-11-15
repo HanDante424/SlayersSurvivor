@@ -71,6 +71,9 @@ public sealed class KagutsuchiPhase2 : IDisposable
     };
     const float PatternGap = 0.5f;          // [임시] 기획서의 패턴 간 공통 간격
     const float DirectionEpsilon = 0.0001f;
+    const float GrabSlamPlayerHeightOffset = 0f, GrabComboSmashPlayerHeightOffset = 0f; // 사용자: 직전 -2 보정에서 Y +2.
+    const float GrabSlamFacingOffset = 1f; // 사용자: 플레이어 왼쪽 보기 X+1, 오른쪽 보기 X-1.
+    const float GrabComboSmashFacingOffset = 1f; // 사용자: 기존 보정에 좌+0.5/우-0.5 추가, 최종 좌+1/우-1.
     const string PunchSheet = "Kagutsuchi_P2_Atk_Punch";
 
     enum Phase { Waiting, Warning, Dash, Hit, Recovery, RunWarning, Running, RunRecovery,
@@ -125,11 +128,15 @@ public sealed class KagutsuchiPhase2 : IDisposable
     float travel, contactDamage;
     bool hit, ownsContactDamage, disposed;
     readonly KagutsuchiPhysicalStompFx physicalStomp;
+    readonly KagutsuchiSonicBoomFx sonicBoom;
+    readonly KagutsuchiUppercutFx uppercutFx;
 
     public KagutsuchiPhase2(Enemy body)
     {
         this.body = body;
         physicalStomp = body.gameObject.AddComponent<KagutsuchiPhysicalStompFx>();
+        sonicBoom = body.gameObject.AddComponent<KagutsuchiSonicBoomFx>();
+        uppercutFx = body.gameObject.AddComponent<KagutsuchiUppercutFx>();
         visual = body.GetComponent<SpriteRenderer>();
         stand = visual.sprite;
         punch = CreatePose(PunchSheet);
@@ -246,6 +253,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
                 {
                     phase = Phase.Hit;
                     elapsed = 0f;
+                    sonicBoom.Play(dashEnd, visual.flipX);
                     TryHit();
                 }
                 return velocity;
@@ -302,6 +310,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
                 {
                     phase = Phase.KickHit;
                     elapsed = 0f;
+                    sonicBoom.Play(kickEnd, visual.flipX);
                     TryKickHit();
                 }
                 return kickVelocity;
@@ -537,10 +546,17 @@ public sealed class KagutsuchiPhase2 : IDisposable
     {
         switch (ComboSteps[comboStep].Action)
         {
-            case ComboAction.Punch: visual.sprite = punch != null ? punch : stand; break;
-            case ComboAction.Kick: visual.sprite = kick != null ? kick : stand; break;
+            case ComboAction.Punch:
+                visual.sprite = punch != null ? punch : stand;
+                sonicBoom.Play(dashEnd, visual.flipX);
+                break;
+            case ComboAction.Kick:
+                visual.sprite = kick != null ? kick : stand;
+                sonicBoom.Play(dashEnd, visual.flipX);
+                break;
             case ComboAction.Uppercut:
                 visual.sprite = uppercut != null ? uppercut : stand;
+                uppercutFx.Play(origin, visual.flipX);
                 CameraFollow.Shake(UppercutShakeTime, LandingShakeAmplitude);
                 break;
             case ComboAction.Stomp:
@@ -702,6 +718,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
     {
         ClearWarning();
         visual.sprite = uppercut != null ? uppercut : stand;
+        uppercutFx.Play(origin, visual.flipX);
         phase = Phase.UppercutHit;
         elapsed = 0f;
         hit = false;
@@ -776,8 +793,11 @@ public sealed class KagutsuchiPhase2 : IDisposable
         Vector2 contactWorld = AirContactPoint(contactPose, topLeftAnchor);
         if (contactPose == groundSmash)
         {
-            // 내려찍기는 보스를 그대로 두고 플레이어 그림이 주먹 아래로 내려간다.
-            Player.I.AlignBossHoldHead(grabComboPattern, contactWorld);
+            // 눕힌 뒤 회전된 머리 위치를 기준으로 주먹 접촉점에 정렬한다.
+            Player.I.SetBossHoldProne(grabComboPattern, true);
+            float horizontal = visual.flipX ? GrabComboSmashFacingOffset : -GrabComboSmashFacingOffset;
+            Vector2 offset = new Vector2(horizontal, GrabComboSmashPlayerHeightOffset);
+            Player.I.AlignBossHoldHead(grabComboPattern, contactWorld + offset);
         }
         else airRoot.transform.position += (Vector3)(Player.I.BossHoldHeadPosition - contactWorld);
     }
@@ -794,7 +814,11 @@ public sealed class KagutsuchiPhase2 : IDisposable
     void AlignGrabStompFoot(Vector2 topLeftAnchor)
     {
         if (stomp == null || Player.I == null || airRoot == null) return;
-        Player.I.AlignBossHoldHead(grabPattern, AirContactPoint(stomp, topLeftAnchor));
+        Player.I.SetBossHoldProne(grabPattern, true);
+        // 플레이어는 보스 반대쪽을 보므로 보스 flipX=false일 때 플레이어가 오른쪽을 본다.
+        float horizontal = visual.flipX ? GrabSlamFacingOffset : -GrabSlamFacingOffset;
+        Vector2 offset = new Vector2(horizontal, GrabSlamPlayerHeightOffset);
+        Player.I.AlignBossHoldHead(grabPattern, AirContactPoint(stomp, topLeftAnchor) + offset);
     }
 
     void StopAirPose()
@@ -1052,6 +1076,8 @@ public sealed class KagutsuchiPhase2 : IDisposable
         if (disposed) return;
         disposed = true;
         if (physicalStomp != null) { physicalStomp.Clear(); UnityEngine.Object.Destroy(physicalStomp); }
+        if (sonicBoom != null) { sonicBoom.Clear(); UnityEngine.Object.Destroy(sonicBoom); }
+        if (uppercutFx != null) { uppercutFx.Clear(); UnityEngine.Object.Destroy(uppercutFx); }
         if (solarPattern != null) { solarPattern.Dispose(); UnityEngine.Object.Destroy(solarPattern); }
         if (grabComboPattern != null) { grabComboPattern.Cancel(); UnityEngine.Object.Destroy(grabComboPattern); }
         if (grabPattern != null) { grabPattern.Cancel(); UnityEngine.Object.Destroy(grabPattern); }
