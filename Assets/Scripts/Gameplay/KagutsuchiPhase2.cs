@@ -34,7 +34,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
     const float KickMoveDistance = 4f, KickMoveTime = 0.1f;
     const string DiveReadySheet = "Kagutsuchi_P2_Atk_DiveReady", DiveSheet = "Kagutsuchi_P2_Atk_Dive";
     const string KickSheet = "Kagutsuchi_P2_Atk_Kick";
-    const string GroundSmashSheet = "Kagutsuchi_P2_Atk_GroundSmash", StompSheet = "Kagutsuchi_P2_Atk_Stomp";
+    const string GroundSmashSheet = "Kagutsuchi_P2_Atk_GroundSmash", StompSheet = "Kagutsuchi_P2_Atk_StompAttack";
     const float StompTrigger = 10f, StompCooldown = 15f;
     const float StompWarnTime = 2.5f, StompRadius = 8f, StompStun = 1f;
     const float StompDamage = 30f, UppercutDamage = 40f; // [임시] 기획서의 공격 3 피해
@@ -102,6 +102,10 @@ public sealed class KagutsuchiPhase2 : IDisposable
     readonly SpriteRenderer visual;
     readonly Sprite stand;
     readonly Sprite punch, diveReady, dive, kick, groundSmash, stomp, stompReady, uppercut, grabReady, grabDash;
+    readonly KagutsuchiSolarPattern solarPattern;
+    readonly Sprite solarJump, solarLaugh;
+    int solarThreshold;
+    bool solarPending;
     readonly KagutsuchiGrabPattern grabPattern;
     float grabCooldownLeft, grabComboCooldownLeft;
     readonly KagutsuchiGrabComboPattern grabComboPattern;
@@ -120,10 +124,12 @@ public sealed class KagutsuchiPhase2 : IDisposable
     float comboCooldownLeft;
     float travel, contactDamage;
     bool hit, ownsContactDamage, disposed;
+    readonly KagutsuchiPhysicalStompFx physicalStomp;
 
     public KagutsuchiPhase2(Enemy body)
     {
         this.body = body;
+        physicalStomp = body.gameObject.AddComponent<KagutsuchiPhysicalStompFx>();
         visual = body.GetComponent<SpriteRenderer>();
         stand = visual.sprite;
         punch = CreatePose(PunchSheet);
@@ -142,6 +148,12 @@ public sealed class KagutsuchiPhase2 : IDisposable
         grabComboPattern = body.gameObject.AddComponent<KagutsuchiGrabComboPattern>();
         grabComboPattern.Initialize(body, grabReady, grabDash, punch, kick, uppercut, diveReady,
                                     groundSmash, stomp, stompReady, ShowAirPose, StopAirPose, ShowGrabComboContactPose);
+        solarJump = CreatePose("Kagutsuchi_P2_Jump");
+        solarLaugh = CreatePose("Kagutsuchi_P2_Laugh");
+        solarPattern = body.gameObject.AddComponent<KagutsuchiSolarPattern>();
+        solarPattern.Initialize(body, stomp, solarJump, stompReady, stomp, groundSmash, solarLaugh,
+                                ShowAirPose, ShowGrabRunFrame, StopAirPose,
+                                () => airRoot != null ? airRoot.transform : body.transform);
         var sheet = Resources.Load<Texture2D>("Sprites/" + RunSheet);
         if (sheet != null && stand != null && sheet.width == RunCell * RunFrameCount && sheet.height == RunCell)
         {
@@ -171,8 +183,30 @@ public sealed class KagutsuchiPhase2 : IDisposable
 
     public Vector2 Tick(float dt, Vector2 toPlayer)
     {
-        if (disposed || body == null || body.hp <= 0f || dt <= 0f || body.Scripted || body.Hidden
+        if (disposed || body == null || body.hp <= 0f || dt <= 0f
             || GameManager.I == null || GameManager.I.State != GameState.Playing) return Vector2.zero;
+
+        while (solarThreshold < KagutsuchiSolarPattern.Thresholds.Length
+               && body.hp <= body.maxHp * KagutsuchiSolarPattern.Thresholds[solarThreshold])
+        {
+            solarThreshold++;
+            solarPending = true; // 한 번에 여러 문턱을 넘으면 기존 1페이즈처럼 한 번만 예약.
+        }
+        // 특수 패턴 자체의 Scripted·Hidden 상태에서도 실행기는 계속 진행한다.
+        if (solarPattern.Active)
+        {
+            Vector2 velocity = solarPattern.Tick(dt);
+            if (!solarPattern.Active) visual.sprite = stand;
+            return velocity;
+        }
+        if (body.Scripted || body.Hidden) return Vector2.zero;
+        if (phase == Phase.Waiting && solarPending)
+        {
+            solarPending = false;
+            ClearWarning(); RestoreContactDamage();
+            solarPattern.Begin();
+            return solarPattern.Tick(dt);
+        }
 
         if (phase == Phase.Waiting)
         {
@@ -250,6 +284,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
                     phase = Phase.Landing;
                     elapsed = 0f;
                     hit = false;
+                    physicalStomp.Play(landingPoint, DiveRadius);
                     TryLandingHit();
                 }
                 return flightVelocity;
@@ -509,6 +544,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
                 CameraFollow.Shake(UppercutShakeTime, LandingShakeAmplitude);
                 break;
             case ComboAction.Stomp:
+                physicalStomp.Play(dashEnd, ComboStompRadius);
                 visual.sprite = stomp != null ? stomp : stand;
                 CameraFollow.Shake(LandingShakeTime, LandingShakeAmplitude);
                 break;
@@ -586,6 +622,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
         elapsed = 0f;
         hit = false;
         CameraFollow.Shake(LandingShakeTime, LandingShakeAmplitude);
+        physicalStomp.Play(origin, ChainStompSteps[chainStompStep].Radius);
         TryChainStompHit();
         // 각 단계에서 적중 여부와 무관하게 맵 전체 감속·끌어오기. 무적은 Player가 처리.
         Player.I?.ApplySlowByBoss(ChainStompSlowMul, ChainStompSlowTime);
@@ -624,6 +661,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
         elapsed = 0f;
         hit = false;
         CameraFollow.Shake(LandingShakeTime, LandingShakeAmplitude);
+        physicalStomp.Play(origin, StompRadius);
         TryStompHit(false);
         ApplyStompControl();
     }
@@ -1013,6 +1051,8 @@ public sealed class KagutsuchiPhase2 : IDisposable
     {
         if (disposed) return;
         disposed = true;
+        if (physicalStomp != null) { physicalStomp.Clear(); UnityEngine.Object.Destroy(physicalStomp); }
+        if (solarPattern != null) { solarPattern.Dispose(); UnityEngine.Object.Destroy(solarPattern); }
         if (grabComboPattern != null) { grabComboPattern.Cancel(); UnityEngine.Object.Destroy(grabComboPattern); }
         if (grabPattern != null) { grabPattern.Cancel(); UnityEngine.Object.Destroy(grabPattern); }
         StopAirPose();
@@ -1030,6 +1070,8 @@ public sealed class KagutsuchiPhase2 : IDisposable
         if (uppercut != null) UnityEngine.Object.Destroy(uppercut);
         if (grabReady != null) UnityEngine.Object.Destroy(grabReady);
         if (grabDash != null) UnityEngine.Object.Destroy(grabDash);
+        if (solarJump != null) UnityEngine.Object.Destroy(solarJump);
+        if (solarLaugh != null) UnityEngine.Object.Destroy(solarLaugh);
         if (runFrames != null)
             foreach (var frame in runFrames) if (frame != null) UnityEngine.Object.Destroy(frame);
     }

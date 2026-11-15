@@ -20,8 +20,8 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
     const float ShakeAmplitude = 0.2f; // [임시] 기존 2페이즈 공격 흔들림 세기 재사용
     const float GrabCameraMagnification = 1.5f;
     const float BossSlowdownDistance = 0.9f;
-    // Stomp 원화의 전방 발바닥 아래 실측점 (좌상단 px / 원화 크기).
-    static readonly Vector2 StompFootBottom = new Vector2(80f / 1152f, 1095f / 1109f);
+    // 통합 StompAttack 원화의 전방 발바닥 아래 실측점 (좌상단 px / 원화 크기).
+    static readonly Vector2 StompFootBottom = new Vector2(210f / 1312f, 1158f / 1199f);
     const float Epsilon = 0.0001f;
 
     enum Step { Finished, Warning, Dash, Hold, Uppercut, Fall, Slam, KickPrepare, Kick }
@@ -127,6 +127,7 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
                 {
                     step = Step.Slam; elapsed = 0f;
                     showPose(stomp, 0f);
+                    body.GetComponent<KagutsuchiPhysicalStompFx>()?.Play(body.transform.position, body.radius);
                     CameraFollow.Shake(SlamShakeTime, ShakeAmplitude);
                     player.TakeDamage(DamagePerHit);
                 }

@@ -1,0 +1,55 @@
+{
+  "ok": true,
+  "engine": "component-row",
+  "kind": "sprite-gen-inspect-report",
+  "run_dir": "C:\\Users\\hanho\\.codex\\visualizations\\2026\\11\\14\\01a1d824-c400-7441-a07e-917bf0593926\\physical-stomp-fx-v1",
+  "states": [
+    "stomp"
+  ],
+  "thresholds": {
+    "histogram_min": 0.0,
+    "dhash_min": 0.55,
+    "motion_min": 0.01
+  },
+  "rows": [
+    {
+      "state": "stomp",
+      "source": "frames",
+      "expected_frames": 6,
+      "found_frames": 6,
+      "natural_pose_count": 6,
+      "frame_files": [
+        "frames/stomp/frame-0.png",
+        "frames/stomp/frame-1.png",
+        "frames/stomp/frame-2.png",
+        "frames/stomp/frame-3.png",
+        "frames/stomp/frame-4.png",
+        "frames/stomp/frame-5.png"
+      ],
+      "metrics": {
+        "histogram_intersection": {
+          "min": 0.6265529208889117,
+          "mean": 0.7820141901635652
+        },
+        "dhash_similarity": {
+          "min": 0.5625,
+          "mean": 0.7135416666666666
+        },
+        "motion_presence": 0.11420788334865196,
+        "centroid_sigma": {
+          "x": 6.38318083352947,
+          "y": 7.007005150635139
+        }
+      },
+      "ok": true,
+      "errors": [],
+      "warnings": [
+        "stomp: frame 05 is much smaller than median (3860 vs 22449)"
+      ]
+    }
+  ],
+  "errors": [],
+  "warnings": [
+    "stomp: frame 05 is much smaller than median (3860 vs 22449)"
+  ]
+}

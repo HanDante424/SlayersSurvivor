@@ -430,6 +430,7 @@ public class Player : MonoBehaviour
             anim.SetClipFps(Slash, Cfg.attackFps);
 
         float dt = Time.deltaTime;
+        Vector2 beforeMovement = transform.position;
         if (bossSlowLeft > 0f) bossSlowLeft = Mathf.Max(0f, bossSlowLeft - dt);
         if (skillInvuln > 0) skillInvuln -= dt;
         if (rootLeft > 0) rootLeft -= dt;
@@ -481,6 +482,7 @@ public class Player : MonoBehaviour
 
         // 중간보스 포위 고블린 사이로 지나갈 수 없음 (돌진 포함)
         MidBossArena.ConstrainPlayer(this);
+        KagutsuchiSolarArena.ConstrainPlayer(this, beforeMovement);
 
         // 제한된 맵 (레이드): 피격 판정 원이 경계 밖으로 나가지 않음 (돌진 · 밀려남 포함)
         if (Stage.Bounded)

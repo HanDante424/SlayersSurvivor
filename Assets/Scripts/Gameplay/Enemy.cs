@@ -357,12 +357,12 @@ public partial class Enemy : MonoBehaviour
         if (Stage.Bounded && !Scripted) pos = Stage.ClampInside(pos, radius);   // 제한된 맵 (레이드): 경계 밖으로 나가지 않음
         transform.position = pos;
         if (anim != null) { if (!stunned) lastFace = face; }   // 방향은 4방향 시트가 정함
-        else if (kind == EnemyKind.Kagutsuchi) { }   // 카구츠치 = 정면 그림만 (2026-11-13 사용자) → 좌우 반전 없음
+        else if (kind == EnemyKind.Kagutsuchi || kind == EnemyKind.KagutsuchiSword) { } // 보스·검의 반전은 각 전용 실행기가 소유.
         else if (!stunned && Mathf.Abs(face.x) > 0.01f) sr.flipX = face.x < 0;
 
-        // 레이드 보스는 접촉 피해 없음. 일반 몹·중간보스는 기존 기절 조건 유지.
+        // 카구츠치 1페이즈만 접촉 피해 허용. 2페이즈·다른 레이드 보스는 기존 차단 유지.
         float touch = radius + p.radius;
-        if (damage > 0f && !raidBossContactDisabled && !stunned && !Hidden && !Scripted && (p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);   // 접촉 피해 0 = 닿아도 피격 무적이 생기지 않음
+        if (damage > 0f && (!raidBossContactDisabled || (kind == EnemyKind.Kagutsuchi && RaidStage.Phase == 1)) && !stunned && !Hidden && !Scripted && (p.HurtCenter - pos).sqrMagnitude < touch * touch) p.TakeDamage(damage);   // 접촉 피해 0 = 닿아도 피격 무적이 생기지 않음
 
         // 너무 멀어지면 플레이어 근처로 재배치 (뱀서 방식)
         // 기준은 카메라 시야에 맞춰 자동 (화면 밖 생성 거리 + 6 넘으면 화면 밖 생성 거리로)

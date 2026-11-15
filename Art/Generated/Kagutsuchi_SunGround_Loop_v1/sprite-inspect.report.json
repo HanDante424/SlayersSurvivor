@@ -1,0 +1,51 @@
+{
+  "ok": true,
+  "engine": "component-row",
+  "kind": "sprite-gen-inspect-report",
+  "run_dir": "C:\\Users\\hanho\\.codex\\visualizations\\2026\\11\\14\\01a1d824-c400-7441-a07e-917bf0593926\\sun-ground-animation-v1",
+  "states": [
+    "burn"
+  ],
+  "thresholds": {
+    "histogram_min": 0.0,
+    "dhash_min": 0.55,
+    "motion_min": 0.01
+  },
+  "rows": [
+    {
+      "state": "burn",
+      "source": "frames",
+      "expected_frames": 6,
+      "found_frames": 6,
+      "natural_pose_count": 6,
+      "frame_files": [
+        "frames/burn/frame-0.png",
+        "frames/burn/frame-1.png",
+        "frames/burn/frame-2.png",
+        "frames/burn/frame-3.png",
+        "frames/burn/frame-4.png",
+        "frames/burn/frame-5.png"
+      ],
+      "metrics": {
+        "histogram_intersection": {
+          "min": 0.917048794631442,
+          "mean": 0.9585828447019152
+        },
+        "dhash_similarity": {
+          "min": 0.984375,
+          "mean": 0.9916666666666667
+        },
+        "motion_presence": 0.013791312423406863,
+        "centroid_sigma": {
+          "x": 0.8780154074245771,
+          "y": 0.14858769733249544
+        }
+      },
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}

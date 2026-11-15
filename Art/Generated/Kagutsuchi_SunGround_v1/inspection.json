@@ -1,0 +1,21 @@
+{
+  "size": [
+    1903,
+    826
+  ],
+  "mode": "RGBA",
+  "alpha_range": [
+    0,
+    255
+  ],
+  "center_alpha": 0,
+  "visible_bbox_alpha_gt16": [
+    20,
+    77,
+    1887,
+    763
+  ],
+  "original_preserved": true,
+  "generator": "built-in image_gen",
+  "unity_play_mode_verified": false
+}

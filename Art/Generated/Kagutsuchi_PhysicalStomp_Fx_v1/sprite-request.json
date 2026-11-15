@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "physical-stomp-impact",
+    "description": "",
+    "base_image": "base-source.png"
+  },
+  "cell": {
+    "shape": "rect",
+    "width": 512,
+    "height": 256,
+    "safe_margin_x": 24,
+    "safe_margin_y": 24
+  },
+  "chroma_key": {
+    "name": "green",
+    "hex": "#00FF00",
+    "rgb": [
+      0,
+      255,
+      0
+    ],
+    "selection": "manual"
+  },
+  "states": {
+    "stomp": {
+      "frames": 6,
+      "fps": 12,
+      "loop": false,
+      "action": "Physical foot ground impact with NO flames or magic. Sharp small grey-white contact pop, outward stone fragments and compact grey-brown dust burst, peak low radial dust shock with stone chips, expanding elliptical dust wave losing stones, low thin dissipating dust ring, faint last dust residue. Fixed impact center and world scale. Every frame one connected main dust silhouette; stones overlap dust and stay in the same cluster, no far satellites. No character, foot, ground tile, crater plate, lingering cracks or scenery."
+    }
+  },
+  "style": "painted anime game physical impact VFX, charcoal grey rock and neutral grey brown dust, no glow, no fire, nonpixel art",
+  "subject": "effect",
+  "layout": "taxonomy/v1",
+  "fit": {
+    "resample": "lanczos",
+    "align_x": "bbox-center",
+    "align_y": "center",
+    "ground_frames": false,
+    "pixel_unfake": false
+  },
+  "chroma": {
+    "mode": "rgb",
+    "unmix_reach": 4,
+    "spill_max_fraction": 0.005
+  }
+}

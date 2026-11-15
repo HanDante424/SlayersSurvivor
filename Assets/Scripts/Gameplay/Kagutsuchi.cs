@@ -57,6 +57,18 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     const float MirrorTurnSpeed = 240f;  // [임시] 플레이어 쪽으로 도는 속도 (도/초)
     const float AfterMirror = 0.5f;      // [임시] 거울이 나타난 뒤 입장 끝까지
 
+    // ---------- 1페이즈 체력 50% 이하 강화 ----------
+    const float EmpoweredHpRatio = 0.5f;
+    const int EmpoweredReflectCount = 3, EmpoweredRepeatCount = 2;
+    const float EmpoweredReflectAimInterval = 0.5f;
+    const float EmpoweredSpinTime = 2f, EmpoweredChaseSpeedRatio = 0.8f;
+    const int EmpoweredMarchCount = 3, EmpoweredMarchCutCount = 10;
+    const float EmpoweredMarchCutWarn = 0.5f, EmpoweredMarchCutWidth = 1f;
+    const float EmpoweredMarchCutDamage = 5f; // [임시] 사용자 지정 추가 직선 베기 피해.
+    const int EmpoweredFanReflectCasts = 5;
+    const float EmpoweredFanArc = 160f, EmpoweredFanMinGap = 10f;
+    bool Phase1Empowered => RaidStage.Phase == 1 && e != null && e.maxHp > 0f && e.hp <= e.maxHp * EmpoweredHpRatio;
+
     // ---------- 공격 패턴 1: 반사 레이저 ----------
     const float ReflectWarn = 2f;        // 경고 2초 (사용자)
     const float ReflectLaserTime = 0.5f; // 레이저 0.5초 (사용자)
@@ -280,6 +292,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
             if (blade != null) blade.Release();
         }
         ClearLasers();
+        comboSlashFx?.Clear();
     }
 
     public bool TryBeginPhaseTransition(int phase)
@@ -343,6 +356,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         if (mod != null) CombatMods.Remove(mod);
         StopSpecial1Lasers();
         ClearLasers();
+        comboSlashFx?.Clear();
         foreach (var w in warnings) if (w != null) Destroy(w.gameObject);
         warnings.Clear();
         if (mirror != null) Destroy(mirror.gameObject);
@@ -477,12 +491,15 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     }
 
     readonly List<RaidLaser> lasers = new List<RaidLaser>();
+    KagutsuchiComboSlashFx comboSlashFx;
 
     RaidLaser SpawnLaser(Vector2 from, Vector2 dir, float length, float width, float seconds,
-                         float damage, float tick, Rect? safe = null, Color? core = null, Color? edge = null)
+                         float damage, float tick, Rect? safe = null, Color? core = null, Color? edge = null, bool flameVisual = false, bool slashVisual = false)
     {
         lasers.RemoveAll(x => x == null);
         var laser = RaidLaser.Line(from, dir, length, width, seconds, damage, tick, safe, core, edge);
+        if (flameVisual) KagutsuchiFlameLaserFx.Attach(laser);
+        else if (slashVisual) KagutsuchiStraightSlashFx.Attach(laser, seconds);
         lasers.Add(laser);
         return laser;
     }
@@ -501,6 +518,18 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     // [임시] 첫 방향 = 경고가 뜰 때의 플레이어 쪽
     IEnumerator ReflectRoutine()
     {
+        int count = Phase1Empowered ? EmpoweredReflectCount : 1;
+        var shots = new List<Coroutine>();
+        for (int i = 0; i < count; i++)
+        {
+            if (i > 0) yield return WaitActive(EmpoweredReflectAimInterval);
+            shots.Add(StartCoroutine(ReflectShot()));
+        }
+        foreach (var shot in shots) yield return shot;
+    }
+
+    IEnumerator ReflectShot()
+    {
         Vector2 aim = P != null ? P.HurtCenter - Pos : Vector2.down;
         aim = aim.sqrMagnitude > 0.000001f ? aim.normalized : Vector2.down;
         Vector2 from = Stage.ClampInside(Muzzle(aim), 0f);   // 몸 바깥 1 에서 시작
@@ -512,6 +541,12 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     // → 0.5초 뒤 거울에서 부채꼴 무작위 방향으로 폭 1 경고 10개 → 경고 0.75초 뒤 0.5초 레이저가 맵을 꿰뚫음
     // → 거울 복귀. 쿨타임 10초
     IEnumerator MirrorBeamRoutine()
+    {
+        int count = Phase1Empowered ? EmpoweredRepeatCount : 1;
+        for (int i = 0; i < count && MirrorAlive; i++) yield return MirrorBeamCast();
+    }
+
+    IEnumerator MirrorBeamCast()
     {
         if (!MirrorAlive) yield break;
         Vector2 dir = ToPlayer;
@@ -527,7 +562,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         Vector2 toMirror = mp - Pos;
         Vector2 beamFrom = Muzzle(toMirror.normalized);
         float beamLen = Mathf.Max(0.05f, (mp - beamFrom).magnitude);
-        SpawnLaser(beamFrom, toMirror.normalized, beamLen, MirrorBeamWidth, MirrorBeamTime, MirrorBeamDamage, 0.5f, null, FireCore, FireEdge);
+        SpawnLaser(beamFrom, toMirror.normalized, beamLen, MirrorBeamWidth, MirrorBeamTime, MirrorBeamDamage, 0.5f, null, FireCore, FireEdge, flameVisual: true);
         Fx.Circle(mp, 1f, FireFx, MirrorBeamTime, mirror.transform);
         yield return WaitActive(MirrorFanDelay);
 
@@ -546,7 +581,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         }
         yield return WaitActive(fanWarn);
         foreach (var r in rays)
-            SpawnLaser(origin, r.d, r.len, MirrorFanWidth, MirrorFanLaserTime, MirrorFanDamage, MirrorFanLaserTime + 1f, null, FireCore, FireEdge);
+            SpawnLaser(origin, r.d, r.len, MirrorFanWidth, MirrorFanLaserTime, MirrorFanDamage, MirrorFanLaserTime + 1f, null, FireCore, FireEdge, flameVisual: true);
         CameraFollow.Shake(0.2f, 0.15f);
         yield return Wait(MirrorFanLaserTime);
         if (mirror != null) mirror.Release();   // 거울 복귀
@@ -594,7 +629,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         // 보스 → 거울 레이저 (패턴 끝까지)
         Vector2 toMirror = c - Pos;
         Vector2 s1From = Muzzle(toMirror.normalized);
-        s1Beam = SpawnLaser(s1From, toMirror.normalized, Mathf.Max(0.05f, (c - s1From).magnitude), S1BeamWidth, 999f, S1BeamDamage, 0.5f, null, FireCore, FireEdge);
+        s1Beam = SpawnLaser(s1From, toMirror.normalized, Mathf.Max(0.05f, (c - s1From).magnitude), S1BeamWidth, 999f, S1BeamDamage, 0.5f, null, FireCore, FireEdge, flameVisual: true);
         Fx.Circle(c, 1f, FireFx, 0.6f, mirror.transform);
 
         // 방사 레이저 5회
@@ -609,7 +644,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
             yield return Wait(S1Warn);
             if (!MirrorAlive) yield break;
             foreach (var d in dirs)
-                SpawnLaser(c, d, Stage.ExitDistance(c, d), S1LaserWidth, S1RadialTime, S1RadialDamage, S1RadialTime + 1f, null, FireCore, FireEdge);
+                SpawnLaser(c, d, Stage.ExitDistance(c, d), S1LaserWidth, S1RadialTime, S1RadialDamage, S1RadialTime + 1f, null, FireCore, FireEdge, flameVisual: true);
             CameraFollow.Shake(0.12f, 0.1f);
             yield return Wait(S1RadialTime);
         }
@@ -626,7 +661,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
             if (!MirrorAlive) yield break;
             s1Spin.Clear();
             foreach (var d in dirs)
-                s1Spin.Add(SpawnLaser(c, d, Stage.ExitDistance(c, d), S1LaserWidth, S1SpinTime, S1SpinDamage, 0.5f, null, FireCore, FireEdge));
+                s1Spin.Add(SpawnLaser(c, d, Stage.ExitDistance(c, d), S1LaserWidth, S1SpinTime, S1SpinDamage, 0.5f, null, FireCore, FireEdge, flameVisual: true));
             float sign = turn == 0 ? -1f : 1f;   // 시계 방향 = 각도 감소
             for (float t = 0f; t < S1SpinTime;)
             {
@@ -659,6 +694,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         inSpecial2 = true;
         blade.Control();
         yield return Special2Body();
+        comboSlashFx?.Clear();
         inSpecial2 = false;
         if (blade != null) blade.Release();
     }
@@ -719,7 +755,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
                 Track(BossWarning.Box(c - d * b2, d, b2 + f2, S2CutWidth, S2CutWarn));
             }
             yield return Wait(S2CutWarn);
-            foreach (var c in cuts) SpawnLaser(c.from, c.d, c.len, S2CutWidth, S2CutFlash, S2CutDamage, S2CutFlash + 1f, null, SwordCore, SwordEdge);
+            foreach (var c in cuts) SpawnLaser(c.from, c.d, c.len, S2CutWidth, S2CutFlash, S2CutDamage, S2CutFlash + 1f, null, SwordCore, SwordEdge, slashVisual: true);
             CameraFollow.Shake(0.1f, 0.1f);
         }
 
@@ -730,6 +766,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         blade.SetPose(mid + Vector2.up * (Half.y + S2OutDistance + SwordLength), -90f);
         yield return BladeTo(mid, -90f, S2StuckDropTime);
         if (!BladeAlive) yield break;
+        blade.SetBuried(true);
         CameraFollow.Shake(0.3f, 0.25f);
         Fx.Circle(mid, 2f, new Color(1f, 1f, 1f, 0.8f), 0.4f);
 
@@ -746,16 +783,18 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         yield return Wait(S2StuckWarn);   // 마지막 경고의 베기까지
 
         // 검 중심 반경 12 경고 3초 → 0.2초 간격 연속 횡베기 3초 (사용자: 횡베기 형태)
-        // [해석] 횡베기 = 검 중심 반원 (반경 12). 매번 직전과 반대쪽 반원을 베고 각도는 ±30도 무작위 → 0.4초마다 원 전체를 한 번씩 덮음
+        // 횡베기 = 검 중심 원 전체 (반경 12). 궤적의 회전 각도·진행 방향은 타격마다 무작위.
         Track(BossWarning.Circle(mid, S2FinalRadius, S2FinalWarn));
         yield return Wait(S2FinalWarn);
-        float sweepAng = Random.Range(0f, 360f);
         for (float t = 0f; t < S2FinalTime && BladeAlive; t += S2FinalInterval)
         {
-            Vector2 d = Dir(sweepAng + Random.Range(-30f, 30f));
-            sweepAng += 180f;
-            Fx.Arc(mid, d, S2FinalRadius, SwordEdge, S2CutFlash);
-            if (PlayerInHalf(mid, d, S2FinalRadius)) P.TakeDamage(S2FinalDamage, ignoreHitInvuln: true);
+            Vector2 d = Dir(Random.Range(0f, 360f));
+            if (comboSlashFx == null) comboSlashFx = gameObject.AddComponent<KagutsuchiComboSlashFx>();
+            if (!comboSlashFx.Play(mid, d, S2FinalRadius, S2CutFlash))
+                Fx.Circle(mid, S2FinalRadius, SwordEdge, S2CutFlash, grow: 0f);
+            var player = P;
+            if (player != null && (player.HurtCenter - mid).sqrMagnitude < Sq(S2FinalRadius + player.radius))
+                player.TakeDamage(S2FinalDamage, ignoreHitInvuln: true);
             CameraFollow.Shake(0.05f, 0.06f);
             yield return Wait(S2FinalInterval);
         }
@@ -764,7 +803,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     IEnumerator DelayedCut(Vector2 from, Vector2 d, float len, float delay, float damage)
     {
         yield return Wait(delay);
-        SpawnLaser(from, d, len, S2CutWidth, S2CutFlash, damage, S2CutFlash + 1f, null, SwordCore, SwordEdge);
+        SpawnLaser(from, d, len, S2CutWidth, S2CutFlash, damage, S2CutFlash + 1f, null, SwordCore, SwordEdge, slashVisual: true);
     }
 
     static Vector2 Dir(float deg) => new Vector2(Mathf.Cos(deg * Mathf.Deg2Rad), Mathf.Sin(deg * Mathf.Deg2Rad));
@@ -805,20 +844,34 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
 
     /// <summary>
     /// 회전베기: 검 아래쪽 (손잡이 끝) 을 축으로 돌면서 축이 from → to 로 seconds 동안 이동 (2026-11-13 사용자: 검 아래부분 기준 회전).
-    /// 범위 = 축 중심 반경 SwordSpinRadius (= 검 길이) 원, 닿으면 1번 피해
+    /// 범위 = 축 중심 반경 SwordSpinRadius (= 검 길이) 원. 기본 1회, 강화 추격은 회전마다 1회 시도.
     /// </summary>
-    IEnumerator BladeSpinMove(Vector2 from, Vector2 to, float seconds, float damage)
+    IEnumerator BladeSpinMove(Vector2 from, Vector2 to, float seconds, float damage, bool chase = false)
     {
         bool hit = false;
+        int lastTurn = -1;
+        Vector2 chasingPivot = from;
         float a = BladeAlive ? blade.Angle : 0f;
         var ring = Fx.Circle(from, SwordSpinRadius, SwordEdge, seconds + 0.1f);
-        for (float t = 0f; t < seconds;)
+        for (float t = 0f; t < seconds && BladeAlive;)
         {
             if (Playing && !e.IsStunned)
             {
                 t = Mathf.Min(seconds, t + Time.deltaTime);
                 a -= SpinSpeed * Time.deltaTime;
                 Vector2 pivot = Vector2.Lerp(from, to, t / seconds);
+                if (chase)
+                {
+                    var target = P;
+                    if (target != null)
+                        chasingPivot = Stage.ClampInside(Vector2.MoveTowards(chasingPivot, target.HurtCenter,
+                            target.moveSpeed * EmpoweredChaseSpeedRatio * Time.deltaTime), 0.5f);
+                    pivot = chasingPivot;
+                    // 회전마다 최대 한 번 시도. 마지막 순간에 다음 회전의 추가 타격을 만들지 않음.
+                    int totalTurns = Mathf.Max(1, Mathf.CeilToInt(seconds * SpinSpeed / 360f));
+                    int turn = Mathf.Min(totalTurns - 1, Mathf.FloorToInt(t * SpinSpeed / 360f));
+                    if (turn != lastTurn) { lastTurn = turn; hit = false; }
+                }
                 if (ring != null) ring.transform.position = pivot;
                 if (BladeAlive) blade.SetPose(CenterFromHilt(pivot, a), a);
                 var p = P;
@@ -849,12 +902,22 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     // [해석] 검은 반원 바깥쪽에 — 검 끝이 반경 10 경계에 닿게 (검 가운데 = 보스에서 10 - 길이/2)
     IEnumerator SwordCutRoutine()
     {
+        int count = Phase1Empowered ? EmpoweredRepeatCount : 1;
         Vector2 dir = ToPlayer;
+        for (int i = 0; i < count && BladeAlive; i++)
+            yield return SwordCutPass(dir, i > 0);
+        if (blade != null) blade.Release();
+    }
+
+    IEnumerator SwordCutPass(Vector2 dir, bool reverse)
+    {
         float ang = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
         float sweepR = SwordSweepRadius - SwordLength * 0.5f;
-        if (BladeAlive) blade.Control();
-        float startA = (ang + 90f) * Mathf.Deg2Rad;
-        StartCoroutine(BladeTo(Pos + new Vector2(Mathf.Cos(startA), Mathf.Sin(startA)) * sweepR, ang + 90f, 0.3f));
+        if (BladeAlive) { blade.Control(); blade.SetReverseSweep(reverse); }
+        float side = reverse ? -1f : 1f;
+        float startAngle = ang + side * 90f;
+        float startA = startAngle * Mathf.Deg2Rad;
+        StartCoroutine(BladeTo(Pos + new Vector2(Mathf.Cos(startA), Mathf.Sin(startA)) * sweepR, startAngle, 0.3f));
         Track(BossWarning.HalfDisc(Pos, dir, SwordSweepRadius, SwordSweepWarn));
         yield return WaitActive(SwordSweepWarn);
 
@@ -866,7 +929,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         for (float t = 0f; t < swing && BladeAlive;)
         {
             if (Playing) t += Time.deltaTime;
-            float a = ang + 90f - 180f * Mathf.Clamp01(t / swing);
+            float a = ang + side * (90f - 180f * Mathf.Clamp01(t / swing));
             float r = a * Mathf.Deg2Rad;
             blade.SetPose(Pos + new Vector2(Mathf.Cos(r), Mathf.Sin(r)) * sweepR, a);
             yield return null;
@@ -890,13 +953,13 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
             SpawnLaser(c.from, c.d, c.len, SwordCutWidth, SwordCutFlash, SwordCutDamage, SwordCutFlash + 1f, null, SwordCore, SwordEdge);
         CameraFollow.Shake(0.2f, 0.18f);
         yield return Wait(SwordCutFlash);
-        if (BladeAlive) blade.Release();   // 검 복귀
     }
 
     // ---------- 공격 패턴 4: 찌르기 → 그 자리에서 회전 ----------
     // 검을 보스 앞에 준비 → 1초 경고 (폭 1.5) → 10 앞으로 찌르기 → 그 자리에서 검 길이에 맞는 원으로 1.5초 경고 → 검이 회전하며 공격 → 검 복귀
     IEnumerator ThrustRoutine()
     {
+        bool empowered = Phase1Empowered;
         if (!BladeAlive) yield break;
         Vector2 dir = ToPlayer;
         float ang = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
@@ -932,7 +995,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         Vector2 hilt = end - dir * (SwordLength * 0.5f);
         SpinWarning(hilt, hilt, ThrustSpinWarn);
         yield return WaitActive(ThrustSpinWarn);
-        yield return BladeSpinMove(hilt, hilt, SpinTime, SpinDamage);
+        yield return BladeSpinMove(hilt, hilt, empowered ? EmpoweredSpinTime : SpinTime, SpinDamage, empowered);
         if (BladeAlive) blade.Release();   // 검 복귀
     }
 
@@ -940,6 +1003,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     // 검이 카구츠치 아래로 → 1초 경고 → 회전하며 플레이어 위치로 8 이동 → 1.5초 경고 → 다시 회전하며 8 이동 → 검 복귀
     IEnumerator MarchRoutine()
     {
+        bool empowered = Phase1Empowered;
         if (!BladeAlive) yield break;
         blade.Control();
         // 검 아래쪽 (손잡이 끝) = 회전축. 보스 아래에 축을 두고 검은 아래로 늘어뜨림
@@ -947,9 +1011,10 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         yield return BladeTo(CenterFromHilt(below, -90f), -90f, 0.3f);
 
         Vector2 cur = below;
-        float[] warns = { MarchFirstWarn, MarchSecondWarn };
-        foreach (float w in warns)
+        int count = empowered ? EmpoweredMarchCount : 2;
+        for (int i = 0; i < count; i++)
         {
+            float w = i == 0 ? MarchFirstWarn : MarchSecondWarn;
             if (!BladeAlive) break;
             Vector2 to = (P != null ? P.HurtCenter : cur + Vector2.down) - cur;
             Vector2 next = Stage.ClampInside(cur + (to.sqrMagnitude > 0.0001f ? to.normalized : Vector2.down) * Mathf.Min(MarchDistance, to.magnitude), 0.5f);
@@ -957,8 +1022,28 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
             yield return WaitActive(w);
             yield return BladeSpinMove(cur, next, MarchTime, MarchDamage);
             cur = next;
+            if (empowered && BladeAlive) yield return MarchExtraCuts();
         }
         if (BladeAlive) blade.Release();   // 검 복귀
+    }
+
+    IEnumerator MarchExtraCuts()
+    {
+        var cuts = new List<(Vector2 from, Vector2 direction, float length)>();
+        for (int i = 0; i < EmpoweredMarchCutCount; i++)
+        {
+            Vector2 through = Center + new Vector2(Random.Range(-Half.x, Half.x), Random.Range(-Half.y, Half.y));
+            Vector2 direction = Dir(Random.Range(0f, 360f));
+            float back = Stage.ExitDistance(through, -direction), forward = Stage.ExitDistance(through, direction);
+            Vector2 from = through - direction * back;
+            cuts.Add((from, direction, back + forward));
+            Track(BossWarning.Box(from, direction, back + forward, EmpoweredMarchCutWidth, EmpoweredMarchCutWarn));
+        }
+        yield return WaitActive(EmpoweredMarchCutWarn);
+        foreach (var cut in cuts)
+            SpawnLaser(cut.from, cut.direction, cut.length, EmpoweredMarchCutWidth, SwordCutFlash,
+                       EmpoweredMarchCutDamage, SwordCutFlash + 1f, null, SwordCore, SwordEdge, slashVisual: true);
+        yield return Wait(SwordCutFlash);
     }
 
     // ---------- 공격 패턴 6: 반쪽씩 차오르는 경고 → 화염장벽 ----------
@@ -967,8 +1052,15 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     // → 다 차면 화염장벽이 같은 방향으로 이동하며 공격. 쿨타임 20초
     IEnumerator FireWallRoutine()
     {
-        Vector2 min = Center - Half, max = Center + Half;
+        bool empowered = Phase1Empowered;
         bool vertical = Random.value < 0.5f;
+        yield return FireWallCast(vertical);
+        if (empowered) yield return FireWallCast(!vertical);
+    }
+
+    IEnumerator FireWallCast(bool vertical)
+    {
+        Vector2 min = Center - Half, max = Center + Half;
         Rect a = vertical ? Rect.MinMaxRect(min.x, min.y, Center.x, max.y) : Rect.MinMaxRect(min.x, min.y, max.x, Center.y);
         Rect b = vertical ? Rect.MinMaxRect(Center.x, min.y, max.x, max.y) : Rect.MinMaxRect(min.x, Center.y, max.x, max.y);
         bool firstA = Random.value < 0.5f;   // 어느 쪽이 먼저 차오를지
@@ -1049,15 +1141,19 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     // → 레이저가 사라지고 0.5초 후 다시 시전, 각도 8도씩 이동. [임시] 3번 시전. 쿨타임 15초
     IEnumerator FanReflectRoutine()
     {
+        bool empowered = Phase1Empowered;
+        int casts = empowered ? EmpoweredFanReflectCasts : FanReflectCasts;
         float shiftSign = Random.value < 0.5f ? -1f : 1f;   // [임시] 이동 방향 무작위 (매 시전 같은 쪽으로)
-        for (int k = 0; k < FanReflectCasts; k++)
+        for (int k = 0; k < casts; k++)
         {
             if (k > 0) yield return WaitActive(FanReflectGap);
             float baseAng = -90f + shiftSign * FanReflectShift * k;
+            float[] enhancedAngles = empowered ? EmpoweredFanAngles() : null;
             var running = new List<Coroutine>();
             for (int i = 0; i < FanReflectCount; i++)
             {
-                float a = baseAng - FanReflectArc * 0.5f + FanReflectArc * i / (FanReflectCount - 1);
+                float a = empowered ? enhancedAngles[i]
+                    : baseAng - FanReflectArc * 0.5f + FanReflectArc * i / (FanReflectCount - 1);
                 float r = a * Mathf.Deg2Rad;
                 Vector2 rd = new Vector2(Mathf.Cos(r), Mathf.Sin(r));
                 running.Add(StartCoroutine(ReflectLaser(Stage.ClampInside(Muzzle(rd), 0f), rd, FanReflectBounces,
@@ -1065,6 +1161,18 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
             }
             foreach (var c in running) yield return c;
         }
+    }
+
+    static float[] EmpoweredFanAngles()
+    {
+        // 간격 10도를 먼저 확보하고 남은 각도를 정렬된 난수로 분배해 재시도 없이 보장.
+        float slack = EmpoweredFanArc - EmpoweredFanMinGap * (FanReflectCount - 1);
+        var samples = new float[FanReflectCount];
+        for (int i = 0; i < samples.Length; i++) samples[i] = Random.Range(0f, slack);
+        System.Array.Sort(samples);
+        for (int i = 0; i < samples.Length; i++)
+            samples[i] += -90f - EmpoweredFanArc * 0.5f + EmpoweredFanMinGap * i;
+        return samples;
     }
 
     /// <summary>
@@ -1086,7 +1194,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         {
             Vector2 seg = pts[i + 1] - pts[i];
             if (seg.sqrMagnitude < 1e-4f) continue;
-            SpawnLaser(pts[i], seg.normalized, seg.magnitude, width, laserTime, damage, laserTime + 1f, null, FireCore, FireEdge);
+            SpawnLaser(pts[i], seg.normalized, seg.magnitude, width, laserTime, damage, laserTime + 1f, null, FireCore, FireEdge, flameVisual: true);
         }
         CameraFollow.Shake(0.15f, 0.12f);
         yield return Wait(laserTime);
@@ -1159,7 +1267,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         d = d.sqrMagnitude > 0.000001f ? d.normalized : Vector2.down;
         Vector2 from = Muzzle(d);
         float len = Mathf.Max(0.05f, (at - from).magnitude);
-        SpawnLaser(from, d, len, NovaBeamWidth, NovaWarnDelay + NovaGrowTime, NovaBeamDamage, 0.5f, null, FireCore, FireEdge);
+        SpawnLaser(from, d, len, NovaBeamWidth, NovaWarnDelay + NovaGrowTime, NovaBeamDamage, 0.5f, null, FireCore, FireEdge, flameVisual: true);
         Fx.Circle(at, 1f, FireFx, 0.4f);
         yield return Wait(NovaWarnDelay);
 
@@ -1203,7 +1311,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         warnings.RemoveAll(x => x == null);
         warnings.Add(w);
         yield return Wait(IntroLaserWarn);
-        SpawnLaser(from, d, len, IntroLaserWidth, IntroLaserTime, IntroLaserDamage, IntroLaserTime + 1f, null, FireCore, FireEdge);
+        SpawnLaser(from, d, len, IntroLaserWidth, IntroLaserTime, IntroLaserDamage, IntroLaserTime + 1f, null, FireCore, FireEdge, flameVisual: true);
         CameraFollow.Shake(0.06f, 0.08f);
     }
 }
@@ -1353,10 +1461,13 @@ public class KagutsuchiBlade : MonoBehaviour
 {
     const float RestGap = 1.5f;              // [임시] 보스 몸과 검 사이 (사용자: 조금 더 옆으로 — 0.6 → 1.5)
     const float RestAngle = 90f;             // 옆 자리: 수직으로 세움 (2026-11-13 사용자)
+    const float SpriteAngleOffset = 180f;    // flipX한 원화의 칼끝을 패턴의 논리 각도 방향에 맞춤.
     const float ReturnSpeed = 20f, ReturnTurn = 540f;   // [임시] 복귀 속도 (유닛/초 · 도/초)
 
     Enemy boss;
-    bool controlled;
+    SpriteRenderer bladeVisual, rimVisual;
+    Sprite fullSprite, buriedSprite, fullRim, buriedRim;
+    bool controlled, reverseSweep;
     Vector2 pos;
     float angle;
 
@@ -1371,6 +1482,8 @@ public class KagutsuchiBlade : MonoBehaviour
         body.maxHp = body.hp = Mathf.Max(1f, boss.maxHp * hpMul);
         var b = body.gameObject.AddComponent<KagutsuchiBlade>();
         b.Body = body;
+        b.bladeVisual = body.GetComponent<SpriteRenderer>();
+        b.fullSprite = b.bladeVisual.sprite;
         b.boss = boss;
         b.pos = b.RestPos; b.angle = RestAngle;
         // 그림 Enemy_KagutsuchiSword (2026-11-13, 칼끝이 오른쪽 = 각도 방향인 가로 검, 1200 × 126): 손잡이 끝 ~ 칼끝 = 검 길이, 비율 그대로 (두께 약 0.5)
@@ -1382,7 +1495,8 @@ public class KagutsuchiBlade : MonoBehaviour
             var rim = new GameObject("Rim");
             rim.transform.SetParent(body.transform, false);
             rim.transform.localScale = new Vector3(1.03f, 1.4f, 1f);
-            SpriteFactory.AddRenderer(rim, "Fx_Square", SpriteFactory.Shape.Square, new Color(0.72f, 0.75f, 0.82f, 0.95f), 6);
+            b.rimVisual = SpriteFactory.AddRenderer(rim, "Fx_Square", SpriteFactory.Shape.Square, new Color(0.72f, 0.75f, 0.82f, 0.95f), 6);
+            b.fullRim = b.rimVisual.sprite;
         }
         b.Apply();
         Fx.Circle(b.pos, 1.5f, new Color(1f, 1f, 1f, 0.8f), 0.4f);
@@ -1393,7 +1507,38 @@ public class KagutsuchiBlade : MonoBehaviour
     Vector2 RestPos => (Vector2)boss.transform.position + Vector2.right * (boss.radius + RestGap + KagutsuchiAI.SwordThick * 0.5f);
 
     public void Control() => controlled = true;
-    public void Release() => controlled = false;
+    public void Release() { SetBuried(false); SetReverseSweep(false); controlled = false; }
+
+    public void SetReverseSweep(bool reverse) { reverseSweep = reverse; Apply(); }
+
+    /// <summary>논리 각도 -90도(반전 원화 표시 +90도)로 박힌 동안 중앙 아래 절반만 표시에서 마스킹.</summary>
+    public void SetBuried(bool buried)
+    {
+        if (bladeVisual == null) return;
+        if (buried && buriedSprite == null) buriedSprite = AboveGroundHalf(fullSprite);
+        bladeVisual.sprite = buried ? buriedSprite : fullSprite;
+        if (rimVisual != null)
+        {
+            if (buried && buriedRim == null) buriedRim = AboveGroundHalf(fullRim);
+            rimVisual.sprite = buried ? buriedRim : fullRim;
+        }
+    }
+
+    static Sprite AboveGroundHalf(Sprite source)
+    {
+        if (source == null) return null;
+        var rect = source.rect;
+        rect.width *= 0.5f; // 원화 왼쪽 손잡이 절반: flipX와 표시 +90도에서 지면 위에 남음.
+        return Sprite.Create(source.texture, rect,
+                             new Vector2(source.pivot.x / rect.width, source.pivot.y / rect.height),
+                             source.pixelsPerUnit, 0, SpriteMeshType.FullRect);
+    }
+
+    void OnDestroy()
+    {
+        if (buriedSprite != null) Destroy(buriedSprite);
+        if (buriedRim != null) Destroy(buriedRim);
+    }
 
     /// <summary>검 가운데 위치 · 각도 (붙잡은 상태에서 패턴이 매 프레임 지정)</summary>
     public void SetPose(Vector2 p, float a) { pos = p; angle = a; Apply(); }
@@ -1401,7 +1546,9 @@ public class KagutsuchiBlade : MonoBehaviour
     void Apply()
     {
         transform.position = pos;
-        transform.rotation = Quaternion.Euler(0, 0, angle);
+        transform.rotation = Quaternion.Euler(0, 0, angle + SpriteAngleOffset);
+        if (bladeVisual != null) { bladeVisual.flipX = true; bladeVisual.flipY = reverseSweep; }
+        if (rimVisual != null) { rimVisual.flipX = true; rimVisual.flipY = reverseSweep; }
     }
 
     // Enemy.Update (이동 · 맵 경계) 다음에 덮어씀

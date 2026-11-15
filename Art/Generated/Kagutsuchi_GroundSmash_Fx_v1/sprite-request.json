@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-request",
+  "engine": "component-row",
+  "character": {
+    "id": "kagutsuchi-ground-smash-fx",
+    "description": "",
+    "base_image": "base-source.png"
+  },
+  "cell": {
+    "shape": "rect",
+    "width": 512,
+    "height": 256,
+    "safe_margin_x": 24,
+    "safe_margin_y": 24
+  },
+  "chroma_key": {
+    "name": "green",
+    "hex": "#00FF00",
+    "rgb": [
+      0,
+      255,
+      0
+    ],
+    "selection": "manual"
+  },
+  "states": {
+    "smash": {
+      "frames": 6,
+      "fps": 12,
+      "loop": false,
+      "action": "One explosive fist ground slam: compact sharp white-yellow impact flash, strong low radial flame shock, full spreading elliptical flame crown, outward rushing thinner fiery shock ring, low unbroken dissipating orange ring, very faint red residual ring. Clearly distinct temporal phases with expansion and dissipation; fixed impact center and world scale, low ground-hugging shape, no tall fireball or sustained burning. Connected silhouette in every frame, no detached debris or sparks."
+    }
+  },
+  "style": "painted anime fantasy VFX, white-hot yellow orange crimson flame shock, smooth nonpixel art",
+  "subject": "effect",
+  "layout": "taxonomy/v1",
+  "fit": {
+    "resample": "lanczos",
+    "align_x": "bbox-center",
+    "align_y": "center",
+    "ground_frames": false,
+    "pixel_unfake": false
+  },
+  "chroma": {
+    "mode": "rgb",
+    "unmix_reach": 4,
+    "spill_max_fraction": 0.005
+  }
+}

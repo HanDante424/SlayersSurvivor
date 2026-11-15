@@ -25,7 +25,7 @@ public class CameraFollow : MonoBehaviour
     object outsideMapOwner;
     Transform beforeOutsideFocus;
     bool beforeOutsideFullMap;
-    float beforeOutsideZoom, outsideBaseSize;
+    float beforeOutsideZoom, outsideBaseSize, beforeOutsideMapOffset;
 
     /// <summary>소유자가 있는 임시 추적. 종료·중단 시 원래 대상과 맵 제한으로 복귀.</summary>
     public static void BeginOutsideMapFollow(object owner, Transform target, float magnification = 1f)
@@ -37,6 +37,7 @@ public class CameraFollow : MonoBehaviour
             inst.beforeOutsideFocus = inst.focus;
             inst.beforeOutsideFullMap = inst.fullMap;
             inst.beforeOutsideZoom = inst.zoomTarget;
+            inst.beforeOutsideMapOffset = inst.fullMapOffsetY;
             var cam = inst.GetComponent<Camera>();
             inst.outsideBaseSize = cam != null ? cam.orthographicSize : GameManager.ViewSize;
         }
@@ -46,6 +47,20 @@ public class CameraFollow : MonoBehaviour
         inst.fullMap = false;
     }
 
+    /// <summary>현재 소유자의 원래 시야 복원 정보는 보존한 채 전체 맵으로 전환.</summary>
+    public static void SetOutsideMapFullView(object owner)
+    {
+        if (inst == null || inst.outsideMapOwner != owner || owner == null) return;
+        var cam = inst.GetComponent<Camera>();
+        float aspect = cam != null ? cam.aspect : 16f / 9f;
+        inst.zoomTarget = FullMapViewSize(aspect, FullMapMargin);
+        inst.focus = null;
+        inst.fullMap = true;
+        inst.fullMapOffsetY = (HudTop - HudBottom) * inst.zoomTarget;
+        inst.blendLeft = BlendTime;
+        inst.lastPos = inst.transform.position;
+    }
+
     public static void EndOutsideMapFollow(object owner)
     {
         if (inst == null || inst.outsideMapOwner != owner || owner == null) return;
@@ -53,6 +68,7 @@ public class CameraFollow : MonoBehaviour
         inst.focus = inst.beforeOutsideFocus;
         inst.fullMap = inst.beforeOutsideFullMap;
         inst.zoomTarget = inst.beforeOutsideZoom;
+        inst.fullMapOffsetY = inst.beforeOutsideMapOffset;
         inst.beforeOutsideFocus = null;
         inst.blendLeft = BlendTime;
         inst.lastPos = inst.transform.position;

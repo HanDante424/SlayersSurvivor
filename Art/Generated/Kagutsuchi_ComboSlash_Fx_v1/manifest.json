@@ -1,0 +1,120 @@
+{
+  "provider": "built-in image_gen",
+  "asset": "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\Kagutsuchi_Fx_ComboSlash.png",
+  "frameCount": 6,
+  "columns": 3,
+  "rows": 2,
+  "cellWidth": 512,
+  "cellHeight": 512,
+  "order": "left-to-right, then top-to-bottom",
+  "pivot": [
+    0.5,
+    0.5
+  ],
+  "orientation": "right-facing semicircle",
+  "preview": "0.15 second slash + 0.05 second gap, referencing existing S2FinalInterval 0.2",
+  "runtimeConnected": true,
+  "alpha": "source RGBA preserved unchanged",
+  "qa": [
+    {
+      "frame": 0,
+      "alphaAbove32Bounds": [
+        242,
+        57,
+        408,
+        139
+      ],
+      "alphaRange": [
+        0,
+        251
+      ]
+    },
+    {
+      "frame": 1,
+      "alphaAbove32Bounds": [
+        220,
+        49,
+        466,
+        356
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 2,
+      "alphaAbove32Bounds": [
+        178,
+        46,
+        467,
+        464
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 3,
+      "alphaAbove32Bounds": [
+        203,
+        58,
+        458,
+        464
+      ],
+      "alphaRange": [
+        0,
+        253
+      ]
+    },
+    {
+      "frame": 4,
+      "alphaAbove32Bounds": [
+        248,
+        55,
+        445,
+        463
+      ],
+      "alphaRange": [
+        0,
+        246
+      ]
+    },
+    {
+      "frame": 5,
+      "alphaAbove32Bounds": [
+        321,
+        84,
+        435,
+        440
+      ],
+      "alphaRange": [
+        0,
+        233
+      ]
+    }
+  ],
+  "runtimeOwner": "KagutsuchiAI / KagutsuchiComboSlashFx",
+  "runtimeUse": "Phase1 Special2 final repeated semicircle slash",
+  "runtimeDurationSeconds": 0.15,
+  "runtimeIntervalSeconds": 0.2,
+  "runtimeRadius": 12,
+  "artRadiusPixels": 194,
+  "mainDirection": "random display rotation 0..360 degrees and random sweep reversal; damage is omnidirectional",
+  "innerVisuals": {
+    "countPerHit": 8,
+    "damage": false,
+    "scaleRelativeToMain": [
+      0.2,
+      0.5
+    ],
+    "placement": "inside full main circle",
+    "orientation": "random local 0..360 degrees and random vertical flip",
+    "clipping": "world-space main circle",
+    "duration": "same as main"
+  },
+  "runtimeShape": "full circle, two opposite half sprites per ring",
+  "runtimeDamageShape": "full circle, radius 12 plus player radius",
+  "rendererCount": 18
+}

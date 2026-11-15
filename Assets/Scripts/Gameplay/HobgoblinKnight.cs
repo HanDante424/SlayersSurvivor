@@ -343,6 +343,10 @@ public class BossWarning : MonoBehaviour
     public static BossWarning Circle(Vector2 at, float r, float seconds) =>
         Make(SpriteFactory.Shape.Circle, at, new Vector2(r * 2f, r * 2f), 0f, seconds, Red);
 
+    /// <summary>축별 반경을 가진 타원 경고. 기존 원 스프라이트만 비균등 확대.</summary>
+    public static BossWarning Ellipse(Vector2 at, Vector2 halfAxes, float seconds) =>
+        Make(SpriteFactory.Shape.Circle, at, halfAxes * 2f, 0f, seconds, Red);
+
     public static BossWarning HalfDisc(Vector2 at, Vector2 dir, float r, float seconds) => HalfDisc(at, dir, r, seconds, Red);
 
     public static BossWarning HalfDisc(Vector2 at, Vector2 dir, float r, float seconds, Color c) =>

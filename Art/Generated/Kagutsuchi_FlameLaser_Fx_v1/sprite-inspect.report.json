@@ -1,0 +1,51 @@
+{
+  "ok": true,
+  "engine": "component-row",
+  "kind": "sprite-gen-inspect-report",
+  "run_dir": "C:\\Users\\hanho\\.codex\\visualizations\\2026\\11\\14\\01a1d824-c400-7441-a07e-917bf0593926\\flame-laser-v1",
+  "states": [
+    "beam"
+  ],
+  "thresholds": {
+    "histogram_min": 0.0,
+    "dhash_min": 0.55,
+    "motion_min": 0.01
+  },
+  "rows": [
+    {
+      "state": "beam",
+      "source": "frames",
+      "expected_frames": 6,
+      "found_frames": 6,
+      "natural_pose_count": 6,
+      "frame_files": [
+        "frames/beam/frame-0.png",
+        "frames/beam/frame-1.png",
+        "frames/beam/frame-2.png",
+        "frames/beam/frame-3.png",
+        "frames/beam/frame-4.png",
+        "frames/beam/frame-5.png"
+      ],
+      "metrics": {
+        "histogram_intersection": {
+          "min": 0.9624350141675623,
+          "mean": 0.9753270325891998
+        },
+        "dhash_similarity": {
+          "min": 1.0,
+          "mean": 1.0
+        },
+        "motion_presence": 0.035149548100490195,
+        "centroid_sigma": {
+          "x": 0.48877824549655374,
+          "y": 2.364672496648983
+        }
+      },
+      "ok": true,
+      "errors": [],
+      "warnings": []
+    }
+  ],
+  "errors": [],
+  "warnings": []
+}

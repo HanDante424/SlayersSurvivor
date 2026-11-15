@@ -151,6 +151,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
                 {
                     step = Step.GroundSmash; elapsed = 0f;
                     Show(groundSmash, 0f);
+                    body.GetComponent<KagutsuchiPhysicalStompFx>()?.Play(bossGround, body.radius);
                     CameraFollow.Shake(ShakeTime, ShakeAmplitude);
                     Hit();
                 }

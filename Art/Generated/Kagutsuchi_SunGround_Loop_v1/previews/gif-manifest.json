@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "kind": "sprite-gen-gif-run",
+  "run_dir": "C:\\Users\\hanho\\.codex\\visualizations\\2026\\11\\14\\01a1d824-c400-7441-a07e-917bf0593926\\sun-ground-animation-v1",
+  "exports": [
+    {
+      "state": "burn",
+      "output": "C:\\Users\\hanho\\.codex\\visualizations\\2026\\11\\14\\01a1d824-c400-7441-a07e-917bf0593926\\sun-ground-animation-v1\\previews\\burn.gif",
+      "frames": 6,
+      "fps": 12.0,
+      "loop": true,
+      "gif_report": {
+        "path": "C:\\Users\\hanho\\.codex\\visualizations\\2026\\11\\14\\01a1d824-c400-7441-a07e-917bf0593926\\sun-ground-animation-v1\\previews\\burn.gif",
+        "frames": 6,
+        "delay_ticks": [
+          8,
+          8,
+          8,
+          8,
+          8,
+          8
+        ],
+        "loop": 0,
+        "transparent": true,
+        "disposal": [
+          2,
+          2,
+          2,
+          2,
+          2,
+          2
+        ]
+      }
+    }
+  ]
+}

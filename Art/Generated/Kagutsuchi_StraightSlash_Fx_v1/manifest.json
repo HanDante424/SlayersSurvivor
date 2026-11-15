@@ -1,0 +1,20 @@
+{
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-12e0d2b3-d75a-46e5-9029-e6ee589ccf4d.png",
+  "sheet": "sprite-sheet-alpha.png",
+  "frameCount": 6,
+  "columns": 1,
+  "rows": 6,
+  "cellWidth": 1536,
+  "cellHeight": 160,
+  "sourceCentersY": [
+    100,
+    274,
+    447,
+    619,
+    784,
+    936
+  ],
+  "runtimeDuration": "existing attack duration (0.15 seconds)",
+  "previewFrameMs": 30,
+  "alpha": "preserved; no chroma removal or background repaint"
+}
