@@ -154,6 +154,9 @@ public class DebugMapController : MonoBehaviour
     Vector2 scroll;
     int monsterCount = 1;
     bool showSpriteInfo = true;
+    bool panelOpen = true;                                   // 디버그 창 전체 켜기 · 끄기 (사용자 2026-11-16, 버튼 또는 ` 키)
+    readonly System.Collections.Generic.Dictionary<string, bool> sectionOpen = new System.Collections.Generic.Dictionary<string, bool>();   // 태그 (구역) 별 접기 · 펴기
+    Rect toggleRect;
     float timeScale = 1f;
     int stepFrames;               // > 0 이면 한 프레임만 진행 후 다시 정지
     GUIStyle btn, btnOn, label, head, info;
@@ -182,11 +185,13 @@ public class DebugMapController : MonoBehaviour
         // 체력 회복: H 키 = 즉시 최대, 자동 회복 켜면 매 프레임 최대 유지 (무적과 달리 피격 연출은 그대로 보임)
         if (Player.I != null && (autoHeal || Input.GetKeyDown(KeyCode.H))) Player.I.hp = Player.I.maxHp;
 
+        if (Input.GetKeyDown(KeyCode.BackQuote)) panelOpen = !panelOpen;   // ` 키: 디버그 창 켜기 · 끄기
+
         // 우클릭: 플레이어 이동 (패널 위는 제외)
         if (Input.GetMouseButtonDown(1) && Player.I != null && Camera.main != null)
         {
             Vector2 gui = new Vector2(Input.mousePosition.x, Screen.height - Input.mousePosition.y);
-            if (!panelRect.Contains(gui))
+            if (!panelRect.Contains(gui) && !toggleRect.Contains(gui))
             {
                 Vector2 world = Camera.main.ScreenToWorldPoint(Input.mousePosition);
                 var p = Player.I;
@@ -223,6 +228,14 @@ public class DebugMapController : MonoBehaviour
         info = new GUIStyle(UIStyles.Small) { fontSize = 12, richText = true, wordWrap = true };
     }
 
+    /// <summary>구역 제목 (누르면 그 구역을 접거나 폄). 펴져 있으면 true</summary>
+    bool Section(string title)
+    {
+        bool open = !sectionOpen.TryGetValue(title, out bool stored) || stored;   // 처음에는 모두 펴짐
+        if (GUILayout.Button($"{(open ? "▼" : "▶")} {title}", head)) { open = !open; sectionOpen[title] = open; }
+        return open;
+    }
+
     bool Toggle(string text, bool on) => GUILayout.Button(on ? $"{text}  <color=#7CFF7C>ON</color>" : $"{text}  <color=#888888>OFF</color>", btn, GUILayout.Height(28));
 
     void OnGUI()
@@ -230,6 +243,10 @@ public class DebugMapController : MonoBehaviour
         UIStyles.Init();
         Styles();
         float H = Screen.height;
+        // 창 전체 켜기 · 끄기 버튼 (항상 보임)
+        toggleRect = new Rect(Screen.width - 150f - PanelMargin, 34f, 150f, 22f);
+        if (GUI.Button(toggleRect, panelOpen ? "디버그 창 ON  (`)" : "디버그 창 OFF  (`)", btn)) panelOpen = !panelOpen;
+        if (!panelOpen) { panelRect = Rect.zero; if (showSpriteInfo) DrawSpriteInfo(); return; }
         panelRect = new Rect(Screen.width - PanelWidth - PanelMargin, 60f, PanelWidth, H - 60f - PanelMargin);
         GUI.color = new Color(0, 0, 0, 0.72f);
         GUI.DrawTexture(panelRect, UIStyles.White);
@@ -241,57 +258,68 @@ public class DebugMapController : MonoBehaviour
         GUILayout.Label("디버그 맵", head);
 
         // ----- 맵 -----
-        GUILayout.Label($"맵 크기  <color=#AAAAAA>{Stage.PresetLabel(Stage.Preset)} · {Stage.HalfSize.x * 2f:0.#} × {Stage.HalfSize.y * 2f:0.#}</color>", label);
-        GUILayout.BeginHorizontal();
-        foreach (MapPreset p in System.Enum.GetValues(typeof(MapPreset)))
-            if (GUILayout.Button(Stage.PresetLabel(p), p == Stage.Preset ? btnOn : btn, GUILayout.Height(28))) SetMap(p);
-        GUILayout.EndHorizontal();
-        GUILayout.Label("<size=12><color=#888888>패턴의 위치 · 크기는 기본 맵 기준 값 그대로, 맵 밖이면 안쪽으로 보정</color></size>", label);
+        if (Section("맵"))
+        {
+            GUILayout.Label($"맵 크기  <color=#AAAAAA>{Stage.PresetLabel(Stage.Preset)} · {Stage.HalfSize.x * 2f:0.#} × {Stage.HalfSize.y * 2f:0.#}</color>", label);
+            GUILayout.BeginHorizontal();
+            foreach (MapPreset p in System.Enum.GetValues(typeof(MapPreset)))
+                if (GUILayout.Button(Stage.PresetLabel(p), p == Stage.Preset ? btnOn : btn, GUILayout.Height(28))) SetMap(p);
+            GUILayout.EndHorizontal();
+            GUILayout.Label("<size=12><color=#888888>패턴의 위치 · 크기는 기본 맵 기준 값 그대로, 맵 밖이면 안쪽으로 보정</color></size>", label);
+        }
 
         // ----- 소환 -----
         GUILayout.Space(6);
-        GUILayout.Label("소환 — 보스", head);
-        if (Toggle("등장 연출 재생", DebugMap.PlayIntro)) DebugMap.PlayIntro = !DebugMap.PlayIntro;
-        foreach (var en in DebugMap.Bosses)
-            if (GUILayout.Button(en.label, btn, GUILayout.Height(26))) DebugMap.Spawn(en, 1);
-        GUILayout.Label("소환 — 몬스터", head);
-        GUILayout.BeginHorizontal();
-        GUILayout.Label($"수량 {monsterCount}", label, GUILayout.Width(70));
-        if (GUILayout.Button("−", btn, GUILayout.Width(34), GUILayout.Height(24))) monsterCount = Mathf.Max(1, monsterCount - 1);
-        if (GUILayout.Button("+", btn, GUILayout.Width(34), GUILayout.Height(24))) monsterCount = Mathf.Min(12, monsterCount + 1);
-        GUILayout.EndHorizontal();
-        foreach (var en in DebugMap.Monsters)
-            if (GUILayout.Button(en.label, btn, GUILayout.Height(26))) DebugMap.Spawn(en, monsterCount);
-        if (GUILayout.Button("모두 제거", btn, GUILayout.Height(26))) DebugMap.ClearAll();
+        if (Section("소환 — 보스"))
+        {
+            if (Toggle("등장 연출 재생", DebugMap.PlayIntro)) DebugMap.PlayIntro = !DebugMap.PlayIntro;
+            foreach (var en in DebugMap.Bosses)
+                if (GUILayout.Button(en.label, btn, GUILayout.Height(26))) DebugMap.Spawn(en, 1);
+        }
+        if (Section("소환 — 몬스터"))
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label($"수량 {monsterCount}", label, GUILayout.Width(70));
+            if (GUILayout.Button("−", btn, GUILayout.Width(34), GUILayout.Height(24))) monsterCount = Mathf.Max(1, monsterCount - 1);
+            if (GUILayout.Button("+", btn, GUILayout.Width(34), GUILayout.Height(24))) monsterCount = Mathf.Min(12, monsterCount + 1);
+            GUILayout.EndHorizontal();
+            foreach (var en in DebugMap.Monsters)
+                if (GUILayout.Button(en.label, btn, GUILayout.Height(26))) DebugMap.Spawn(en, monsterCount);
+            if (GUILayout.Button("모두 제거", btn, GUILayout.Height(26))) DebugMap.ClearAll();
+        }
 
         // ----- 대상 -----
         DebugMap.Clean();
         GUILayout.Space(6);
-        GUILayout.Label("대상", head);
-        if (DebugMap.Spawned.Count == 0) GUILayout.Label("<color=#888888>소환된 대상 없음</color>", label);
-        foreach (var e in DebugMap.Spawned)
-        {
-            if (e == null) continue;
-            bool sel = e == DebugMap.Target;
-            if (GUILayout.Button($"{(sel ? "▶ " : "")}{e.DisplayName}  <size=12>{Mathf.CeilToInt(Mathf.Max(0f, e.hp))}/{Mathf.CeilToInt(e.maxHp)}</size>", sel ? btnOn : btn, GUILayout.Height(24)))
-                DebugMap.Target = e;
-        }
         var t = DebugMap.Target;
-        if (t != null)
+        if (Section("대상"))
         {
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Button("체력 회복", btn, GUILayout.Height(24))) t.hp = t.maxHp;
-            // 사용자 (2026-11-16): 현재 체력을 절반으로 (체력 문턱 패턴 · 50% 강화 확인용). 최소 1 남김
-            if (GUILayout.Button("체력 50% 감소", btn, GUILayout.Height(24))) t.hp = Mathf.Max(1f, t.hp * 0.5f);
-            if (GUILayout.Button("제거", btn, GUILayout.Height(24))) DebugMap.Destroy(t);
-            GUILayout.EndHorizontal();
-            if (t != null && showSpriteInfo) GUILayout.Label(SpriteInfoText(t), info);
+            if (DebugMap.Spawned.Count == 0) GUILayout.Label("<color=#888888>소환된 대상 없음</color>", label);
+            foreach (var e in DebugMap.Spawned)
+            {
+                if (e == null) continue;
+                bool sel = e == DebugMap.Target;
+                if (GUILayout.Button($"{(sel ? "▶ " : "")}{e.DisplayName}  <size=12>{Mathf.CeilToInt(Mathf.Max(0f, e.hp))}/{Mathf.CeilToInt(e.maxHp)}</size>", sel ? btnOn : btn, GUILayout.Height(24)))
+                    DebugMap.Target = e;
+            }
+            t = DebugMap.Target;
+            if (t != null)
+            {
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("체력 회복", btn, GUILayout.Height(24))) t.hp = t.maxHp;
+                // 사용자 (2026-11-16): 현재 체력을 절반으로 (체력 문턱 패턴 · 50% 강화 확인용). 최소 1 남김
+                if (GUILayout.Button("체력 50% 감소", btn, GUILayout.Height(24))) t.hp = Mathf.Max(1f, t.hp * 0.5f);
+                if (GUILayout.Button("제거", btn, GUILayout.Height(24))) DebugMap.Destroy(t);
+                GUILayout.EndHorizontal();
+                if (t != null && showSpriteInfo) GUILayout.Label(SpriteInfoText(t), info);
+            }
         }
 
         // ----- 패턴 -----
         t = DebugMap.Target;
         GUILayout.Space(6);
-        GUILayout.Label("패턴", head);
+        if (Section("패턴"))
+        {
         IDebugBoss boss = null;
         if (t != null) t.TryGetComponent(out boss);
         if (t == null) GUILayout.Label("<color=#888888>대상을 소환하세요</color>", label);
@@ -309,24 +337,29 @@ public class DebugMapController : MonoBehaviour
             if (t.TryGetComponent<IDebugSprites>(out var sprites) && sprites.DebugSpriteNames.Length > 0)
             {
                 GUILayout.Space(6);
-                GUILayout.Label("스프라이트 (패턴 없이 모양만)", head);
-                if (GUILayout.Button("원래대로 (대기 모양)", btn, GUILayout.Height(26))) { ClearSpriteView(t); boss.DebugCancel(); }
-                var spriteNames = sprites.DebugSpriteNames;
-                for (int i = 0; i < spriteNames.Length; i += 2)
+                if (Section("스프라이트 (패턴 없이 모양만)"))
                 {
-                    GUILayout.BeginHorizontal();
-                    for (int j = i; j < Mathf.Min(i + 2, spriteNames.Length); j++)
-                        if (GUILayout.Button(spriteNames[j], btn, GUILayout.Height(24))) { ClearSpriteView(t); sprites.DebugShowSprite(j); }
-                    GUILayout.EndHorizontal();
+                    if (GUILayout.Button("원래대로 (대기 모양)", btn, GUILayout.Height(26))) { ClearSpriteView(t); boss.DebugCancel(); }
+                    var spriteNames = sprites.DebugSpriteNames;
+                    for (int i = 0; i < spriteNames.Length; i += 2)
+                    {
+                        GUILayout.BeginHorizontal();
+                        for (int j = i; j < Mathf.Min(i + 2, spriteNames.Length); j++)
+                            if (GUILayout.Button(spriteNames[j], btn, GUILayout.Height(24))) { ClearSpriteView(t); sprites.DebugShowSprite(j); }
+                        GUILayout.EndHorizontal();
+                    }
                 }
             }
         }
+
+        }   // 패턴 구역 끝
 
         DrawSpriteViewer(t);
 
         // ----- 보기 · 시간 · 플레이어 -----
         GUILayout.Space(6);
-        GUILayout.Label("보기 · 시간 · 플레이어", head);
+        if (Section("보기 · 시간 · 플레이어"))
+        {
         if (Toggle("판정 표시 (F1)", HitboxView.Show)) HitboxView.Show = !HitboxView.Show;
         if (Toggle("스프라이트 경계 · 정보", showSpriteInfo)) showSpriteInfo = !showSpriteInfo;
         if (Toggle("맵 배경 이미지 (폐허 성, 임시)", ArenaView.DebugBackdrop)) { ArenaView.DebugBackdrop = !ArenaView.DebugBackdrop; ArenaView.Rebuild(); }
@@ -342,6 +375,7 @@ public class DebugMapController : MonoBehaviour
         if (GUILayout.Button("한 프레임 진행 (정지 중)", btn, GUILayout.Height(26))) { timeScale = 0f; stepFrames = 1; }
         if (GUILayout.Button("플레이어 위치 초기화", btn, GUILayout.Height(24))) PlacePlayer();
         GUILayout.Label("<size=12><color=#888888>마우스 우클릭 = 플레이어를 그 위치로 이동</color></size>", label);
+        }   // 보기 · 시간 · 플레이어 구역 끝
 
         GUILayout.EndScrollView();
         GUILayout.EndArea();
@@ -389,7 +423,7 @@ public class DebugMapController : MonoBehaviour
         if (svTarget != t) { svTarget = t; svDef = 0; svRow = 0; svCol = 0; }
         var view = DebugSpriteView.Of(t);
         GUILayout.Space(6);
-        GUILayout.Label("그림 보기 (시트 · 한 장 그림)", head);
+        if (!Section("그림 보기 (시트 · 한 장 그림)")) return;
         GUILayout.BeginHorizontal();
         for (int i = 0; i < defs.Count; i++)
             if (GUILayout.Button(defs[i].Label, view.Active && svDef == i ? btnOn : btn, GUILayout.Height(24)))

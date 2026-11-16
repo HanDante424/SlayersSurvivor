@@ -312,6 +312,19 @@ public class Player : MonoBehaviour
 
     /// <summary>체력 바를 그릴 위치 (플레이어 기준 아래쪽 거리)</summary>
     public float HealthBarOffset { get; private set; } = 0.65f;
+    /// <summary>체력 바를 그릴 월드 위치. 보스가 눕혀 잡고 있을 때는 눕힌 그림 바로 아래 (사용자 2026-11-16), 아니면 발 아래</summary>
+    public Vector3 HealthBarWorldPosition
+    {
+        get
+        {
+            if (bossHoldProne && bossHoldRenderer != null && bossHoldRenderer.sprite != null)
+            {
+                var b = bossHoldRenderer.bounds;
+                return new Vector3(b.center.x, b.min.y - 0.15f, transform.position.z);
+            }
+            return transform.position + Vector3.down * HealthBarOffset;
+        }
+    }
 
     float invuln;
     SpriteRenderer sr;

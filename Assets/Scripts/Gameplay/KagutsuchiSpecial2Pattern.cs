@@ -319,6 +319,8 @@ public sealed class KagutsuchiKickWindFx : IDisposable
     SpriteRenderer renderer;
     float age;
     bool playing;
+    /// <summary>표시 배율 (기본 1, 공격 11 마지막 발차기는 0.4 = 60% 감소)</summary>
+    public float Scale = 1f;
 
     public KagutsuchiKickWindFx()
     {
@@ -342,6 +344,7 @@ public sealed class KagutsuchiKickWindFx : IDisposable
         }
         renderer.sortingOrder = sortingOrder;
         renderer.flipX = !facingRight;     // 원화는 오른쪽으로 뻗음 (끝이 왼쪽)
+        root.transform.localScale = Vector3.one * Scale;
         root.transform.position = bossPosition + Vector2.right * (facingRight ? FrontDistance : -FrontDistance);
         age = 0f; playing = true;
         renderer.sprite = frames[0];
