@@ -119,6 +119,7 @@ public class KagutsuchiPhaseTransition : MonoBehaviour
         step = Step.Warning;
         elapsed = 0f;
         Flash(ChargeFlashHold);
+        ArenaView.SetBackdropPhase(2);   // 화면이 하얗게 점멸하는 동안 배경을 2페이즈 판 (더 부서지고 불타는) 으로 교체
         StopFlames();
         visual.enabled = false;
         CameraFollow.SetTransitionView(-1f, Vector2.zero);
@@ -182,7 +183,7 @@ public class KagutsuchiPhaseTransition : MonoBehaviour
         body.hp = body.maxHp;
         FlameSword.RemoveBurn(body);
         body.ClearControlEffects();
-        source.sprite = SpriteFactory.TryGet(Stand) ?? originalSprite;
+        source.sprite = KagutsuchiPhase2.StandSprite() ?? SpriteFactory.TryGet(Stand) ?? originalSprite;   // pivot = 맨 아래 · 두 발 사이 (사용자 2026-11-16)
         source.flipX = Player.I != null && Player.I.HurtCenter.x > transform.position.x;
         body.SetHidden(false);
         completed = true;

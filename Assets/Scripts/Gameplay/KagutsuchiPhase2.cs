@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 /// <summary>
@@ -69,14 +69,30 @@ public sealed class KagutsuchiPhase2 : IDisposable
         new ComboStep(ComboAction.Kick, 1f), // [임시] 발차기 경고 시간
         new ComboStep(ComboAction.Stomp, 1f), // 사용자 확정: 마지막 경고 1초
     };
+    // 강화: 공격 5 = 마지막 추적 내려찍기 뒤에 추적 내려찍기 한 번 더. 공격 2 = 발차기 뒤에 추적 내려찍기 한 번.
+    static readonly ComboStep[] ComboStepsEnhanced =
+    {
+        new ComboStep(ComboAction.Punch, 1f), new ComboStep(ComboAction.Uppercut, 1f), new ComboStep(ComboAction.Punch, 1f),
+        new ComboStep(ComboAction.Kick, 1f), new ComboStep(ComboAction.Stomp, 1f), new ComboStep(ComboAction.Stomp, 1f),
+    };
+    static readonly ComboStep[] TrackStompOnly = { new ComboStep(ComboAction.Stomp, 1f) };
+    ComboStep[] activeSteps = ComboSteps;
     const float PatternGap = 0.5f;          // [임시] 기획서의 패턴 간 공통 간격
     const float DirectionEpsilon = 0.0001f;
     const float GrabSlamPlayerHeightOffset = 0f, GrabComboSmashPlayerHeightOffset = 0f; // 사용자: 직전 -2 보정에서 Y +2.
     const float GrabSlamFacingOffset = 1f; // 사용자: 플레이어 왼쪽 보기 X+1, 오른쪽 보기 X-1.
     const float GrabComboSmashFacingOffset = 1f; // 사용자: 기존 보정에 좌+0.5/우-0.5 추가, 최종 좌+1/우-1.
     const string PunchSheet = "Kagutsuchi_P2_Atk_Punch";
+    // ---- 체력 50% 이하 강화 (사용자 2026-11-16) ----
+    const float EnhanceHealth = 0.5f;
+    const float PunchEnhanceDistance = 2f, PunchEnhancedCooldown = 0.5f;   // 공격 1: 돌진 거리 +2 [해석: 감지 범위는 원래 없음], 0.5초 후 재사용
+    const float RunEnhancedCooldownCut = 1f;                              // 이동 1: 쿨타임 1초 감소
+    const float ChainStompShift = 1f, ChainStompShiftTime = 0.1f;         // 공격 4: 매 공격 후 플레이어 쪽으로 1 이동 [해석: 방향 · 시간 임시]
+    const float SpecialCooldown = 90f;                                    // 체력 문턱 특수 패턴 각각의 쿨타임 1분 30초
+    static readonly float[] Special2Thresholds = { 0.75f, 0.5f, 0.25f };  // 특수 패턴 2 발동 체력
+    bool Enhanced => body != null && body.hp <= body.maxHp * EnhanceHealth;
 
-    enum Phase { Waiting, Warning, Dash, Hit, Recovery, RunWarning, Running, RunRecovery,
+    enum Phase { Waiting, StompMoving, ChainStompMoving, Warning, Dash, Hit, Recovery, RunWarning, Running, RunRecovery,
                  DiveWarning, Flying, Landing, KickWarning, KickMoving, KickHit, KickRecovery,
                  StompWarning, StompHit, StompRecovery, UppercutWarning, UppercutHit, UppercutRecovery,
                  ChainStompWarning, ChainStompHit, ChainStompRecovery,
@@ -107,8 +123,10 @@ public sealed class KagutsuchiPhase2 : IDisposable
     readonly Sprite punch, diveReady, dive, kick, groundSmash, stomp, stompReady, uppercut, grabReady, grabDash;
     readonly KagutsuchiSolarPattern solarPattern;
     readonly Sprite solarJump, solarLaugh;
-    int solarThreshold;
-    bool solarPending;
+    readonly KagutsuchiSpecial2Pattern special2Pattern;
+    int solarThreshold, special2Threshold;
+    bool solarPending, special2Pending;
+    float solarCooldownLeft, special2CooldownLeft;
     readonly KagutsuchiGrabPattern grabPattern;
     float grabCooldownLeft, grabComboCooldownLeft;
     readonly KagutsuchiGrabComboPattern grabComboPattern;
@@ -138,7 +156,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
         sonicBoom = body.gameObject.AddComponent<KagutsuchiSonicBoomFx>();
         uppercutFx = body.gameObject.AddComponent<KagutsuchiUppercutFx>();
         visual = body.GetComponent<SpriteRenderer>();
-        stand = visual.sprite;
+        stand = StandSprite() ?? visual.sprite;
         punch = CreatePose(PunchSheet);
         diveReady = CreatePose(DiveReadySheet);
         dive = CreatePose(DiveSheet);
@@ -152,7 +170,11 @@ public sealed class KagutsuchiPhase2 : IDisposable
         grabPattern = body.gameObject.AddComponent<KagutsuchiGrabPattern>();
         grabPattern.Initialize(body, grabReady, grabDash, uppercut, stompReady, stomp, kick,
                                ShowAirPose, StopAirPose, () => airRoot != null ? airRoot.transform : body.transform, ShowGrabRunFrame, AlignGrabStompFoot);
+        grabPattern.GroundSmashPose = groundSmash;
+        grabPattern.IsEnhanced = () => Enhanced;
         grabComboPattern = body.gameObject.AddComponent<KagutsuchiGrabComboPattern>();
+        grabComboPattern.IsEnhanced = () => Enhanced;
+        grabComboPattern.PoseWorldHeight = () => airRoot != null ? airRoot.transform.position.y - body.transform.position.y : 0f;
         grabComboPattern.Initialize(body, grabReady, grabDash, punch, kick, uppercut, diveReady,
                                     groundSmash, stomp, stompReady, ShowAirPose, StopAirPose, ShowGrabComboContactPose);
         solarJump = CreatePose("Kagutsuchi_P2_Jump");
@@ -161,7 +183,13 @@ public sealed class KagutsuchiPhase2 : IDisposable
         solarPattern.Initialize(body, stomp, solarJump, stompReady, stomp, groundSmash, solarLaugh,
                                 ShowAirPose, ShowGrabRunFrame, StopAirPose,
                                 () => airRoot != null ? airRoot.transform : body.transform);
-        var sheet = Resources.Load<Texture2D>("Sprites/" + RunSheet);
+        special2Pattern = body.gameObject.AddComponent<KagutsuchiSpecial2Pattern>();
+        special2Pattern.Initialize(body, stomp, solarJump, stompReady, punch, grabReady, grabDash, solarLaugh,
+                                   ShowAirPose, ShowGrabRunFrame, StopAirPose,
+                                   () => airRoot != null ? airRoot.transform : body.transform,
+                                   (ground, radius) => physicalStomp.Play(ground, radius),
+                                   (position, facingRight) => sonicBoom.Play(position, facingRight));
+        var sheet =Resources.Load<Texture2D>("Sprites/" + RunSheet);
         if (sheet != null && stand != null && sheet.width == RunCell * RunFrameCount && sheet.height == RunCell)
         {
             // 같은 배율·같은 발 기준으로 잘라 3·7프레임의 공중 높이를 보존.
@@ -177,15 +205,178 @@ public sealed class KagutsuchiPhase2 : IDisposable
         }
     }
 
+    /// <summary>
+    /// 포즈별 표시 크기 배율 (1 = 기본, 0.9 = 10% 축소, 1.05 = 5% 증가). 사용자 (2026-11-16): 앞으로 스프라이트 크기 조절은 이 표의 값만 바꾼다.
+    /// 그림 파일은 그대로, 발 기준 (pivot) 은 유지하고 표시 크기만 조절. 같은 포즈를 쓰는 모든 패턴에 함께 적용됨.
+    /// 표에 없는 포즈 = 1.
+    /// </summary>
+    static readonly System.Collections.Generic.Dictionary<string, float> PoseSizes = new System.Collections.Generic.Dictionary<string, float>
+    {
+        { "Kagutsuchi_P2_Atk_GroundSmash", 0.9f },        // 다른 포즈보다 커 보여 10% 축소
+        { "Kagutsuchi_P2_Atk_StompAttack", 0.95f },        // 10% 축소
+        { "Kagutsuchi_P2_Atk_GrabDash", 0.9f * 0.95f },   // 10% 축소 후 5% 추가 축소 (잡기 패턴 · 특수 패턴 2 레이저 공용)
+        { "Kagutsuchi_P2_Atk_Dive", 0.8f },               // 10% 축소
+        { "Kagutsuchi_P2_Atk_StompReady", 1.15f },        // 5% 증가
+        { "Kagutsuchi_P2_Jump", 1.3f },                  // 15% 증가
+    };
+
+    /// <summary>포즈별 아래로 내리는 거리 (월드 유닛, 음수 = 위로). 사용자 (2026-11-16): 크기는 PoseSizes, 위치는 이 표.</summary>
+    static readonly System.Collections.Generic.Dictionary<string, float> PoseDrops = new System.Collections.Generic.Dictionary<string, float>
+    {
+        { "Kagutsuchi_P2_Atk_StompAttack", 0.1f },       // 초기 위치 기준 0.1 아래로 (사용자: 0.5 → 초기 기준 0.1)
+        { "Kagutsuchi_P2_Atk_GroundSmash", 0.1f },       // 초기 위치 기준 0.1 아래로
+    };
+
+    /// <summary>
+    /// 포즈별 pivot 직접 지정 (그림 크기 대비 0~1, 아래 = 0). 표에 없으면 가운데 · 대기 자세의 발 높이.
+    /// GrabDash (1691×930): 사용자 (2026-11-16) pivot 을 가장 아래 (맨 아래 불투명 픽셀 y=903 → 27px 위) · 두 발 사이 (왼발 341~442, 오른발 1356~1455 의 가운데 x≈898) 로.
+    /// </summary>
+    static readonly System.Collections.Generic.Dictionary<string, Vector2> PosePivots = new System.Collections.Generic.Dictionary<string, Vector2>
+    {
+        // 사용자 (2026-11-16): 모든 포즈 pivot = 맨 아래 불투명 픽셀. x = 지정한 기준.
+        //  "맨 아래 중앙" = 불투명 영역 가로 중앙, "맨 아래 발 중앙" = 맨 아래 발 중앙, "발과 발 사이 중앙" = 두 발 중심의 가운데 (px 실측).
+        // Pivot(그림 가로, 세로, 맨 아래 불투명 y, x)
+        { "Kagutsuchi_P2_Atk_Kick", Pivot(1165, 1227, 1225, 582.5f) },            // 맨 아래 중앙
+        { "Kagutsuchi_P2_Atk_StompReady", Pivot(959, 1420, 1418, 260.5f) },       // 맨 아래 발 중앙
+        { "Kagutsuchi_P2_Atk_Punch", Pivot(1259, 1096, 1094, 512f) },             // 발과 발 사이
+        { "Kagutsuchi_P2_Atk_Uppercut", Pivot(1015, 1329, 1328, 497f) },          // 발과 발 사이
+        { "Kagutsuchi_P2_Atk_DiveReady", Pivot(1132, 1205, 1203, 617f) },         // 발과 발 사이 (오른발이 맨 아래)
+        { "Kagutsuchi_P2_Atk_Dive", Pivot(1290, 1004, 1002, 644f) },              // 맨 아래 중앙
+        { "Kagutsuchi_P2_Atk_GrabReady", Pivot(1200, 1310, 1260, 584f) },         // 발과 발 사이
+        { "Kagutsuchi_P2_Atk_GrabDash", Pivot(1691, 930, 903, 898.5f) },          // 발과 발 사이
+        { "Kagutsuchi_P2_Jump", Pivot(1024, 1536, 1399, 510f) },                  // 맨 아래 중앙
+        { "Kagutsuchi_P2_Laugh", Pivot(1086, 1448, 1429, 511f) },                 // 발과 발 사이
+        { "Kagutsuchi_P2_Atk_GroundSmashHeavy", Pivot(1195, 1229, 1227, 596.5f) },// 맨 아래 중앙
+        { "Kagutsuchi_P2_Atk_GroundSmash", Pivot(1218, 1153, 1151, 520f) },       // 발과 발 사이
+        { "Kagutsuchi_P2_Atk_StompAttack", Pivot(1312, 1199, 1162, 610f) },       // 발과 발 사이
+    };
+
+    static Vector2 Pivot(float width, float height, float bottomY, float x) => new Vector2(x / width, (height - (bottomY + 1f)) / height);
+
+    /// <summary>
+    /// 모든 포즈 pivot 은 맨 아래 (발바닥). 보스 위치 (판정 중심) 기준으로 발바닥을 대기 자세 키 × 이 값만큼 아래에 둔다.
+    /// 0.5 = 이전 (가운데 pivot) 의 대기 자세와 같은 위치 → 기존 패턴의 위치 · 판정과 맞음. 전체를 위/아래로 옮기려면 이 값만 바꾼다.
+    /// </summary>
+    const float GroundDepth = 0.5f;
+
+    static Sprite standSprite;
+    /// <summary>
+    /// 대기 자세 (Kagutsuchi_P2_Stand 843×1198). 사용자 (2026-11-16): pivot = 맨 아래 불투명 y=1196 · 두 발 사이 (왼발 128~257, 오른발 577~709 → x≈417.75).
+    /// 공용 캐시 스프라이트 (가운데 pivot) 는 건드리지 않고 같은 그림 · 같은 크기로 pivot 만 다른 스프라이트를 만들어 모든 곳에서 공유.
+    /// </summary>
+    public static Sprite StandSprite()
+    {
+        if (standSprite != null) return standSprite;
+        var art = SpriteFactory.TryGet("Kagutsuchi_P2_Stand");
+        if (art == null) return null;
+        Vector2 pivot = Pivot(843f, 1198f, 1196f, 417.75f) + Vector2.up * GroundDepth;   // 발바닥 = 보스 위치에서 대기 자세 키의 GroundDepth 배 아래
+        standSprite = Sprite.Create(art.texture, art.rect, pivot, art.pixelsPerUnit, 0, SpriteMeshType.FullRect);
+        standSprite.name = "Kagutsuchi_P2_Stand";
+        return standSprite;
+    }
+
     Sprite CreatePose(string sheetName)
     {
         var art = SpriteFactory.TryGet(sheetName);
         if (art == null || stand == null) return null;
-        // 공용 캐시·원본을 변경하지 않고 키·발 기준을 맞춘 실행기 소유 스프라이트 생성.
-        var pose = Sprite.Create(art.texture, art.rect, new Vector2(0.5f, stand.pivot.y / stand.rect.height),
-                                 art.rect.height / Mathf.Max(DirectionEpsilon, stand.bounds.size.y), 0, SpriteMeshType.FullRect);
+        float scale = PoseSizes.TryGetValue(sheetName, out var size) ? size : 1f;
+        float ppu = art.rect.height / Mathf.Max(DirectionEpsilon, stand.bounds.size.y) / scale;
+        // 위치: 월드 유닛만큼 아래로 = pivot 을 그림 높이 비율만큼 위로 (ppu 가 크기 배율을 이미 반영)
+        float drop = PoseDrops.TryGetValue(sheetName, out var d) ? d : 0f;
+        float pivotX = 0.5f, pivotY = stand.pivot.y / stand.rect.height;
+        if (PosePivots.TryGetValue(sheetName, out var custom)) { pivotX = custom.x; pivotY = custom.y; }
+        pivotY += drop * ppu / art.rect.height;
+        // 모든 포즈의 발바닥 (pivot = 맨 아래) 을 대기 자세와 같은 높이에 둠: 보스 위치 아래 대기 자세 키 × GroundDepth
+        pivotY += stand.bounds.size.y * GroundDepth * ppu / art.rect.height;
+        // 공용 캐시·원본을 변경하지 않고 키·발 기준을 맞춘 실행기 소유 스프라이트 생성. (그림 파일은 그대로, 표시 크기 · 위치만 조절)
+        var pose = Sprite.Create(art.texture, art.rect, new Vector2(pivotX, pivotY), ppu, 0, SpriteMeshType.FullRect);
         pose.name = sheetName;
         return pose;
+    }
+
+    // ---------- 디버그 맵 (2026-11-16) ----------
+    /// <summary>패턴 이름 — DebugRun 의 index = Pattern enum 순서, 8 = 특수 패턴 1</summary>
+    public static readonly string[] DebugPatternNames =
+    {
+        "공격 1 · 돌진 펀치", "이동 1 · 달리기", "공격 2 · 점프 돌진 → 발차기", "공격 3 · 지면 찍기 → 어퍼컷",
+        "공격 4 · 지면 연속 찍기", "공격 5 · 연속 타격", "공격 6 · 잡기 → 어퍼컷 → 내려찍기 → 발차기", "공격 7 · 잡기 → 연속 공격",
+        "특수 패턴 1 · 태양 · 돌기둥 · 화염구",
+        "특수 패턴 2 · 돌기둥 · 레이저 · 초거대 화염구",
+    };
+
+    /// <summary>스프라이트만 바꿔 보기 메뉴 (DebugShowSprite 의 index 순서)</summary>
+    public static readonly string[] DebugSpriteNames =
+    {
+        "기본 (Stand)", "Punch", "DiveReady", "Dive", "Kick", "GroundSmash", "StompAttack", "StompReady",
+        "Uppercut", "GrabReady", "GrabDash", "Jump", "Laugh",
+    };
+    bool debugSpriteHold;
+
+    /// <summary>패턴을 취소하고 포즈 하나를 계속 표시 (발 위치 기준 높이 0). 기본 = 대기 모양</summary>
+    public void DebugShowSprite(int index)
+    {
+        if (disposed || body == null) return;
+        DebugAuto = false;
+        DebugCancel();
+        Sprite pose = null;
+        switch (index)
+        {
+            case 1: pose = punch; break;
+            case 2: pose = diveReady; break;
+            case 3: pose = dive; break;
+            case 4: pose = kick; break;
+            case 5: pose = groundSmash; break;
+            case 6: pose = stomp; break;
+            case 7: pose = stompReady; break;
+            case 8: pose = uppercut; break;
+            case 9: pose = grabReady; break;
+            case 10: pose = grabDash; break;
+            case 11: pose = solarJump; break;
+            case 12: pose = solarLaugh; break;
+        }
+        if (pose == null) return;   // 0 = 기본 (DebugCancel 로 이미 복귀)
+        ShowAirPose(pose, 0f);
+        debugSpriteHold = true;
+    }
+
+    /// <summary>false = 자동 패턴 선택 · 체력 문턱 특수 패턴을 끔 (DebugRun 으로 지정한 패턴만)</summary>
+    public bool DebugAuto = true;
+
+    public string DebugStatus => solarPattern != null && solarPattern.Active ? "실행 중: 특수 패턴 1"
+                               : special2Pattern != null && special2Pattern.Active ? "실행 중: 특수 패턴 2"
+                               : phase == Phase.Waiting ? "대기" : $"실행 중: {DebugPatternNames[(int)pattern]} ({phase})";
+
+    /// <summary>index 번 패턴을 쿨타임 · 거리 조건을 무시하고 바로 실행 (진행 중이던 패턴은 취소)</summary>
+    public void DebugRun(int index, Vector2 toPlayer)
+    {
+        if (disposed || body == null) return;
+        DebugCancel();
+        if (index == 8) { solarPending = false; solarPattern.Begin(); return; }
+        if (index >= 9) { special2Pending = false; special2Pattern.Begin(); return; }
+        pattern = (Pattern)Mathf.Clamp(index, 0, 7);
+        comboStep = 0;
+        BeginPattern(toPlayer);
+    }
+
+    /// <summary>진행 중인 패턴 · 경고 · 연출 · 잡기 · 공중 표시를 모두 정리하고 대기 상태로</summary>
+    public void DebugCancel()
+    {
+        if (disposed || body == null) return;
+        debugSpriteHold = false;
+        if (grabPattern != null) grabPattern.Cancel();
+        if (grabComboPattern != null) grabComboPattern.Cancel();
+        if (solarPattern != null && solarPattern.Active) solarPattern.Cancel();
+        if (special2Pattern != null && special2Pattern.Active) special2Pattern.Cancel();
+        if (physicalStomp != null) physicalStomp.Clear();
+        if (sonicBoom != null) sonicBoom.Clear();
+        if (uppercutFx != null) uppercutFx.Clear();
+        StopAirPose();
+        ClearWarning();
+        RestoreContactDamage();
+        if (visual != null) visual.sprite = stand;
+        phase = Phase.Waiting;
+        elapsed = 0f;
+        gapLeft = 0f;
     }
 
     public Vector2 Tick(float dt, Vector2 toPlayer)
@@ -199,6 +390,11 @@ public sealed class KagutsuchiPhase2 : IDisposable
             solarThreshold++;
             solarPending = true; // 한 번에 여러 문턱을 넘으면 기존 1페이즈처럼 한 번만 예약.
         }
+        while (special2Threshold < Special2Thresholds.Length && body.hp <= body.maxHp * Special2Thresholds[special2Threshold])
+        {
+            special2Threshold++;
+            special2Pending = true;   // 특수 패턴 2: 체력 75% · 50% · 25%
+        }
         // 특수 패턴 자체의 Scripted·Hidden 상태에서도 실행기는 계속 진행한다.
         if (solarPattern.Active)
         {
@@ -206,18 +402,38 @@ public sealed class KagutsuchiPhase2 : IDisposable
             if (!solarPattern.Active) visual.sprite = stand;
             return velocity;
         }
-        if (body.Scripted || body.Hidden) return Vector2.zero;
-        if (phase == Phase.Waiting && solarPending)
+        if (special2Pattern.Active)
         {
-            solarPending = false;
+            Vector2 velocity = special2Pattern.Tick(dt);
+            if (!special2Pattern.Active) visual.sprite = stand;
+            return velocity;
+        }
+        if (body.Scripted || body.Hidden) return Vector2.zero;
+        if (phase == Phase.Waiting)
+        {
+            // 특수 패턴 각각의 쿨타임 1분 30초 (사용 시점부터). 쿨타임 중에는 예약만 유지.
+            solarCooldownLeft = Mathf.Max(0f, solarCooldownLeft - dt);
+            special2CooldownLeft = Mathf.Max(0f, special2CooldownLeft - dt);
+        }
+        if (phase == Phase.Waiting && DebugAuto && solarPending && solarCooldownLeft <= 0f)
+        {
+            solarPending = false; solarCooldownLeft = SpecialCooldown;
             ClearWarning(); RestoreContactDamage();
             solarPattern.Begin();
             return solarPattern.Tick(dt);
+        }
+        if (phase == Phase.Waiting && DebugAuto && special2Pending && special2CooldownLeft <= 0f)
+        {
+            special2Pending = false; special2CooldownLeft = SpecialCooldown;
+            ClearWarning(); RestoreContactDamage();
+            special2Pattern.Begin();
+            return special2Pattern.Tick(dt);
         }
 
         if (phase == Phase.Waiting)
         {
             visual.flipX = toPlayer.x > 0f;
+            if (debugSpriteHold && airActive && airVisual != null) airVisual.flipX = visual.flipX;   // 스프라이트 보기: 플레이어 쪽을 바라봄
             // 1페이즈와 동일하게 다른 패턴이 진행 중일 때는 쿨타임이 흐르지 않음.
             cooldownLeft = Mathf.Max(0f, cooldownLeft - dt);
             runCooldownLeft = Mathf.Max(0f, runCooldownLeft - dt);
@@ -228,7 +444,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
             grabCooldownLeft = Mathf.Max(0f, grabCooldownLeft - dt);
             grabComboCooldownLeft = Mathf.Max(0f, grabComboCooldownLeft - dt);
             gapLeft = Mathf.Max(0f, gapLeft - dt);
-            if (gapLeft <= 0f) ChoosePattern(toPlayer);
+            if (gapLeft <= 0f && DebugAuto) ChoosePattern(toPlayer);   // 디버그 맵에서 자동 선택을 끄면 대기만
             return Vector2.zero;
         }
 
@@ -319,10 +535,45 @@ public sealed class KagutsuchiPhase2 : IDisposable
                 if (elapsed >= PunchHitTime) { phase = Phase.KickRecovery; elapsed = 0f; }
                 break;
             case Phase.KickRecovery:
-                if (elapsed >= PunchRecovery) CompletePattern();
+                if (elapsed >= PunchRecovery)
+                {
+                    if (Enhanced)
+                    {
+                        // 강화: 발차기 이후 공격 5 의 마지막 (추적) 내려찍기
+                        activeSteps = TrackStompOnly; comboStep = 0;
+                        BeginComboWarning();
+                    }
+                    else CompletePattern();
+                }
                 break;
+            case Phase.StompMoving:
+                Vector2 stompPos = Vector2.Lerp(origin, dashEnd, Mathf.Clamp01(elapsed / ComboStompMoveTime));
+                Vector2 stompVelocity = (stompPos - (Vector2)body.transform.position) / dt;
+                if (elapsed >= ComboStompMoveTime) { origin = dashEnd; BeginStompHit(); }
+                return stompVelocity;
+            case Phase.ChainStompMoving:
+                Vector2 shiftPos = Vector2.Lerp(origin, dashEnd, Mathf.Clamp01(elapsed / ChainStompShiftTime));
+                Vector2 shiftVelocity = (shiftPos - (Vector2)body.transform.position) / dt;
+                if (elapsed >= ChainStompShiftTime)
+                {
+                    origin = dashEnd;
+                    chainStompStep++;
+                    if (chainStompStep < ChainStompSteps.Length) BeginChainStompWarning();
+                    else CompletePattern();
+                }
+                return shiftVelocity;
             case Phase.StompWarning:
-                if (elapsed >= StompWarnTime) BeginStompHit();
+                if (elapsed >= StompWarnTime)
+                {
+                    if (Enhanced && travel > DirectionEpsilon)
+                    {
+                        // 강화: 공격 5 의 마지막 내려찍기처럼 플레이어 쪽으로 이동한 뒤 내려찍음
+                        ClearWarning();
+                        visual.sprite = stompReady != null ? stompReady : stand;
+                        phase = Phase.StompMoving; elapsed = 0f;
+                    }
+                    else BeginStompHit();
+                }
                 break;
             case Phase.StompHit:
                 if (elapsed <= PunchHitTime) TryStompHit(false);
@@ -343,11 +594,11 @@ public sealed class KagutsuchiPhase2 : IDisposable
                 if (elapsed >= UppercutPoseTime) CompletePattern();
                 break;
             case Phase.ComboWarning:
-                if (elapsed >= ComboSteps[comboStep].WarningTime) BeginComboAttack();
+                if (elapsed >= activeSteps[comboStep].WarningTime) BeginComboAttack();
                 break;
             case Phase.ComboMoving:
-                float moveTime = ComboSteps[comboStep].Action == ComboAction.Punch
-                    ? ComboPunchMoveTime : (ComboSteps[comboStep].Action == ComboAction.Kick
+                float moveTime = activeSteps[comboStep].Action == ComboAction.Punch
+                    ? ComboPunchMoveTime : (activeSteps[comboStep].Action == ComboAction.Kick
                         ? ComboKickMoveTime : ComboStompMoveTime);
                 Vector2 comboPos = Vector2.Lerp(origin, dashEnd, Mathf.Clamp01(elapsed / moveTime));
                 Vector2 comboVelocity = (comboPos - (Vector2)body.transform.position) / dt;
@@ -361,7 +612,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
                 if (elapsed >= PunchRecovery)
                 {
                     comboStep++;
-                    if (comboStep < ComboSteps.Length) BeginComboWarning();
+                    if (comboStep < activeSteps.Length) BeginComboWarning();
                     else CompletePattern();
                 }
                 break;
@@ -375,6 +626,17 @@ public sealed class KagutsuchiPhase2 : IDisposable
             case Phase.ChainStompRecovery:
                 if (elapsed >= PunchRecovery)
                 {
+                    if (Enhanced)
+                    {
+                        // 강화 (공격 4): 매 공격 후 플레이어 쪽으로 1 이동한 뒤 다음 단계 (또는 종료)
+                        Vector2 aimAfter = Player.I != null ? Player.I.HurtCenter - (Vector2)body.transform.position : direction;
+                        Vector2 shiftDir = aimAfter.sqrMagnitude > DirectionEpsilon ? aimAfter.normalized : direction;
+                        origin = body.transform.position;
+                        float shift = BoundedTravel(origin, shiftDir, ChainStompShift, body.radius);
+                        dashEnd = origin + shiftDir * shift;
+                        phase = Phase.ChainStompMoving; elapsed = 0f;
+                        break;
+                    }
                     chainStompStep++;
                     if (chainStompStep < ChainStompSteps.Length) BeginChainStompWarning();
                     else CompletePattern();
@@ -414,13 +676,19 @@ public sealed class KagutsuchiPhase2 : IDisposable
             ready.Add(Pattern.GrabCombo);
         if (ready.Count == 0) return;
         pattern = ready[UnityEngine.Random.Range(0, ready.Count)];
+        BeginPattern(toPlayer);
+    }
+
+    /// <summary>선택된 pattern 의 첫 단계를 시작 (ChoosePattern · 디버그 맵 공용)</summary>
+    void BeginPattern(Vector2 toPlayer)
+    {
         switch (pattern)
         {
             case Pattern.Run: BeginRunWarning(toPlayer); break;
             case Pattern.DiveKick: BeginDiveWarning(); break;
             case Pattern.StompUppercut: BeginStompWarning(); break;
             case Pattern.ChainStomp: BeginChainStomp(); break;
-            case Pattern.Combo: comboStep = 0; BeginComboWarning(); break;
+            case Pattern.Combo: activeSteps = Enhanced ? ComboStepsEnhanced : ComboSteps; comboStep = 0; BeginComboWarning(); break;
             case Pattern.Grab: phase = Phase.Grab; grabPattern.Begin(); break;
             case Pattern.GrabCombo: phase = Phase.GrabCombo; grabComboPattern.Begin(); break;
             default: BeginWarning(toPlayer); break;
@@ -431,10 +699,11 @@ public sealed class KagutsuchiPhase2 : IDisposable
     {
         origin = body.transform.position;
         direction = toPlayer.sqrMagnitude > DirectionEpsilon ? toPlayer.normalized : Vector2.down;
-        travel = BoundedTravel(origin, direction, PunchDistance, body.radius);
+        float punchDistance = PunchDistance + (Enhanced ? PunchEnhanceDistance : 0f);   // 강화: 돌진 거리 +2
+        travel = BoundedTravel(origin, direction, punchDistance, body.radius);
         dashEnd = origin + direction * travel;
         visual.flipX = direction.x > 0f;
-        warning = BossWarning.Box(origin, direction, PunchDistance, PunchWidth, 0f);
+        warning = BossWarning.Box(origin, direction, punchDistance, PunchWidth, 0f);
         phase = Phase.Warning;
         elapsed = 0f;
         hit = false;
@@ -469,14 +738,14 @@ public sealed class KagutsuchiPhase2 : IDisposable
         elapsed = 0f;
         switch (pattern)
         {
-            case Pattern.Run: runCooldownLeft = RunCooldown; break;
+            case Pattern.Run: runCooldownLeft = RunCooldown - (Enhanced ? RunEnhancedCooldownCut : 0f); break;
             case Pattern.DiveKick: diveCooldownLeft = DiveCooldown; break;
             case Pattern.StompUppercut: stompCooldownLeft = StompCooldown; break;
             case Pattern.ChainStomp: chainStompCooldownLeft = ChainStompCooldown; break;
             case Pattern.Combo: comboCooldownLeft = ComboCooldown; break;
             case Pattern.Grab: grabCooldownLeft = KagutsuchiGrabPattern.Cooldown; break;
             case Pattern.GrabCombo: grabComboCooldownLeft = KagutsuchiGrabComboPattern.Cooldown; break;
-            default: cooldownLeft = PunchCooldown; break;
+            default: cooldownLeft = Enhanced ? PunchEnhancedCooldown : PunchCooldown; break;
         }
         gapLeft = PatternGap;
     }
@@ -491,7 +760,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
         direction = aim.sqrMagnitude > DirectionEpsilon ? aim.normalized : Vector2.down;
         visual.flipX = direction.x > 0f;
         // 각 단계 경고 시작에 한 번 조준하고, 해당 타격이 끝날 때까지 고정한다.
-        switch (ComboSteps[comboStep].Action)
+        switch (activeSteps[comboStep].Action)
         {
             case ComboAction.Punch:
                 travel = BoundedTravel(origin, direction, ComboPunchDistance, body.radius);
@@ -530,7 +799,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
     {
         ClearWarning();
         SuppressContactDamage();
-        ComboAction action = ComboSteps[comboStep].Action;
+        ComboAction action = activeSteps[comboStep].Action;
         if (action == ComboAction.Punch || action == ComboAction.Stomp || action == ComboAction.Kick)
         {
             visual.sprite = action == ComboAction.Punch
@@ -544,7 +813,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
 
     void BeginComboHit()
     {
-        switch (ComboSteps[comboStep].Action)
+        switch (activeSteps[comboStep].Action)
         {
             case ComboAction.Punch:
                 visual.sprite = punch != null ? punch : stand;
@@ -577,7 +846,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
         if (hit || player == null || player.IsInvulnerable || DebugCheats.God) return;
         Vector2 delta = player.HurtCenter - origin;
         float damage, stun = ComboStun;
-        switch (ComboSteps[comboStep].Action)
+        switch (activeSteps[comboStep].Action)
         {
             case ComboAction.Punch:
                 if (!GaniacAI.InBox(player.HurtCenter, origin, direction, travel, ComboPunchWidth, player.radius)) return;
@@ -599,7 +868,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
         }
         hit = true;
         player.HitByBoss(damage, stun, Vector2.zero, 0f);
-        if (ComboSteps[comboStep].Action == ComboAction.Kick)
+        if (activeSteps[comboStep].Action == ComboAction.Kick)
         {
             Vector2 away = player.HurtCenter - dashEnd;
             away = away.sqrMagnitude > DirectionEpsilon ? away.normalized : direction;
@@ -662,7 +931,16 @@ public sealed class KagutsuchiPhase2 : IDisposable
         direction = aim.sqrMagnitude > DirectionEpsilon ? aim.normalized : Vector2.down;
         visual.flipX = direction.x > 0f;
         visual.sprite = stompReady != null ? stompReady : stand;
-        warning = BossWarning.Circle(origin, StompRadius, 0f);
+        travel = 0f; dashEnd = origin;
+        Vector2 stompCenter = origin;
+        if (Enhanced)
+        {
+            // 강화 (공격 3): 경고 시작에 한 번 조준해 최대 ComboStompMaxMove 만큼 따라간 위치를 경고 중심으로
+            travel = BoundedTravel(origin, direction, Mathf.Min(ComboStompMaxMove, aim.magnitude), body.radius);
+            dashEnd = origin + direction * travel;
+            stompCenter = dashEnd;
+        }
+        warning = BossWarning.Circle(stompCenter, StompRadius, 0f);
         phase = Phase.StompWarning;
         elapsed = 0f;
         hit = false;
@@ -1079,6 +1357,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
         if (sonicBoom != null) { sonicBoom.Clear(); UnityEngine.Object.Destroy(sonicBoom); }
         if (uppercutFx != null) { uppercutFx.Clear(); UnityEngine.Object.Destroy(uppercutFx); }
         if (solarPattern != null) { solarPattern.Dispose(); UnityEngine.Object.Destroy(solarPattern); }
+        if (special2Pattern != null) { special2Pattern.Dispose(); UnityEngine.Object.Destroy(special2Pattern); }
         if (grabComboPattern != null) { grabComboPattern.Cancel(); UnityEngine.Object.Destroy(grabComboPattern); }
         if (grabPattern != null) { grabPattern.Cancel(); UnityEngine.Object.Destroy(grabPattern); }
         StopAirPose();

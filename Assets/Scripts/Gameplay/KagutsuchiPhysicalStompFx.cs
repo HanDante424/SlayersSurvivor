@@ -8,15 +8,19 @@ public sealed class KagutsuchiPhysicalStompFx : MonoBehaviour
     const float VisibleWidth = 491f; // 새 원화6프레임 alpha>16 최대 가시폭. 기존 판정 지름에 표시 폭을 맞춤.
     const float Fps = 12f; // [임시] 기존 스톰프의0.5초 재생 유지.
     const float VerticalOffset = -1.5f; // 사용자: 기존 Y-2.5 위치에서 1 올림.
+    // 지면 균열 (사용자 2026-11-16): 스톰프와 같이 생성되어 0.5초 동안 천천히 투명해짐. 지름 = 스톰프 먼지 지름과 같게 [해석]
+    const string CrackSheet = "Kagutsuchi_P2_Fx_StompCrack";
+    const float CrackFadeTime = FrameCount / Fps;   // 0.5초 (스톰프 재생 시간과 같음)
     sealed class Slot
     {
         public GameObject Root;
-        public SpriteRenderer Back, Front;
+        public SpriteRenderer Back, Front, Crack;
         public float Age;
         public bool Active;
     }
     readonly List<Slot> slots = new List<Slot>();
     Sprite[] backFrames, frontFrames;
+    Sprite crackSprite;   // 없으면 균열만 생략 (스톰프는 그대로)
     SpriteRenderer bodyVisual;
 
     void Awake()
@@ -30,6 +34,9 @@ public sealed class KagutsuchiPhysicalStompFx : MonoBehaviour
             Debug.LogError("앞뒤 분리용 스톰프 시트가 없거나 각1536×512 규격과 다릅니다.");
             return;
         }
+        var crack = Resources.Load<Texture2D>("Sprites/" + CrackSheet);
+        if (crack != null)   // 가로 1 유닛 (루트 크기 = 지름) 기준, 중심 피벗
+            crackSprite = Sprite.Create(crack, new Rect(0, 0, crack.width, crack.height), new Vector2(0.5f, 0.5f), crack.width, 0, SpriteMeshType.FullRect);
         backFrames = new Sprite[FrameCount];
         frontFrames = new Sprite[FrameCount];
         for (int i = 0; i < FrameCount; i++)
@@ -55,6 +62,13 @@ public sealed class KagutsuchiPhysicalStompFx : MonoBehaviour
             var front = new GameObject("FrontDust");
             front.transform.SetParent(root.transform, false);
             slot.Front = front.AddComponent<SpriteRenderer>();
+            if (crackSprite != null)
+            {
+                var crackGo = new GameObject("GroundCrack");
+                crackGo.transform.SetParent(root.transform, false);
+                slot.Crack = crackGo.AddComponent<SpriteRenderer>();
+                slot.Crack.sprite = crackSprite;
+            }
             slots.Add(slot);
         }
         slot.Age = 0f; slot.Active = true;
@@ -65,6 +79,12 @@ public sealed class KagutsuchiPhysicalStompFx : MonoBehaviour
         slot.Back.sortingOrder = bodyVisual.sortingOrder - 2; // 보스 외곽선보다도 뒤.
         slot.Front.sortingOrder = bodyVisual.sortingOrder + 1;
         slot.Back.color = slot.Front.color = Color.white;
+        if (slot.Crack != null)
+        {
+            slot.Crack.sortingLayerID = bodyVisual.sortingLayerID;
+            slot.Crack.sortingOrder = bodyVisual.sortingOrder - 3;   // 먼지 뒤 · 보스 뒤 (바닥에 새겨진 느낌)
+            slot.Crack.color = Color.white;
+        }
         slot.Back.flipX = slot.Front.flipX = false;
         slot.Back.flipY = slot.Front.flipY = false;
         SetFrame(slot, 0);
@@ -88,7 +108,11 @@ public sealed class KagutsuchiPhysicalStompFx : MonoBehaviour
             slot.Age += Time.deltaTime;
             int frame = (int)(slot.Age * Fps);
             if (frame >= FrameCount) { slot.Active = false; slot.Root.SetActive(false); }
-            else SetFrame(slot, frame);
+            else
+            {
+                SetFrame(slot, frame);
+                if (slot.Crack != null) slot.Crack.color = new Color(1f, 1f, 1f, 1f - Mathf.Clamp01(slot.Age / CrackFadeTime));   // 천천히 투명해짐
+            }
         }
     }
 
@@ -105,5 +129,6 @@ public sealed class KagutsuchiPhysicalStompFx : MonoBehaviour
         slots.Clear();
         if (backFrames != null) foreach (var frame in backFrames) if (frame != null) Destroy(frame);
         if (frontFrames != null) foreach (var frame in frontFrames) if (frame != null) Destroy(frame);
+        if (crackSprite != null) Destroy(crackSprite);
     }
 }

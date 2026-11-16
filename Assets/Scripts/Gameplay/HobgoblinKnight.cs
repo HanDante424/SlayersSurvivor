@@ -8,7 +8,7 @@ using UnityEngine;
 /// 여러 패턴이 준비되면 무작위, 기절하면 진행 중인 패턴이 멈췄다가 이어서, 체력 50% 아래 강화.
 /// 기획에 없는 값(피해량 · 기절 시간 · 속도 등)은 [임시].
 /// </summary>
-public class HobgoblinKnightAI : MonoBehaviour
+public class HobgoblinKnightAI : MonoBehaviour, IDebugBoss
 {
     // ---------- 방패 돌진 ----------
     const float ChargeWindup = 1f, ChargeDistance = 12f, ChargeCooldown = 10f, ChargeCooldownEnraged = 5f;
@@ -70,6 +70,43 @@ public class HobgoblinKnightAI : MonoBehaviour
         warnings.Clear();
     }
 
+    // ---------- 디버그 맵 (2026-11-16) ----------
+    static readonly string[] DebugNames = { "방패 돌진", "내려찍기", "방패 막기", "횡 베기", "연속 내려베기", "뛰어오르기" };
+    string debugCurrent = "";
+    public bool DebugAuto { get; set; } = true;
+    public string[] DebugPatternNames => DebugNames;
+    public string DebugStatus => busy ? $"실행 중: {debugCurrent}" : "대기";
+    public void DebugBegin(int phase, bool playIntro) { DebugAuto = false; }
+
+    public void DebugRun(int index)
+    {
+        DebugCancel();
+        index = Mathf.Clamp(index, 0, DebugNames.Length - 1);
+        IEnumerator body;
+        switch ((Pattern)index)
+        {
+            case Pattern.Charge: body = ChargeRoutine(); break;
+            case Pattern.Slam: body = SlamRoutine(); break;
+            case Pattern.Guard: body = GuardRoutine(); break;
+            case Pattern.Sweep: body = SweepRoutine(); break;
+            case Pattern.Chop: body = ChopRoutine(); break;
+            default: body = LeapRoutine(); break;
+        }
+        debugCurrent = DebugNames[index];
+        StartCoroutine(Run((Pattern)index, body));
+    }
+
+    public void DebugCancel()
+    {
+        StopAllCoroutines();
+        foreach (var w in warnings) if (w != null) Destroy(w.gameObject);
+        warnings.Clear();
+        busy = stopped = guarding = false;
+        e.SetHidden(false);                                              // 뛰어오르기 도중 취소
+        transform.localScale = Vector3.one * transform.localScale.z;      // 웅크림 변형 복구
+        debugCurrent = "";
+    }
+
     bool Enraged => e.hp <= e.maxHp * 0.5f;
     Vector2 Pos => transform.position;
     static Player P => Player.I;
@@ -88,6 +125,7 @@ public class HobgoblinKnightAI : MonoBehaviour
     public Vector2 Behave(Vector2 toPlayer, float moveSpeed, ref Vector2 face)
     {
         face = stopped && faceDir.sqrMagnitude > 0f ? faceDir : toPlayer;
+        if (!DebugAuto) return Vector2.zero;   // 디버그 맵: 지정한 패턴만, 제자리 (패턴 자체의 이동은 코루틴이 함)
         if (Enraged && !wasEnraged)
         {
             wasEnraged = true;

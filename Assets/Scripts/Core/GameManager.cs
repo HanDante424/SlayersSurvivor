@@ -40,6 +40,9 @@ public class GameManager : MonoBehaviour
     {
         I = this;
         Time.timeScale = 1f;
+        ArenaView.ResetBackdropPhase();   // 새 판은 1페이즈 배경부터 (디버그 맵은 소환할 때 다시 지정)
+        Stage.ApplyStartMap();  // 맵 크기: 디버그 맵이면 고른 크기 유지, 아니면 기본으로 (카메라 · 바닥보다 먼저)
+        DebugMap.Clean();        // 재시작 시 이전 판의 소환 목록 정리
         CombatMods.Clear();   // 재시작 시 이전 판의 패시브 수정자가 남지 않게
         MidBossArena.Reset();  // 중간보스 포위 상태도 새 판으로
         Application.targetFrameRate = 120;
@@ -68,7 +71,8 @@ public class GameManager : MonoBehaviour
         if (Stage.IsRaid) RaidStage.Begin(player);
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
-        gameObject.AddComponent<DebugCheats>();   // 테스트용 치트 패널 (F2)
+        if (Stage.IsDebug) gameObject.AddComponent<DebugMapController>();   // 디버그 맵 패널 (소환 · 패턴 · 맵 크기). 치트 패널 대신
+        else gameObject.AddComponent<DebugCheats>();   // 테스트용 치트 패널 (F2)
 #endif
     }
 
@@ -94,7 +98,7 @@ public class GameManager : MonoBehaviour
         if (State != GameState.Playing) return;
 
         Elapsed += Time.deltaTime;
-        if (Stage.IsRaid) { Enemy.Separate(); return; }   // 레이드: 시간 제한 · 일반 스폰 없음 (보스 처치 = 승리)
+        if (Stage.IsRaid || Stage.IsDebug) { Enemy.Separate(); return; }   // 디버그 맵: 시간 제한 · 스폰 없음. 레이드: 시간 제한 · 일반 스폰 없음 (보스 처치 = 승리)
         if (Elapsed >= surviveTime) { Victory(); return; }
 
         if (!DebugCheats.NoSpawn) Spawning();   // 치트 F8: 적 생성 중지
@@ -471,6 +475,7 @@ public class GameManager : MonoBehaviour
     /// <summary>스테이지 목표 달성 (레이드 보스 처치). 게임 오버와 같은 프레임이면 게임 오버 유지</summary>
     public void StageCleared()
     {
+        if (Stage.IsDebug) return;   // 디버그 맵: 보스를 쓰러뜨려도 승리 화면 없음
         if (State != GameState.GameOver) Victory();
     }
 
@@ -670,9 +675,10 @@ public class GameManager : MonoBehaviour
     void DrawBossBar(float W)
     {
         var b = MidBossArena.Boss ?? RaidStage.Boss;
+        if (b == null && Stage.IsDebug) b = DebugMap.TargetAlive;   // 디버그 맵: 고른 대상의 체력 바
         if (b == null) return;
         // 레이드 보스 첫 등장 전 (맵 이탈 상태)에는 체력 바 없음. 등장 후 이동 패턴으로 잠깐 이탈할 때는 그대로 표시
-        if (Stage.IsRaid && b.TryGetComponent<IRaidBossAI>(out var ai) && ai.HideBossBar) return;
+        if ((Stage.IsRaid || Stage.IsDebug) && b.TryGetComponent<IRaidBossAI>(out var ai) && ai.HideBossBar) return;
         if (bossNameStyle == null)
         {
             bossNameStyle = new GUIStyle(UIStyles.Label) { fontSize = 24, fontStyle = FontStyle.Bold, alignment = TextAnchor.MiddleCenter,
@@ -682,7 +688,11 @@ public class GameManager : MonoBehaviour
         float bw = Mathf.Clamp(W * 0.42f, 360f, 760f), bh = 20f;
         float bx = (W - bw) / 2f, ny = 46f, by = ny + 32f;
         GUI.Label(new Rect(bx, ny, bw, 30), b.DisplayName, bossNameStyle);
-        if (Stage.IsRaid && b == RaidStage.Boss)
+        if (Stage.IsDebug && b == RaidStage.Boss)
+        {
+            GUI.Label(new Rect(bx, ny + 4, bw, 24), $"디버그   {RaidStage.Phase} 페이즈", new GUIStyle(bossHpStyle) { alignment = TextAnchor.MiddleRight });
+        }
+        else if (Stage.IsRaid && b == RaidStage.Boss)
         {
             // 난이도 · 페이즈 (이름 오른쪽 위), 페이즈 전환 중이면 가운데에 크게
             GUI.Label(new Rect(bx, ny + 4, bw, 24), $"{RaidStage.DifficultyInfo.name}   {RaidStage.Phase} / {RaidStage.MaxPhase} 페이즈",

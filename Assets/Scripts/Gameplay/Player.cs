@@ -511,6 +511,7 @@ public class Player : MonoBehaviour
         // 중간보스 포위 고블린 사이로 지나갈 수 없음 (돌진 포함)
         MidBossArena.ConstrainPlayer(this);
         KagutsuchiSolarArena.ConstrainPlayer(this, beforeMovement);
+        KagutsuchiPillarField.ConstrainPlayer(this, beforeMovement);   // 특수 패턴 2 돌기둥
 
         // 제한된 맵 (레이드): 피격 판정 원이 경계 밖으로 나가지 않음 (돌진 · 밀려남 포함)
         if (Stage.Bounded)

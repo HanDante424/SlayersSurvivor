@@ -15,7 +15,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
     const float DiveDistance = 6f, DiveTime = 0.5f, GroundSmashTime = 1f;
     const float StompTime = 0.25f, StompReadyTime = 0.25f;
     const float LiftTime = 0.1f; // 사용자: 눕힌 후 중앙 전방으로 끌어올림 이동 시간.
-    const float FinalKickDistance = 5f, FinalMoveTime = 0.2f, FinalKickPoseTime = 2f, FinalStun = 1f;
+    const float FinalKickDistance = 10f /* 사용자 2026-11-16: 5 → +5 */, FinalMoveTime = 0.2f, FinalKickPoseTime = 2f, FinalStun = 1f;
     const float DamagePerHit = 5f, CameraMagnification = 1.5f;
     const float ReadyFrontDistance = 0.5f;
     const float OppositeDistance = 0.5f; // [임시] 사용자 지정 반대편 순간이동 거리
@@ -25,8 +25,38 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
     static readonly Vector2 DiveFingertip = new Vector2(25f / 1132f, 700f / 1205f);
     static readonly Vector2 SmashFistBottom = new Vector2(410f / 1218f, 1148f / 1153f);
     const float Epsilon = 0.0001f;
+    const float SlamDustScale = 3f;   // 내려찍기 먼지 효과 배율 (피해 범위와 무관)
 
-    enum Step { Finished, Warning, Dash, Hold, Punch, PunchArrived, Kick, KickArrived, Uppercut, UppercutArrived, Dive, GroundSmash, Stomp, StompReady, FinalKick }
+    // ---- 체력 50% 이하 강화 (사용자 2026-11-16) [해석 많음 — 보고서 참조] ----
+    // 마지막 발차기 (밀어냄) 이후, 플레이어가 도착하기 0.1초 전에 보스가 2 거리를 파고들며 공격 → 밀어냄 → 반복.
+    const float ChaseLunge = 0.1f, ChaseDistance = 2f, ChaseKnockTime = 0.25f, ChaseHoldTime = 1f;
+    const float ChaseFinalKnock = 8f, ChaseFinalStun = 3f;
+    const float FirstHoldShift = 1f;   // 첫 홀딩 때 플레이어 전진 거리
+    const float ChaseHoldShift = 2f,ChaseFollowGap = 2.5f /* 사용자: 1 → +1 → +1 → -0.5 */, ChaseFollowInterval = 0.15f /* 사용자: 후속 3연타 간격 0.1 → 0.25 → 0.15 */;  // 홀딩 때 플레이어 전진 거리 / 후속 3연타 보스 · 플레이어 간격
+    enum ChasePose { Punch, Kick, StompReady, GrabDash }
+    readonly struct ChaseStage
+    {
+        public readonly ChasePose Pose; public readonly float Knock; public readonly bool Hold;
+        public ChaseStage(ChasePose pose, float knock, bool hold = false) { Pose = pose; Knock = knock; Hold = hold; }
+    }
+    // 0~2: 밀어냄 (펀치 7 · 킥 5 · StompReady 4), 3: GrabDash 로 1초 홀딩, 4~6: 펀치 · StompReady = 넉백 없음, 마지막 킥 = 8 넉백 + 3초 기절. 보스 위치는 매 단계 좌우 교대.
+    static readonly ChaseStage[] ChaseTable =
+    {
+        new ChaseStage(ChasePose.Punch, 7f), new ChaseStage(ChasePose.Kick, 5f), new ChaseStage(ChasePose.StompReady, 4f),
+        new ChaseStage(ChasePose.GrabDash, 0f, true),
+        new ChaseStage(ChasePose.Punch, 0f), new ChaseStage(ChasePose.StompReady, 0f), new ChaseStage(ChasePose.Kick, ChaseFinalKnock),
+    };
+    public Func<bool> IsEnhanced;
+    /// <summary>지금 표시 중인 포즈 pivot 의 보스 지면 위 높이 (월드). GrabDash 홀딩 정렬 결과를 읽어 후속 공격 높이로 씀</summary>
+    public Func<float> PoseWorldHeight;
+    float chasePoseHeight;
+    bool enhancedRun;
+    int chaseIndex;
+    float knockClock, knockDuration = 1f, lungeClock, finalStun = FinalStun;
+    Vector2 lungeStart, lungeEnd;
+
+    enum Step { Finished, Warning, Dash, Hold, Punch, PunchArrived, Kick, KickArrived, Uppercut, UppercutArrived, Dive, GroundSmash, Stomp, StompReady, FinalKick,
+                ChaseWait, ChaseLunge, ChaseHold }
     Step step;
     Enemy body;
     SpriteRenderer bodyVisual;
@@ -60,6 +90,8 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
         Cancel();
         player = Player.I;
         if (player == null) return;
+        enhancedRun = IsEnhanced != null && IsEnhanced();
+        finalStun = FinalStun; chaseIndex = 0; chasePoseHeight = 0f;
         bossGround = dashOrigin = body.transform.position;
         Vector2 aim = player.HurtCenter - dashOrigin;
         dashDirection = aim.sqrMagnitude > Epsilon ? aim.normalized : Vector2.down;
@@ -83,10 +115,13 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
         if (Finished || player == null || !player.IsHeldByBoss(this)) return;
         player.SetBossHoldFacing(this, !bodyVisual.flipX);
         // Enemy.Update의 지면 이동이 적용된 뒤 정렬해야 돌진·순간이동 프레임에도 일치한다.
-        if (step == Step.Hold) showContactPose(currentPose, grabDash, poseHeight, GrabFingertip);
-        else if (step == Step.Dive) showContactPose(currentPose, diveReady, poseHeight, DiveFingertip);
+        // 첫 홀딩 (Hold) 도 접촉점 정렬을 하지 않음 (사용자 2026-11-16): 정렬하면 첫 적중 때 보스가 위로 올라가 후속 펀치와 높이가 어긋남.
+        // GrabDash 도 pivot (발바닥) 높이 그대로 → 후속 펀치와 같은 높이.
+        if (step == Step.Dive) showContactPose(currentPose, diveReady, poseHeight, DiveFingertip);
         else if (step == Step.GroundSmash || step == Step.Stomp)
             showContactPose(currentPose, groundSmash, poseHeight, SmashFistBottom);
+        // 강화 추격의 홀딩 (ChaseHold) 은 접촉점 정렬을 하지 않음: 정렬하면 보스가 플레이어 머리를 따라 위로 올라가 버림 (사용자 2026-11-16).
+        // 보스는 pivot (발바닥) 높이 그대로 두고 후속 공격도 같은 높이를 씀.
     }
 
     public Vector2 Tick(float dt)
@@ -115,6 +150,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
                 }
                 break;
             case Step.Hold:
+                MoveHeld(Mathf.Clamp01(elapsed / ChaseLunge), 0f);   // 두 번째 GrabDash 홀딩과 같은 0.1초 이동
                 if (elapsed >= HoldTime) BeginPunch();
                 break;
             case Step.Punch:
@@ -153,7 +189,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
                 {
                     step = Step.GroundSmash; elapsed = 0f;
                     Show(groundSmash, 0f);
-                    body.GetComponent<KagutsuchiPhysicalStompFx>()?.Play(bossGround, body.radius);
+                    body.GetComponent<KagutsuchiPhysicalStompFx>()?.Play(bossGround, body.radius * SlamDustScale);   // 사용자 (2026-11-16): 내려찍기 먼지 효과 3배 (표시 크기만)
                     CameraFollow.Shake(ShakeTime, ShakeAmplitude);
                     Hit();
                 }
@@ -180,11 +216,34 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
                 player.SetBossHoldOffsetWeight(this, 1f - liftProgress);
                 if (elapsed >= StompReadyTime && AtMoveEnd())
                 {
-                    step = Step.FinalKick; elapsed = 0f;
+                    step = enhancedRun ? Step.ChaseWait : Step.FinalKick; elapsed = 0f;
                     SetMove(FinalKickDistance);
                     Show(kick, 0f);
                     body.GetComponent<KagutsuchiSonicBoomFx>()?.Play(bossGround, bodyVisual.flipX);
                     Hit();
+                    if (enhancedRun) { chaseIndex = 0; knockClock = 0f; knockDuration = FinalMoveTime; }   // 강화: 이 밀어냄이 끝나기 0.1초 전부터 추격
+                }
+                break;
+            case Step.ChaseWait:
+                knockClock += dt;
+                MoveHeld(Mathf.Clamp01(knockClock / knockDuration), 0f);
+                if (chaseIndex >= ChaseTable.Length) { Cancel(); break; }
+                if (chaseIndex >= 4 || knockClock >= knockDuration - ChaseLunge) BeginChaseLunge();   // 반대 방향 단계는 바로
+                break;
+            case Step.ChaseLunge:
+                knockClock += dt; lungeClock += dt;
+                MoveHeld(Mathf.Clamp01(knockClock / knockDuration), 0f);
+                float lungeTime = chaseIndex >= 4 ? ChaseFollowInterval : ChaseLunge;
+                bossGround = Vector2.Lerp(lungeStart, lungeEnd, Mathf.Clamp01(lungeClock / lungeTime));
+                if (lungeClock >= lungeTime) ResolveChase();
+                break;
+            case Step.ChaseHold:
+                MoveHeld(Mathf.Clamp01(elapsed / ChaseLunge), 0f);
+                if (elapsed >= ChaseHoldTime)
+                {
+                    // 사용자: GrabDash 이후 공격은 GrabDash (홀딩 정렬된) pivot 높이에 맞춤
+                    chasePoseHeight = PoseWorldHeight != null ? PoseWorldHeight() : 0f;
+                    chaseIndex++; step = Step.ChaseWait; elapsed = 0f; knockClock = knockDuration;
                 }
                 break;
             case Step.FinalKick:
@@ -195,7 +254,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
                 {
                     // 최종 자세가 끝날 때까지 홀드 기절, 종료 뒤 일반 기절 적용.
                     player.EndBossHold(this);
-                    player.StunByBoss(FinalStun);
+                    player.StunByBoss(finalStun);
                     Cancel();
                 }
                 break;
@@ -216,6 +275,7 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
         float horizontal = player.HurtCenter.x - contact.x;
         if (Mathf.Abs(horizontal) > Epsilon) attackSign = horizontal < 0f ? -1f : 1f;
         Show(grabDash, 0f);
+        SetMove(FirstHoldShift);   // 사용자 (2026-11-16): 첫 홀딩은 플레이어를 보스 진행 방향으로 1 이동 (두 번째 GrabDash 는 ChaseHoldShift = 2)
         player.SetBossHoldFacing(this, !bodyVisual.flipX);
         CameraFollow.BeginOutsideMapFollow(this, player.BossHoldVisual, CameraMagnification);
         return true;
@@ -267,6 +327,66 @@ public sealed class KagutsuchiGrabComboPattern : MonoBehaviour
         bossGround = BesidePlayer();
         SetMove(DiveDistance);
         Show(diveReady, AirHeight);
+    }
+
+    Sprite ChaseSprite(ChasePose pose)
+    {
+        switch (pose)
+        {
+            case ChasePose.Punch: return punch;
+            case ChasePose.Kick: return kick;
+            case ChasePose.StompReady: return stompReady;
+            default: return grabDash;
+        }
+    }
+
+    /// <summary>플레이어가 도착할 지점 (밀려나는 중이면 그 끝) 앞에 2 뒤에서 파고들며 공격 자세. 4번째 단계부터는 반대 방향.</summary>
+    void BeginChaseLunge()
+    {
+        var stage = ChaseTable[chaseIndex];
+        // 사용자: 단계마다 보스가 서는 쪽이 번갈아 바뀜 (발차기 왼쪽 → 펀치 오른쪽 → 킥 왼쪽 → StompReady 오른쪽 → 잡기 왼쪽 → 펀치 오른쪽 → StompReady 왼쪽 → 킥 오른쪽).
+        // attackSign = 밀어내는 방향이므로 단계마다 뒤집으면 보스는 직전 밀려난 쪽 (플레이어가 향한 쪽) 반대편에 선다.
+        attackSign = -attackSign;
+        Vector2 arrival = moveEnd;
+        // 사용자: 홀딩 이후 후속 3연타 (4~6번째) 는 이동하면서 공격하지 않고 플레이어에게서 거리 1 떨어진 자리에 생성만
+        float gap = chaseIndex >= 4 ? ChaseFollowGap : OppositeDistance;
+        float runIn = chaseIndex >= 4 ? 0f : ChaseDistance;
+        lungeEnd = Stage.ClampInside(arrival - new Vector2(attackSign * gap, 0f), body.radius);
+        lungeStart = Stage.ClampInside(arrival - new Vector2(attackSign * (gap + runIn), 0f), body.radius);
+        bossGround = lungeStart;
+        lungeClock = 0f;
+        step = Step.ChaseLunge;
+        Show(ChaseSprite(stage.Pose), chaseIndex >= 4 ? chasePoseHeight : 0f);
+    }
+
+    /// <summary>플레이어 도착 순간: 피해 · 밀어냄 · 다음 단계</summary>
+    void ResolveChase()
+    {
+        var stage = ChaseTable[chaseIndex];
+        bossGround = lungeEnd;
+        Hit();
+        // 펀치 · 킥과 함께, 후속 3연타의 2번째 (StompReady) 에도 풍압 이펙트 (사용자 2026-11-16)
+        if (stage.Pose == ChasePose.Punch || stage.Pose == ChasePose.Kick || (stage.Pose == ChasePose.StompReady && chaseIndex == 5))
+            body.GetComponent<KagutsuchiSonicBoomFx>()?.Play(bossGround, bodyVisual.flipX);
+        if (chaseIndex == ChaseTable.Length - 1)
+        {
+            // 마지막: 8 넉백 · 2초 자세 유지 · 3초 기절 (기존 마지막 발차기 단계 재사용)
+            finalStun = ChaseFinalStun;
+            step = Step.FinalKick; elapsed = 0f;
+            SetMove(ChaseFinalKnock);
+            Show(kick, chasePoseHeight);
+            return;
+        }
+        if (stage.Hold)
+        {
+            SetMove(ChaseHoldShift);   // 사용자: 홀딩 시 플레이어를 보스 진행 방향으로 2 이동
+            step = Step.ChaseHold; elapsed = 0f;
+            Show(grabDash, 0f);
+            return;
+        }
+        if (stage.Knock > 0f) { SetMove(stage.Knock); knockClock = 0f; knockDuration = ChaseKnockTime; }
+        chaseIndex++;
+        step = Step.ChaseWait;
     }
 
     Vector2 BesidePlayer()

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 /// <summary>2페이즈 특수 1. Phase2가 발동과 Tick을 소유하고, 실행기는 경고·기둥·표시·무적·카메라를 회수한다.</summary>
@@ -36,6 +36,8 @@ public sealed class KagutsuchiSolarPattern : MonoBehaviour
     bool beforeScripted, beforeHidden, disposed;
     GameObject cameraAnchor, sun;
     Material sunMaterial;
+    KagutsuchiSunFireAnim sunAnim;
+    SpriteRenderer sunRenderer;
     KagutsuchiSolarGroundEffect sunGroundEffect;
     BossWarning sunWarning;
     KagutsuchiSolarArena arena;
@@ -92,6 +94,8 @@ public sealed class KagutsuchiSolarPattern : MonoBehaviour
         elapsed += dt;
         rain?.Tick(dt);
         sunGroundEffect?.Tick(dt);
+        if (sun != null) sunAnim?.Tick(dt, sunRenderer);   // 태양 표면 흐름 반복
+        arena?.UpdateDepth();   // 기둥 앞뒤: 플레이어보다 아래 (y 낮음) 면 앞, 위면 뒤
         switch (step)
         {
             case Step.CenterRun:
@@ -223,8 +227,14 @@ public sealed class KagutsuchiSolarPattern : MonoBehaviour
         sunWarning = BossWarning.Ellipse(Stage.Center, SunHalfAxes, 0f);
         sun = new GameObject("KagutsuchiSunFire");
         var sr = sun.AddComponent<SpriteRenderer>();
-        sr.sprite = SpriteFactory.TryGet("Kagutsuchi_P2_SunFire") ?? SpriteFactory.Get("Fx_Circle", SpriteFactory.Shape.Circle);
-        sun.transform.localScale = Vector3.one * (SunRadius * 2f * SunVisualScale / sr.sprite.bounds.size.x);
+        // 사용자 (2026-11-16): 정지 그림 대신 반복 애니메이션 (Kagutsuchi_SunFire_Loop). 시트가 없으면 이전 정지 그림.
+        sunAnim?.Dispose();
+        sunAnim = new KagutsuchiSunFireAnim();
+        sunRenderer = sr;
+        bool animated = sunAnim.Valid;
+        sr.sprite = animated ? sunAnim.First
+            : SpriteFactory.TryGet("Kagutsuchi_P2_SunFire") ?? SpriteFactory.Get("Fx_Circle", SpriteFactory.Shape.Circle);
+        sun.transform.localScale = Vector3.one * (SunRadius * 2f * SunVisualScale * (animated ? KagutsuchiSunFireAnim.CellScale : 1f) / sr.sprite.bounds.size.x);
         sun.transform.position = Stage.Center + Vector2.up * startHeight;
         // 태양 꼭대기에 착지한 보스와 테두리를 화염구가 덮지 않도록 그 뒤에 표시.
         sr.sortingOrder = bodyVisual.sortingOrder - 2;
@@ -280,6 +290,7 @@ public sealed class KagutsuchiSolarPattern : MonoBehaviour
         arena.Dispose(); arena = null;
         sunGroundEffect?.Dispose(); sunGroundEffect = null;
         if (sun != null) { sun.SetActive(false); Destroy(sun); sun = null; }
+        if (sunAnim != null) { sunAnim.Dispose(); sunAnim = null; }
         if (sunMaterial != null) { Destroy(sunMaterial); sunMaterial = null; }
         // 흰 화면 시작부터 지면 중앙에서 Laugh 표시. 취약 시간은 화면 복귀 후 시작.
         showPose(laugh, 0f);
@@ -312,6 +323,7 @@ public sealed class KagutsuchiSolarPattern : MonoBehaviour
         ClearSunWarning();
         sunGroundEffect?.Dispose(); sunGroundEffect = null;
         if (sun != null) { sun.SetActive(false); Destroy(sun); sun = null; }
+        if (sunAnim != null) { sunAnim.Dispose(); sunAnim = null; }
         if (sunMaterial != null) { Destroy(sunMaterial); sunMaterial = null; }
         CameraFollow.EndOutsideMapFollow(this);
         if (cameraAnchor != null) { Destroy(cameraAnchor); cameraAnchor = null; }
