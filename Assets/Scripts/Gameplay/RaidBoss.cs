@@ -8,6 +8,7 @@ public class RaidBossInfo
     public string name, nameEn;
     public string element;      // 주요 전투 요소
     public string note;         // 상태 안내 (선택 화면)
+    public bool locked;         // 개발 예정 (보이지만 고를 수 없음)
 }
 
 /// <summary>
@@ -27,6 +28,9 @@ public static class RaidBossRoster
             kind = EnemyKind.Kagutsuchi, name = "카구츠치", nameEn = "Kagutsuchi",
             element = "화염 · 검 · 거울", note = "입장 · 공격 패턴 1~7 · 특수 패턴 1~2",
         },
+        // 개발 예정 (2026-11-16 사용자): 보스 표기만. kind = -1 은 실제 보스와 겹치지 않음 (Find 가 찾지 않음)
+        new RaidBossInfo { kind = (EnemyKind)(-1), name = "알레시오 생귄", nameEn = "", element = "", note = "개발 예정", locked = true },
+        new RaidBossInfo { kind = (EnemyKind)(-1), name = "아그니", nameEn = "", element = "", note = "개발 예정", locked = true },
     };
 
     public static RaidBossInfo Find(EnemyKind k) => All.Find(b => b.kind == k);
