@@ -729,7 +729,7 @@ public class GameManager : MonoBehaviour
         RaidStage.BossAI?.DrawHud(W);   // 레이드 보스 전용 표시 (가니악 특수 패턴 3 카운트다운 등)
 
         // 체력 바 (플레이어 아래)
-        var sp = Camera.main.WorldToScreenPoint(p.transform.position + Vector3.down * p.HealthBarOffset);
+        var sp = Camera.main.WorldToScreenPoint(p.HealthBarWorldPosition);
         UIStyles.Bar(new Rect(sp.x - 30, H - sp.y, 60, 7), p.hp / p.maxHp, new Color(0.9f, 0.25f, 0.25f));
 
         // 보유 스킬 (종류별)

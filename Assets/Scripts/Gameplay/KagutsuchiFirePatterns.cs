@@ -358,14 +358,14 @@ public sealed class KagutsuchiFireRainPattern : KagutsuchiFirePattern
 /// <summary>
 /// 공격 10 · 부채꼴 반사 레이저 (사용자 2026-11-16, 특수 패턴 2 이후 해금). 쿨타임 10초, 피해 [임시] 5.
 /// 플레이어 방향 60도 부채꼴에 폭 1 · 5회 반사 레이저 3개 → 1초 워닝 → 레이저. 0.5초 뒤 한 번 더 (다시 조준).
-/// 체력 50% 이하: 부채꼴 120도 · 레이저 6개. 추가 사용은 같은 1회.
+/// 체력 50% 이하: 부채꼴 120도 · 레이저 6개 · 추가 사용 2회 (총 3번).
 /// [임시] 레이저 지속 0.5초 (1페이즈 반사 레이저와 같음), 레이저는 부채꼴 안에 같은 간격으로 배치, 포즈 (GrabReady → GrabDash).
 /// </summary>
 public sealed class KagutsuchiReflectLaserPattern : KagutsuchiFirePattern
 {
     public const float Cooldown = 10f;
     const float WarnTime = 1f, LaserTime = 0.5f, Gap = 0.5f, Width = 1f, Damage = 5f, LaserTick = 0.5f;
-    const int Bounces = 5, ExtraUses = 1;
+    const int Bounces = 5, ExtraUses = 1, EnhancedExtraUses = 2;   // 추가 사용: 일반 1회 (총 2번), 강화 2회 (총 3번, 사용자 2026-11-16)
     enum Step { Warn, Fire, Gap }
     Step step;
     int use;
@@ -429,7 +429,7 @@ public sealed class KagutsuchiReflectLaserPattern : KagutsuchiFirePattern
             case Step.Fire:
                 if (elapsed >= LaserTime)
                 {
-                    if (use < ExtraUses) { step = Step.Gap; elapsed = 0f; }
+                    if (use < (enhanced ? EnhancedExtraUses : ExtraUses)) { step = Step.Gap; elapsed = 0f; }
                     else Cancel();
                 }
                 break;

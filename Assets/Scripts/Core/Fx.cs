@@ -71,6 +71,14 @@ public static class Fx
     }
 
     /// <summary>화면 전체 번쩍임</summary>
+    /// <summary>hold 초 동안 완전히 유지한 뒤 fade 초 동안 서서히 사라지는 화면 점멸</summary>
+    public static void ScreenFlash(Color c, float hold, float fade)
+    {
+        var go = new GameObject("FxScreenFlash");
+        var f = go.AddComponent<FxScreenFlash>();
+        f.color = c; f.hold = hold; f.duration = hold + fade;
+    }
+
     public static void ScreenFlash(Color c, float duration)
     {
         var go = new GameObject("FxScreenFlash");
@@ -112,6 +120,7 @@ public class FxScreenFlash : MonoBehaviour
 {
     public Color color;
     public float duration;
+    public float hold;   // 처음 hold 초는 완전히 유지 (기본 0)
     float t;
 
     void Update()
@@ -123,7 +132,7 @@ public class FxScreenFlash : MonoBehaviour
     void OnGUI()
     {
         GUI.depth = 10;
-        var c = color; c.a *= 1f - t / duration;
+        var c = color; c.a *= t < hold ? 1f : 1f - (t - hold) / Mathf.Max(0.0001f, duration - hold);
         GUI.color = c;
         GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
         GUI.color = Color.white;
