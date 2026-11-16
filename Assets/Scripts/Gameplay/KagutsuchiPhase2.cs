@@ -96,8 +96,9 @@ public sealed class KagutsuchiPhase2 : IDisposable
                  DiveWarning, Flying, Landing, KickWarning, KickMoving, KickHit, KickRecovery,
                  StompWarning, StompHit, StompRecovery, UppercutWarning, UppercutHit, UppercutRecovery,
                  ChainStompWarning, ChainStompHit, ChainStompRecovery,
-                 ComboWarning, ComboMoving, ComboHit, ComboRecovery, Grab, GrabCombo }
-    enum Pattern { Punch, Run, DiveKick, StompUppercut, ChainStomp, Combo, Grab, GrabCombo }
+                 ComboWarning, ComboMoving, ComboHit, ComboRecovery, Grab, GrabCombo, Fireballs, FireRain, ReflectLaser }
+    // 8 · 9 = 특수 패턴 1 이후 해금, 10 = 특수 패턴 2 이후 해금 (사용자 2026-11-16). enum 순서 = DebugPatternNames 순서 (공격 8 → index 8).
+    enum Pattern { Punch, Run, DiveKick, StompUppercut, ChainStomp, Combo, Grab, GrabCombo, Fireballs, FireRain, ReflectLaser }
     enum ComboAction { Punch, Uppercut, Kick, Stomp }
 
     readonly struct ComboStep
@@ -130,6 +131,13 @@ public sealed class KagutsuchiPhase2 : IDisposable
     readonly KagutsuchiGrabPattern grabPattern;
     float grabCooldownLeft, grabComboCooldownLeft;
     readonly KagutsuchiGrabComboPattern grabComboPattern;
+    // 해금 패턴 (사용자 2026-11-16): 공격 8 · 9 = 특수 패턴 1 을 한 번 마친 뒤, 공격 10 = 특수 패턴 2 를 한 번 마친 뒤
+    readonly KagutsuchiFireVolley fireVolley;
+    readonly KagutsuchiFireballBarrage fireballPattern;
+    readonly KagutsuchiFireRainPattern fireRainPattern;
+    readonly KagutsuchiReflectLaserPattern reflectLaserPattern;
+    bool firePatternsUnlocked, reflectLaserUnlocked;
+    float fireballCooldownLeft, fireRainCooldownLeft, reflectLaserCooldownLeft;
     GameObject airRoot;
     SpriteRenderer airVisual;
     bool airActive, sourceWasEnabled;
@@ -172,6 +180,13 @@ public sealed class KagutsuchiPhase2 : IDisposable
                                ShowAirPose, StopAirPose, () => airRoot != null ? airRoot.transform : body.transform, ShowGrabRunFrame, AlignGrabStompFoot);
         grabPattern.GroundSmashPose = groundSmash;
         grabPattern.IsEnhanced = () => Enhanced;
+        fireVolley = new KagutsuchiFireVolley();
+        fireballPattern = body.gameObject.AddComponent<KagutsuchiFireballBarrage>();
+        fireRainPattern = body.gameObject.AddComponent<KagutsuchiFireRainPattern>();
+        reflectLaserPattern = body.gameObject.AddComponent<KagutsuchiReflectLaserPattern>();
+        fireballPattern.Initialize(body, grabReady, grabDash, stomp, uppercut, ShowAirPose, StopAirPose, fireVolley, () => Enhanced);
+        fireRainPattern.Initialize(body, grabReady, grabDash, stomp, uppercut, ShowAirPose, StopAirPose, fireVolley, () => Enhanced);
+        reflectLaserPattern.Initialize(body, grabReady, grabDash, stomp, uppercut, ShowAirPose, StopAirPose, fireVolley, () => Enhanced);
         grabComboPattern = body.gameObject.AddComponent<KagutsuchiGrabComboPattern>();
         grabComboPattern.IsEnhanced = () => Enhanced;
         grabComboPattern.PoseWorldHeight = () => airRoot != null ? airRoot.transform.position.y - body.transform.position.y : 0f;
@@ -300,6 +315,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
     {
         "공격 1 · 돌진 펀치", "이동 1 · 달리기", "공격 2 · 점프 돌진 → 발차기", "공격 3 · 지면 찍기 → 어퍼컷",
         "공격 4 · 지면 연속 찍기", "공격 5 · 연속 타격", "공격 6 · 잡기 → 어퍼컷 → 내려찍기 → 발차기", "공격 7 · 잡기 → 연속 공격",
+        "공격 8 · 화염구 연발 (특수 1 이후)", "공격 9 · 화염구 쏟아 내리기 (특수 1 이후)", "공격 10 · 부채꼴 반사 레이저 (특수 2 이후)",
         "특수 패턴 1 · 태양 · 돌기둥 · 화염구",
         "특수 패턴 2 · 돌기둥 · 레이저 · 초거대 화염구",
     };
@@ -351,9 +367,9 @@ public sealed class KagutsuchiPhase2 : IDisposable
     {
         if (disposed || body == null) return;
         DebugCancel();
-        if (index == 8) { solarPending = false; solarPattern.Begin(); return; }
-        if (index >= 9) { special2Pending = false; special2Pattern.Begin(); return; }
-        pattern = (Pattern)Mathf.Clamp(index, 0, 7);
+        if (index == 11) { solarPending = false; solarPattern.Begin(); return; }
+        if (index >= 12) { special2Pending = false; special2Pattern.Begin(); return; }
+        pattern = (Pattern)Mathf.Clamp(index, 0, 10);
         comboStep = 0;
         BeginPattern(toPlayer);
     }
@@ -365,6 +381,10 @@ public sealed class KagutsuchiPhase2 : IDisposable
         debugSpriteHold = false;
         if (grabPattern != null) grabPattern.Cancel();
         if (grabComboPattern != null) grabComboPattern.Cancel();
+        if (fireballPattern != null) fireballPattern.Cancel();
+        if (fireRainPattern != null) fireRainPattern.Cancel();
+        if (reflectLaserPattern != null) reflectLaserPattern.Cancel();
+        if (fireVolley != null) fireVolley.Clear();
         if (solarPattern != null && solarPattern.Active) solarPattern.Cancel();
         if (special2Pattern != null && special2Pattern.Active) special2Pattern.Cancel();
         if (physicalStomp != null) physicalStomp.Clear();
@@ -395,17 +415,18 @@ public sealed class KagutsuchiPhase2 : IDisposable
             special2Threshold++;
             special2Pending = true;   // 특수 패턴 2: 체력 75% · 50% · 25%
         }
+        fireVolley.Tick(dt);   // 공격 8 · 9 의 화염구는 패턴이 끝난 뒤에도 날아가므로 항상 진행
         // 특수 패턴 자체의 Scripted·Hidden 상태에서도 실행기는 계속 진행한다.
         if (solarPattern.Active)
         {
             Vector2 velocity = solarPattern.Tick(dt);
-            if (!solarPattern.Active) visual.sprite = stand;
+            if (!solarPattern.Active) { visual.sprite = stand; firePatternsUnlocked = true; }   // 특수 패턴 1 을 마치면 공격 8 · 9 해금
             return velocity;
         }
         if (special2Pattern.Active)
         {
             Vector2 velocity = special2Pattern.Tick(dt);
-            if (!special2Pattern.Active) visual.sprite = stand;
+            if (!special2Pattern.Active) { visual.sprite = stand; reflectLaserUnlocked = true; }   // 특수 패턴 2 를 마치면 공격 10 해금
             return velocity;
         }
         if (body.Scripted || body.Hidden) return Vector2.zero;
@@ -443,6 +464,9 @@ public sealed class KagutsuchiPhase2 : IDisposable
             comboCooldownLeft = Mathf.Max(0f, comboCooldownLeft - dt);
             grabCooldownLeft = Mathf.Max(0f, grabCooldownLeft - dt);
             grabComboCooldownLeft = Mathf.Max(0f, grabComboCooldownLeft - dt);
+            fireballCooldownLeft = Mathf.Max(0f, fireballCooldownLeft - dt);
+            fireRainCooldownLeft = Mathf.Max(0f, fireRainCooldownLeft - dt);
+            reflectLaserCooldownLeft = Mathf.Max(0f, reflectLaserCooldownLeft - dt);
             gapLeft = Mathf.Max(0f, gapLeft - dt);
             if (gapLeft <= 0f && DebugAuto) ChoosePattern(toPlayer);   // 디버그 맵에서 자동 선택을 끄면 대기만
             return Vector2.zero;
@@ -451,6 +475,18 @@ public sealed class KagutsuchiPhase2 : IDisposable
         elapsed += dt;
         switch (phase)
         {
+            case Phase.Fireballs:
+                fireballPattern.Tick(dt);
+                if (fireballPattern.Finished) CompletePattern();
+                return Vector2.zero;
+            case Phase.FireRain:
+                fireRainPattern.Tick(dt);
+                if (fireRainPattern.Finished) CompletePattern();
+                return Vector2.zero;
+            case Phase.ReflectLaser:
+                reflectLaserPattern.Tick(dt);
+                if (reflectLaserPattern.Finished) CompletePattern();
+                return Vector2.zero;
             case Phase.GrabCombo:
                 Vector2 comboGrabVelocity = grabComboPattern.Tick(dt);
                 if (grabComboPattern.Finished) CompletePattern();
@@ -674,6 +710,13 @@ public sealed class KagutsuchiPhase2 : IDisposable
             && (player.HurtCenter - (Vector2)body.transform.position).sqrMagnitude
                 <= KagutsuchiGrabComboPattern.TriggerRadius * KagutsuchiGrabComboPattern.TriggerRadius)
             ready.Add(Pattern.GrabCombo);
+        // 해금 패턴 (거리 조건 없음)
+        if (firePatternsUnlocked && player != null)
+        {
+            if (fireballCooldownLeft <= 0f) ready.Add(Pattern.Fireballs);
+            if (fireRainCooldownLeft <= 0f) ready.Add(Pattern.FireRain);
+        }
+        if (reflectLaserUnlocked && player != null && reflectLaserCooldownLeft <= 0f) ready.Add(Pattern.ReflectLaser);
         if (ready.Count == 0) return;
         pattern = ready[UnityEngine.Random.Range(0, ready.Count)];
         BeginPattern(toPlayer);
@@ -691,6 +734,9 @@ public sealed class KagutsuchiPhase2 : IDisposable
             case Pattern.Combo: activeSteps = Enhanced ? ComboStepsEnhanced : ComboSteps; comboStep = 0; BeginComboWarning(); break;
             case Pattern.Grab: phase = Phase.Grab; grabPattern.Begin(); break;
             case Pattern.GrabCombo: phase = Phase.GrabCombo; grabComboPattern.Begin(); break;
+            case Pattern.Fireballs: phase = Phase.Fireballs; fireballPattern.Begin(); break;
+            case Pattern.FireRain: phase = Phase.FireRain; fireRainPattern.Begin(); break;
+            case Pattern.ReflectLaser: phase = Phase.ReflectLaser; reflectLaserPattern.Begin(); break;
             default: BeginWarning(toPlayer); break;
         }
     }
@@ -745,6 +791,9 @@ public sealed class KagutsuchiPhase2 : IDisposable
             case Pattern.Combo: comboCooldownLeft = ComboCooldown; break;
             case Pattern.Grab: grabCooldownLeft = KagutsuchiGrabPattern.Cooldown; break;
             case Pattern.GrabCombo: grabComboCooldownLeft = KagutsuchiGrabComboPattern.Cooldown; break;
+            case Pattern.Fireballs: fireballCooldownLeft = KagutsuchiFireballBarrage.Cooldown; break;
+            case Pattern.FireRain: fireRainCooldownLeft = KagutsuchiFireRainPattern.Cooldown; break;
+            case Pattern.ReflectLaser: reflectLaserCooldownLeft = KagutsuchiReflectLaserPattern.Cooldown; break;
             default: cooldownLeft = Enhanced ? PunchEnhancedCooldown : PunchCooldown; break;
         }
         gapLeft = PatternGap;
@@ -1358,6 +1407,10 @@ public sealed class KagutsuchiPhase2 : IDisposable
         if (uppercutFx != null) { uppercutFx.Clear(); UnityEngine.Object.Destroy(uppercutFx); }
         if (solarPattern != null) { solarPattern.Dispose(); UnityEngine.Object.Destroy(solarPattern); }
         if (special2Pattern != null) { special2Pattern.Dispose(); UnityEngine.Object.Destroy(special2Pattern); }
+        if (fireballPattern != null) { fireballPattern.Cancel(); UnityEngine.Object.Destroy(fireballPattern); }
+        if (fireRainPattern != null) { fireRainPattern.Cancel(); UnityEngine.Object.Destroy(fireRainPattern); }
+        if (reflectLaserPattern != null) { reflectLaserPattern.Cancel(); UnityEngine.Object.Destroy(reflectLaserPattern); }
+        if (fireVolley != null) fireVolley.Dispose();
         if (grabComboPattern != null) { grabComboPattern.Cancel(); UnityEngine.Object.Destroy(grabComboPattern); }
         if (grabPattern != null) { grabPattern.Cancel(); UnityEngine.Object.Destroy(grabPattern); }
         StopAirPose();
