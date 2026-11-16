@@ -38,8 +38,30 @@ public class SpriteSheetAnimator : MonoBehaviour
     float oneShotTime;
     Action oneShotEnd;
 
+    // 측면 전용 모드: 시트 행이 1개 (왼쪽을 보는 옆면) 인 클립이 하나라도 있으면, 오른쪽은 좌우 반전으로 표시하고
+    // 위 · 아래 방향은 마지막 좌우 방향을 유지한다 (가니악 1페이즈, 2026-11-16 — 카구츠치 2페이즈와 같은 방식).
+    bool sideMode;
+
     public Facing4 Facing { get; private set; } = Facing4.Down;
     public bool IsPlayingOneShot => oneShot != null;
+
+    // 자세 고정: 지정한 시간 동안 클립의 첫 프레임을 다른 모든 재생보다 우선해 보여 줌 (가니악 돌진 자세, 시간이 지나면 저절로 풀림 —
+    // 패턴이 중간에 끊겨도 자세가 남지 않게)
+    Clip heldPose;
+    float heldUntil;
+
+    /// <summary>key 클립의 첫 프레임을 seconds 초 동안 고정 표시. dir 쪽을 바라봄. 클립이 없으면 false</summary>
+    public bool HoldPose(string key, Vector2 dir, float seconds)
+    {
+        if (!clips.TryGetValue(key, out var clip) || sr == null) return false;
+        if (dir.sqrMagnitude > 0.01f) SetFacing(dir);
+        heldPose = clip;
+        heldUntil = Time.time + seconds;
+        sr.sprite = FrameOf(clip, 0);
+        return true;
+    }
+
+    public void ReleasePose() => heldPose = null;
 
     /// <summary>기존 호환용: 이동(Run) 클립 하나를 불러옵니다. 없으면 false.</summary>
     public bool Load(string sheetName, int rows, int columns, float cellWorldSize, float pivotY)
@@ -66,6 +88,7 @@ public class SpriteSheetAnimator : MonoBehaviour
             frames[r, c].name = $"{sheetName}_{r}_{c}";
         }
         clips[key] = new Clip { frames = frames, cols = columns, fps = fps, loop = loop };
+        if (rows == 1) sideMode = true;
 
         if (sr == null)
         {
@@ -82,8 +105,24 @@ public class SpriteSheetAnimator : MonoBehaviour
     public Sprite GetIdleFrame(Facing4 facing)
     {
         if (!clips.TryGetValue(Idle, out var clip) && !clips.TryGetValue(Run, out clip)) return null;
-        int row = Mathf.Clamp((int)facing, 0, clip.frames.GetLength(0) - 1);
-        return clip.frames[row, 0];
+        return clip.frames[Row(clip, facing), 0];
+    }
+
+    /// <summary>시트 행 번호 (행이 1개면 항상 0 = 왼쪽을 보는 옆면)</summary>
+    static int Row(Clip clip, Facing4 facing) => Mathf.Clamp((int)facing, 0, clip.frames.GetLength(0) - 1);
+
+    Sprite FrameOf(Clip clip, int frame)
+    {
+        if (sideMode) sr.flipX = Facing == Facing4.Right && clip.frames.GetLength(0) == 1;   // 4행 클립 (기존 베기) 은 행으로 방향 표현
+        return clip.frames[Row(clip, Facing), frame];
+    }
+
+    /// <summary>방향 갱신 (측면 전용 모드에서는 위 · 아래가 와도 좌우 방향을 유지)</summary>
+    void SetFacing(Vector2 dir)
+    {
+        var f = ToFacing(dir);
+        if (sideMode && (f == Facing4.Up || f == Facing4.Down)) { if (Facing != Facing4.Left && Facing != Facing4.Right) Facing = Facing4.Left; return; }
+        Facing = f;
     }
 
     /// <summary>클립 재생 속도 변경 (실행 중 조정용)</summary>
@@ -98,13 +137,13 @@ public class SpriteSheetAnimator : MonoBehaviour
         moving = dir.sqrMagnitude > 0.01f;
         if (!moving) return;
         // 동작 재생 중에도 이동 방향을 따라 돌아봄 (같은 프레임에서 행만 바뀜)
-        Facing = ToFacing(dir);
+        SetFacing(dir);
     }
 
     /// <summary>멈춰 있을 때 바라볼 방향 (동작 재생 중에는 무시 — 휘두르는 도중 돌아보지 않게)</summary>
     public void Look(Vector2 dir)
     {
-        if (oneShot == null && dir.sqrMagnitude > 0.01f) Facing = ToFacing(dir);
+        if (oneShot == null && dir.sqrMagnitude > 0.01f) SetFacing(dir);
     }
 
     /// <summary>
@@ -116,11 +155,11 @@ public class SpriteSheetAnimator : MonoBehaviour
     {
         if (oneShot != null && !interrupt) return false;
         if (!clips.TryGetValue(key, out var clip)) return false;
-        if (dir.sqrMagnitude > 0.01f) Facing = ToFacing(dir);
+        if (dir.sqrMagnitude > 0.01f) SetFacing(dir);
         oneShot = clip;
         oneShotTime = 0f;
         oneShotEnd = onEnd;
-        sr.sprite = clip.frames[(int)Facing, 0];
+        sr.sprite = FrameOf(clip, 0);
         return true;
     }
 
@@ -138,6 +177,13 @@ public class SpriteSheetAnimator : MonoBehaviour
     {
         if (sr == null) return;
 
+        // 0) 고정 자세 (돌진 등)
+        if (heldPose != null)
+        {
+            if (Time.time < heldUntil) { sr.sprite = FrameOf(heldPose, 0); return; }
+            heldPose = null;
+        }
+
         // 1) 한 번 재생 중인 동작
         if (oneShot != null)
         {
@@ -145,7 +191,7 @@ public class SpriteSheetAnimator : MonoBehaviour
             int f = (int)(oneShotTime * oneShot.fps);
             if (f < oneShot.cols || oneShot.loop)
             {
-                sr.sprite = oneShot.frames[(int)Facing, f % oneShot.cols];
+                sr.sprite = FrameOf(oneShot, f % oneShot.cols);
                 return;
             }
             var end = oneShotEnd;
@@ -169,6 +215,6 @@ public class SpriteSheetAnimator : MonoBehaviour
         int frame = frozen ? 0 : (int)(time * clip.fps) % clip.cols;
         if (!frozen) time += Time.deltaTime;
 
-        sr.sprite = clip.frames[(int)Facing, frame];
+        sr.sprite = FrameOf(clip, frame);
     }
 }

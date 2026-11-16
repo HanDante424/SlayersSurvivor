@@ -160,6 +160,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI, IDebugBoss
     // ---------- 전방위 베기 (공격 패턴 1 · 2 마무리) ----------
     const float SpinWarn = 1.25f, SpinRadius = 4f, SpinAdvance = 7f;   // 1.25초 경고 → 7 돌진하며 반경 4 전방위 베기 (사용자: 경고 0.75 → 1.75 → 1.25 · 반경 5 → 4 · 이동 2 → 5 → 10 → 7)
     const float SpinDamage = 25f;        // [임시]
+    const float SideSlashPoseTime = 0.4f;   // [임시] 횡베기 타격 자세 유지 시간 (휘두름 0.18 + 전진 0.2 정도)
     const float AdvanceTime = 0.2f;      // [임시] 횡베기하며 2 이동하는 데 걸리는 시간
     const float SwingSweepTime = 0.18f;  // [임시] 휘두르기 이펙트: 반원을 지나가는 시간
     const float SpinAdvanceTime = 0.35f; // [임시] 전방위 베기 돌진 7 이동에 걸리는 시간 (속도 20, 공격 패턴 2 돌진과 같음)
@@ -616,6 +617,13 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI, IDebugBoss
         }
     }
 
+    /// <summary>Move + 돌진 자세 (측면 시트의 돌진 그림, 2026-11-16). 돌진 · 전진 이동에만 사용</summary>
+    IEnumerator DashMove(Vector2 delta, float seconds, System.Action<float> onStep = null)
+    {
+        e.HoldDashPose(delta, seconds + 0.05f);
+        yield return Move(delta, seconds, onStep);
+    }
+
     BossWarning Track(BossWarning w) { warnings.RemoveAll(x => x == null); warnings.Add(w); return w; }
 
     /// <summary>플레이어 피격 판정 원이 보스 기준 반경 r 원 안</summary>
@@ -668,7 +676,13 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI, IDebugBoss
     {
         faceDir = dir;
         Track(BossWarning.HalfDisc(Pos, dir, r, warn));
-        yield return WarnThenSlash(warn, dir);
+        if (e.HasSideSlashPose)
+        {
+            // 횡베기 그림 = 타격 순간 한 장 → 경고가 끝나는 순간(판정)에 이 자세를 잠깐 유지
+            yield return WaitActive(warn);
+            e.HoldSideSlashPose(dir, SideSlashPoseTime);
+        }
+        else yield return WarnThenSlash(warn, dir);
         Fx.Arc(Pos, dir, r, new Color(0.75f, 0.45f, 1f, 0.85f), 0.2f);
         GaniacSwing.Arc(transform, dir, r, SwingSweepTime);   // 반원을 따라 큰 검이 지나감
         CameraFollow.Shake(0.08f, 0.08f);
@@ -788,7 +802,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI, IDebugBoss
             P.HitByBoss(SpinDamage, 0f, Vector2.zero, 0f);
         }
         Check();
-        yield return Move(dir * SpinAdvance, SpinAdvanceTime, _ => Check());
+        yield return DashMove(dir * SpinAdvance, SpinAdvanceTime, _ => Check());
         Fx.Disc(Pos, SpinRadius, new Color(0.5f, 0.2f, 0.8f, 0.35f), 0.2f);
 
         if (Enraged) yield return SpinLasers();   // 체력 50% 아래 강화
@@ -860,7 +874,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI, IDebugBoss
         Track(BossWarning.Box(Pos, dir, distance, e.radius * 2f, warn));
         yield return WaitActive(warn);
         bool hit = false;
-        yield return Move(dir * distance, distance / RushSpeed, _ =>
+        yield return DashMove(dir * distance, distance / RushSpeed, _ =>
         {
             if (!hit && PlayerInCircle(Pos, e.radius + 0.2f))
             {
@@ -920,7 +934,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI, IDebugBoss
             Vector2 to = points[i];
             Vector2 d = to - Pos;
             if (d.sqrMagnitude > 0.0001f) faceDir = d.normalized;
-            yield return Move(d, Mathf.Max(0.05f, d.magnitude / RushSpeed));
+            yield return DashMove(d, Mathf.Max(0.05f, d.magnitude / RushSpeed));
             // 검에 닿음 → 반경 6 전방위 베기
             if (marks[i] != null) Destroy(marks[i]);
             if (rings[i] != null) Destroy(rings[i].gameObject);

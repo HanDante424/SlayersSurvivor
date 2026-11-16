@@ -94,7 +94,7 @@ public partial class Enemy : MonoBehaviour
     public const string SlashClip = "Slash";
     public const float SlashFps = 14f;                       // [임시] 베기 8프레임 ≈ 0.57초
     public const float SlashLead = 3f / SlashFps;            // 베기 4번째 프레임(칼이 지나가는 순간)까지 걸리는 시간 → 판정 순간에 맞춰 미리 재생
-    const float GaniacHeight = 2.3f;                         // [임시] 화면 키 (유닛, 플레이어 약 1.62)
+    const float GaniacHeight = 3.5f;                         // [임시] 화면 키 (유닛, 플레이어 약 1.62). 사용자 2026-11-17: 2.3 → 3.5 (카구츠치 4 에 가깝게). 판정은 EnemyConfig.ganiacHitbox 라 그대로
     const float GaniacPivotAboveFeet = 1.0f;                 // transform(판정 원 중심) = 발 위 1유닛 (판정 반경 약 1)
     const float MoveAnimSpeed = 0.3f;                        // 이 속도 이상 움직이면 걷기
     SpriteSheetAnimator anim;
@@ -110,13 +110,57 @@ public partial class Enemy : MonoBehaviour
         float pivotIdle = (24f + ppu * pivotAboveFeet) / 384f, pivotSlash = (30f + ppu * pivotAboveFeet) / 480f;
         var placeholder = sr.sprite;
         sr.sprite = null;   // 첫 프레임부터 시트 그림 (도형이 한 프레임 보이지 않게)
+        // 가니악 1페이즈 = 왼쪽 측면 한 벌 + 좌우 반전 (2026-11-16 사용자). 시트가 있으면 이것으로 대기 · 걷기, 없으면 기존 4방향 시트
+        if (id == "Ganiac" && SetupGaniacSide(a, placeholder, height, pivotAboveFeet, s)) { SetupSlash(a, id, cellSlash, pivotSlash); return; }
         if (!a.LoadClip(SpriteSheetAnimator.Run, id + "_Run", 4, 8, cellIdle, pivotIdle, 10f, true)) { sr.sprite = placeholder; Destroy(a); return; }
         a.LoadClip(SpriteSheetAnimator.Idle, id + "_Idle", 4, 1, cellIdle, pivotIdle, 1f, true);
+        SetupSlash(a, id, cellSlash, pivotSlash);
+    }
+
+    void SetupSlash(SpriteSheetAnimator a, string id, float cellSlash, float pivotSlash)
+    {
         a.LoadClip(SlashClip, id + "_Slash", 4, 8, cellSlash, pivotSlash, SlashFps, false);
         anim = a;
         sr.color = baseColor = Color.white;   // 도형 대체 색을 지움
-        sr.flipX = false;                    // 방향은 시트 행으로
+        sr.flipX = false;                    // 방향은 시트 행 (측면 전용 클립은 애니메이터가 좌우 반전)
         animLastPos = transform.position;
+    }
+
+    // 가니악 1페이즈 측면 시트 (Docs/Design/Raid_Ganiac_Plan_v0.1.md 맨 아래): 칸 400px, 키 372px (머리카락 끝 ~ 발끝), 발끝 = 칸 아래 12px.
+    // 키는 기존 GaniacHeight 그대로. 베기 · 돌진 등 동작 그림은 아직 없어 기존 4방향 Ganiac_Slash 를 임시로 계속 사용.
+    const float GaniacSideCell = 400f, GaniacSideBody = 372f, GaniacSideFoot = 12f;
+    const float GaniacWalkFps = 7f;   // [임시] 8프레임 걷기 ≈ 1.14초 (속도 1.0 에서 발이 덜 미끄러지는 정도, Play 로 확인 후 조정)
+
+    bool SetupGaniacSide(SpriteSheetAnimator a, Sprite placeholder, float height, float pivotAboveFeet, float objScale)
+    {
+        float ppu = GaniacSideBody / height;
+        float cell = GaniacSideCell / ppu / Mathf.Max(0.0001f, objScale);
+        float pivot = (GaniacSideFoot + ppu * pivotAboveFeet) / GaniacSideCell;
+        if (!a.LoadClip(SpriteSheetAnimator.Run, "Ganiac_P1_Walk", 1, 8, cell, pivot, GaniacWalkFps, true)) return false;
+        a.LoadClip(SpriteSheetAnimator.Idle, "Ganiac_P1_Stand", 1, 1, cell, pivot, 1f, true);
+        // 돌진 자세: 칸 640 × 400 (칼 · 망토가 길어 가로만 넓음), 같은 배율 · 같은 발끝 높이 → 월드 칸 폭만 640 기준으로
+        a.LoadClip(DashClip, "Ganiac_P1_Dash", 1, 1, 640f / ppu / Mathf.Max(0.0001f, objScale), pivot, 1f, false);
+        // 횡베기 자세 (타격 순간 한 장): 칸 · 배율 · 발끝 높이는 돌진과 같음
+        a.LoadClip(SideSlashClip, "Ganiac_P1_Slash", 1, 1, 640f / ppu / Mathf.Max(0.0001f, objScale), pivot, 1f, false);
+        return true;
+    }
+
+    public const string DashClip = "Dash";
+    public const string SideSlashClip = "SideSlash";
+
+    /// <summary>횡베기 자세 그림이 있는가 (없으면 기존 Ganiac_Slash 동작 사용)</summary>
+    public bool HasSideSlashPose => anim != null && anim.HasClip(SideSlashClip);
+
+    /// <summary>횡베기 타격 자세를 seconds 초 동안 고정. dir 쪽을 바라봄</summary>
+    public void HoldSideSlashPose(Vector2 dir, float seconds)
+    {
+        if (anim != null) anim.HoldPose(SideSlashClip, dir, seconds);
+    }
+
+    /// <summary>돌진 자세를 seconds 초 동안 고정 (측면 시트가 있을 때만, 없으면 아무것도 안 함). 이동 방향을 바라봄</summary>
+    public void HoldDashPose(Vector2 dir, float seconds)
+    {
+        if (anim != null) anim.HoldPose(DashClip, dir, seconds);
     }
 
     /// <summary>베기 동작 재생 (시트가 없으면 아무것도 안 함). 진행 중인 동작은 끊고 새로</summary>
