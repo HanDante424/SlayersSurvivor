@@ -88,7 +88,8 @@ public sealed class KagutsuchiSolarArena : IDisposable
 {
     public const float Radius = 1f;
     const float CornerInset = 4f;
-    const float PillarVisualScale = 3f; // 사용자: 직전 표시 크기(1.5배)에서 추가 2배.
+    const float SpriteDrop = 1f;       // 사용자 (2026-11-16): 돌기둥 그림만 아래로 1 (충돌 · 경고 · 안전지대 위치는 그대로)
+    const float PillarVisualScale = 3f;// 사용자: 직전 표시 크기(1.5배)에서 추가 2배.
     static KagutsuchiSolarArena active;
     readonly Vector2[] positions = new Vector2[4];
     readonly GameObject[] roots = new GameObject[4];
@@ -132,7 +133,23 @@ public sealed class KagutsuchiSolarArena : IDisposable
             roots[i].SetActive(true);
             var sr = renderers[i];
             float foot = -sr.sprite.bounds.min.y * roots[i].transform.localScale.y;
-            roots[i].transform.position = positions[i] + Vector2.up * (height + foot);
+            roots[i].transform.position = positions[i] + Vector2.up * (height + foot - SpriteDrop);
+        }
+    }
+
+    // 원근감 (사용자 2026-11-16): 발 y 가 플레이어보다 아래면 플레이어 앞 (위), 위면 뒤 (아래). 플레이어 표시 순서 10 고정.
+    const int FrontOfPlayerOrder = 12, BehindPlayerOrder = 9;
+
+    public void UpdateDepth()
+    {
+        var player = Player.I;
+        if (player == null) return;
+        float playerFootY = player.transform.position.y;
+        for (int i = 0; i < roots.Length; i++)
+        {
+            if (renderers[i] == null || !roots[i].activeSelf) continue;
+            float pillarFootY = positions[i].y - SpriteDrop;   // 그림이 실제로 서 있는 바닥 높이
+            renderers[i].sortingOrder = pillarFootY < playerFootY ? FrontOfPlayerOrder : BehindPlayerOrder;
         }
     }
 

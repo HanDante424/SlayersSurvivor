@@ -15,8 +15,79 @@ using UnityEngine;
 /// 특수 패턴 3 (체력 90 · 60 · 30%): 맵 이탈 · 카메라 맵 전체 · 가니악의 검 3개 · 1분 안에 부수지 못하면 검마다 반경 12 전방위 베기.
 /// 피해 · 기획에 없는 값은 [임시].
 /// </summary>
-public class GaniacAI : MonoBehaviour, IRaidBossAI
+public class GaniacAI : MonoBehaviour, IRaidBossAI, IDebugBoss
 {
+    // ---------- IDebugBoss (디버그 맵, 2026-11-16) ----------
+    // 순서 = Pattern enum (이동 1, 공격 1 ~ 7) 다음에 특수 패턴 1 ~ 4. 거리 · 쿨타임 · 체력 조건을 무시하고 바로 실행
+    static readonly string[] DebugNames =
+    {
+        "이동 패턴 1 (옆으로 이탈 → 등장)", "공격 패턴 1 (횡베기 → 전방위)", "공격 패턴 2 (돌진 → 연속 베기)", "공격 패턴 3 (횡베기 → 전방위 ×2)",
+        "공격 패턴 4 (넓은 횡베기 → 연속 베기)", "공격 패턴 5 (어둠의 검 돌진)", "공격 패턴 6 (돌진 → 횡베기 → 레이저)", "공격 패턴 7 (횡베기 → 레이저 ×3)",
+        "특수 패턴 1 (맵 가르는 직선 10개)", "특수 패턴 2 (중앙 레이저 · 좌우 레이저)", "특수 패턴 3 (가니악의 검 1분)", "특수 패턴 4 (구석 레이저 난사)",
+    };
+    string debugCurrent = "";
+    bool debugSkipIntro;
+    public string[] DebugPatternNames => DebugNames;
+    /// <summary>false = 자동 패턴 · 체력 문턱 특수 패턴 · 추격을 모두 끔 (DebugRun 으로 지정한 패턴만)</summary>
+    public bool DebugAuto { get; set; } = true;
+    public string DebugStatus => busy ? $"실행 중: {debugCurrent}" : "대기";
+
+    /// <summary>입장 연출 (특수 패턴 1 · 2) 을 건너뛰고 바로 전투 대기 상태로. Start 보다 먼저 불려도 안전</summary>
+    public void DebugBegin(int phase, bool playIntro)
+    {
+        if (playIntro) { DebugAuto = false; return; }   // 등장 연출을 그대로 재생 (끝난 뒤 자동 패턴 없음)
+        debugSkipIntro = true;
+        StopAllCoroutines();
+        intro = false;
+        busy = false;
+        e.alpha = 1f;
+        e.SetHidden(false);
+        gapLeft = 0f;
+    }
+
+    public void DebugCancel()
+    {
+        OnPhaseEnd();   // 진행 중인 패턴 · 경고 · 검 · 화면 축소 정리 (페이즈 소진 때와 같은 경로)
+        debugCurrent = "";
+    }
+
+    public void DebugRun(int index)
+    {
+        if (intro) return;   // 등장 연출 중에는 패턴 실행 안 함 (연출이 끝난 뒤)
+        DebugCancel();
+        index = Mathf.Clamp(index, 0, DebugNames.Length - 1);
+        debugCurrent = DebugNames[index];
+        if (index < 8) { var p = (Pattern)index; StartCoroutine(Run(p, DebugPatternBody(p))); return; }
+        StartCoroutine(DebugSpecial(index - 8));
+    }
+
+    IEnumerator DebugPatternBody(Pattern p) => p switch
+    {
+        Pattern.Blink => BlinkRoutine(),
+        Pattern.Slash => SlashRoutine(),
+        Pattern.Rush => RushRoutine(),
+        Pattern.Cross => CrossRoutine(),
+        Pattern.Wide => WideRoutine(),
+        Pattern.Summon => SummonRoutine(),
+        Pattern.ChargeLaser => ChargeLaserRoutine(),
+        _ => SweepLaserRoutine(),
+    };
+
+    IEnumerator DebugSpecial(int s)
+    {
+        busy = true;
+        switch (s)
+        {
+            case 0: yield return SpecialLines(); break;
+            case 1: yield return SpecialCenterLaser(); break;
+            case 2: yield return SwordPhase(); break;
+            default: yield return StormPhase(); break;
+        }
+        busy = false;
+        e.alpha = 1f;
+        if (e.Hidden) e.SetHidden(false);
+    }
+
     // ---------- IRaidBossAI ----------
     /// <summary>첫 등장 전 (맵 이탈 상태) 에는 체력 바 없음. 등장 후 이동 패턴으로 잠깐 이탈할 때는 그대로 표시</summary>
     public bool HideBossBar => intro && e != null && e.Hidden;
@@ -235,7 +306,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
         Current = this;
     }
 
-    void Start() => StartCoroutine(Intro());
+    void Start() { if (!debugSkipIntro) StartCoroutine(Intro()); }
 
     void OnDisable()
     {
@@ -260,6 +331,7 @@ public class GaniacAI : MonoBehaviour, IRaidBossAI
     {
         face = busy && faceDir.sqrMagnitude > 0f ? faceDir : toPlayer;
         if (intro || RaidStage.InTransition) return Vector2.zero;   // 페이즈 전환 (체력 회복 연출) 중에는 아무것도 안 함
+        if (!DebugAuto) return Vector2.zero;                         // 디버그 맵: 자동 패턴 끔 (지정한 패턴만, 보스는 제자리)
         // 특수 패턴 3: 체력 90 · 60 · 30% 아래로 내려가면 진행 중인 패턴이 끝난 뒤 바로 (공통 쿨타임 무시)
         if (!busy && !swordPhase && !DebugCheats.NoGaniacSpecial[2] && nextThreshold < SwordThresholds.Length && e.hp <= e.maxHp * SwordThresholds[nextThreshold])
         {

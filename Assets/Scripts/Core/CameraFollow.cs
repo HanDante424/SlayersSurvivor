@@ -28,6 +28,24 @@ public class CameraFollow : MonoBehaviour
     float beforeOutsideZoom, outsideBaseSize, beforeOutsideMapOffset;
 
     /// <summary>소유자가 있는 임시 추적. 종료·중단 시 원래 대상과 맵 제한으로 복귀.</summary>
+    bool outsideFocusClamped;   // 임시 추적 중에도 카메라가 맵 경계 안에 머무름 (보스가 맵 밖으로 나가도 따라가지 않음)
+
+    /// <summary>소유자의 임시 추적을 맵 경계 안으로 제한하거나 해제 (카구츠치 특수 패턴 2 뛰어오르기).</summary>
+    public static void SetOutsideMapFollowClamped(object owner, bool clamped)
+    {
+        if (inst == null || owner == null || inst.outsideMapOwner != owner) return;
+        inst.outsideFocusClamped = clamped;
+    }
+
+    /// <summary>blend = true 면 전체 맵 시야에서 대상으로 옮길 때 위치를 부드럽게 보간.</summary>
+    public static void BeginOutsideMapFollow(object owner, Transform target, float magnification, bool blend)
+    {
+        BeginOutsideMapFollow(owner, target, magnification);
+        if (inst == null || inst.outsideMapOwner != owner || !blend) return;
+        inst.blendLeft = BlendTime;
+        inst.lastPos = inst.transform.position;
+    }
+
     public static void BeginOutsideMapFollow(object owner, Transform target, float magnification = 1f)
     {
         if (inst == null || owner == null) return;
@@ -56,6 +74,7 @@ public class CameraFollow : MonoBehaviour
         inst.zoomTarget = FullMapViewSize(aspect, FullMapMargin);
         inst.focus = null;
         inst.fullMap = true;
+        inst.outsideFocusClamped = false;
         inst.fullMapOffsetY = (HudTop - HudBottom) * inst.zoomTarget;
         inst.blendLeft = BlendTime;
         inst.lastPos = inst.transform.position;
@@ -65,6 +84,7 @@ public class CameraFollow : MonoBehaviour
     {
         if (inst == null || inst.outsideMapOwner != owner || owner == null) return;
         inst.outsideMapOwner = null;
+        inst.outsideFocusClamped = false;
         inst.focus = inst.beforeOutsideFocus;
         inst.fullMap = inst.beforeOutsideFullMap;
         inst.zoomTarget = inst.beforeOutsideZoom;
@@ -76,9 +96,35 @@ public class CameraFollow : MonoBehaviour
     Transform ground;
     float tile;
 
+    // 맵 크기가 바뀔 때 (디버그 맵) 마지막 시야 모드를 새 크기로 다시 계산하기 위한 기록
+    enum ViewMode { Normal, FullMap, FollowMap }
+    ViewMode viewMode;
+    float viewMargin, viewScale = 1f;
+
+    void OnMapChanged()
+    {
+        if (ground != null && Stage.Bounded)
+        {
+            ground.GetComponent<SpriteRenderer>().size = Stage.HalfSize * 2f;
+            ground.position = Stage.Center;
+            ArenaView.Rebuild();
+        }
+        if (viewMode == ViewMode.FullMap) ZoomToFullMap(viewMargin);
+        else if (viewMode == ViewMode.FollowMap) FollowMap(viewScale, viewMargin);
+        blendLeft = BlendTime;
+        lastPos = transform.position;
+    }
+
+    void OnDestroy()
+    {
+        Stage.MapChanged -= OnMapChanged;
+        if (inst == this) inst = null;
+    }
+
     void Awake()
     {
         inst = this;
+        Stage.MapChanged += OnMapChanged;
         var g = new GameObject("Ground");
         var sr = g.AddComponent<SpriteRenderer>();
         sr.sprite = SpriteFactory.Get("Ground", SpriteFactory.Shape.Ground);
@@ -137,6 +183,7 @@ public class CameraFollow : MonoBehaviour
         var cam = inst.GetComponent<Camera>();
         float aspect = cam != null ? cam.aspect : 16f / 9f;
         float size = FullMapViewSize(aspect, margin);
+        inst.viewMode = ViewMode.FullMap; inst.viewMargin = margin;
         inst.zoomTarget = size;
         inst.fullMap = true;
         inst.fullMapOffsetY = (HudTop - HudBottom) * size;
@@ -156,12 +203,19 @@ public class CameraFollow : MonoBehaviour
         if (inst != null && Stage.Bounded) inst.limitViewportToMap = true;
     }
 
+    /// <summary>화면을 맵 안에 제한하던 것을 해제 (카구츠치 1페이즈 입장 연출: 맵 밖에서 걸어 들어오는 보스를 따라감). 다시 제한하려면 ConstrainToMap · FollowMap.</summary>
+    public static void ReleaseMapConstraint()
+    {
+        if (inst != null) inst.limitViewportToMap = false;
+    }
+
     /// <summary>전체 맵 시야의 비율만큼 확대하고 플레이어를 따라감.</summary>
     public static void FollowMap(float viewScale, float margin)
     {
         if (inst == null || !Stage.Bounded) return;
         var cam = inst.GetComponent<Camera>();
         float aspect = cam != null ? cam.aspect : 16f / 9f;
+        inst.viewMode = ViewMode.FollowMap; inst.viewMargin = margin; inst.viewScale = viewScale;
         inst.zoomTarget = FullMapViewSize(aspect, margin) * Mathf.Max(0.0001f, viewScale);
         inst.limitViewportToMap = true;
         inst.fullMap = false;
@@ -175,6 +229,7 @@ public class CameraFollow : MonoBehaviour
     {
         if (inst == null) return;
         inst.zoomTarget = -1f;
+        inst.viewMode = ViewMode.Normal;
         if (inst.fullMap) { inst.fullMap = false; inst.blendLeft = BlendTime; inst.lastPos = inst.transform.position; }
     }
 
@@ -242,7 +297,7 @@ public class CameraFollow : MonoBehaviour
         if (Stage.Bounded)
         {
             // 보스별 화면 제한이 켜져 있으면 집중 연출도 최종 위치에서 경계 적용.
-            Vector3 want = focus != null ? new Vector3(p.x, p.y, -10f)
+            Vector3 want = focus != null ? (outsideMapOwner != null && outsideFocusClamped ? ClampToBounds(new Vector3(p.x, p.y, -10f)) : new Vector3(p.x, p.y, -10f))
                          : fullMap ? new Vector3(Stage.Center.x, Stage.Center.y + fullMapOffsetY, -10f)   // 맵 전체: 고정 (UI 자리만큼 위로)
                          : outsideMapOwner != null ? new Vector3(p.x, p.y, -10f) : ClampToBounds(new Vector3(p.x, p.y, -10f));
             if (blendLeft > 0f)

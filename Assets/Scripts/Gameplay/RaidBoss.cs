@@ -136,6 +136,7 @@ public static class RaidStage
     /// </summary>
     public static bool TryNextPhase(Enemy e)
     {
+        if (Stage.IsDebug) return false;   // 디버그 맵: 페이즈는 직접 고름 (체력이 0 이 되면 그냥 쓰러짐)
         if (e == null || e != boss || InTransition || Phase >= MaxPhase) return false;
         InTransition = true;
         Phase++;
@@ -145,6 +146,34 @@ public static class RaidStage
         var transition = e.GetComponent<IRaidPhaseTransition>();
         if (transition == null || !transition.TryBeginPhaseTransition(Phase)) RaidPhaseTransition.Begin(e);
         return true;
+    }
+
+    /// <summary>디버그 맵: 이번 판의 페이즈를 직접 지정 (보스를 소환하기 전에 호출)</summary>
+    public static void DebugSetPhase(int phase)
+    {
+        if (!Stage.IsDebug) return;
+        Phase = Mathf.Max(1, phase);
+        InTransition = false;
+    }
+
+    /// <summary>디버그 맵: 소환한 레이드 보스를 현재 레이드 보스로 등록 (체력 바 · 보스 전용 화면 표시가 이 보스를 따름)</summary>
+    public static void DebugAdopt(Enemy e)
+    {
+        if (!Stage.IsDebug) return;
+        boss = e;
+    }
+
+    /// <summary>디버그 맵: 지금 보스를 2페이즈로 전환하는 연출을 바로 재생 (TryNextPhase 와 같은 경로, 디버그 예외 없이)</summary>
+    public static void DebugBeginTransition(Enemy e)
+    {
+        if (!Stage.IsDebug || e == null || e != boss) return;
+        InTransition = true;
+        Phase = 2;
+        e.hp = 0.01f;
+        e.SetScripted(true);
+        e.GetComponent<IRaidBossAI>()?.OnPhaseEnd();
+        var transition = e.GetComponent<IRaidPhaseTransition>();
+        if (transition == null || !transition.TryBeginPhaseTransition(Phase)) RaidPhaseTransition.Begin(e);
     }
 
     /// <summary>체력 회복 연출 끝 (RaidPhaseTransition)</summary>

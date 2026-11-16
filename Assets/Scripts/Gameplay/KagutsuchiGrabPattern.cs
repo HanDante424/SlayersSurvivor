@@ -8,6 +8,7 @@ using UnityEngine;
 public sealed class KagutsuchiGrabPattern : MonoBehaviour
 {
     public const float TriggerRadius = 10f, Cooldown = 15f;
+    const float SlamDustScale = 3f;   // 내려찍기 먼지 효과 배율 (피해 범위와 무관)
     const float WarningTime = 0.5f, HoldTime = 1f;
     const float DashDistance = 14f, DashMaxSpeed = 16f, DashTime = 2f * DashDistance / DashMaxSpeed;
     const float GuideInterval = 0.25f, TurnDegrees = 5f; // 이동 1과 동일한 유도 규칙
@@ -25,7 +26,15 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
     static readonly Vector2 StompFootBottom = new Vector2(210f / 1312f, 1158f / 1199f);
     const float Epsilon = 0.0001f;
 
-    enum Step { Finished, Warning, Dash, Hold, Uppercut, Fall, Slam, KickPrepare, Kick }
+    // ---- 체력 50% 이하 강화 (사용자 2026-11-16): 내려찍기 이후 StompReady → StompAttack → StompReady 를 3회 반복, 각 0.5초. 가운데 StompAttack 때만 피해 · 화면 흔들림 ----
+    const float SmashSegmentTime = 0.5f;
+    const int SmashRepeats = 3;
+    public Func<bool> IsEnhanced;
+    public Sprite GroundSmashPose;
+    bool enhancedRun;
+    int smashSegment;
+
+    enum Step { Finished, Warning, Dash, Hold, Uppercut, Fall, Slam, Smash, KickPrepare, Kick }
     Step step;
     Enemy body;
     SpriteRenderer bodyVisual;
@@ -65,6 +74,7 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
         elapsed = runElapsed = runDistance = 0f;
         nextGuide = GuideInterval;
         released = false;
+        enhancedRun = IsEnhanced != null && IsEnhanced();
         step = Step.Warning;
         showPose(ready, 0f);
         warning = BossWarning.Box(body.transform.position, direction, DashDistance, body.radius * 2f, 0f);
@@ -82,7 +92,7 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
     {
         if (player == null || !player.IsHeldByBoss(this)) return;
         player.SetBossHoldFacing(this, !bodyVisual.flipX);
-        if (step == Step.Slam) alignStompFoot(StompFootBottom);
+        if (step == Step.Slam || step == Step.Smash) alignStompFoot(StompFootBottom);
     }
 
     public Vector2 Tick(float dt)
@@ -130,14 +140,32 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
                 {
                     step = Step.Slam; elapsed = 0f;
                     showPose(stomp, 0f);
-                    body.GetComponent<KagutsuchiPhysicalStompFx>()?.Play(body.transform.position, body.radius);
+                    body.GetComponent<KagutsuchiPhysicalStompFx>()?.Play(body.transform.position, body.radius * SlamDustScale);   // 사용자 (2026-11-16): 내려찍기 먼지 효과 3배 (표시 크기만)
                     CameraFollow.Shake(SlamShakeTime, ShakeAmplitude);
                     player.TakeDamage(DamagePerHit);
                 }
                 break;
             case Step.Slam:
                 if (elapsed >= SlamPoseTime)
-                { step = Step.KickPrepare; elapsed = 0f; player.SetBossHoldProne(this, false); showPose(stompReady, 0f); }
+                {
+                    if (enhancedRun) { step = Step.Smash; elapsed = 0f; smashSegment = 0; showPose(stompReady, 0f); }
+                    else BeginKickPrepare();
+                }
+                break;
+            case Step.Smash:
+                if (elapsed >= SmashSegmentTime)
+                {
+                    elapsed = 0f; smashSegment++;
+                    if (smashSegment >= SmashRepeats * 3) { BeginKickPrepare(); break; }
+                    bool smash = smashSegment % 3 == 1;   // StompReady(0) → StompAttack(1) → StompReady(2)
+                    showPose(smash ? stomp : stompReady, 0f);
+                    if (smash)
+                    {
+                        // 가운데 StompAttack 때만 피해 · 화면 흔들림 (이전 GroundSmash 자리)
+                        CameraFollow.Shake(SmashSegmentTime, ShakeAmplitude);
+                        player.TakeDamage(DamagePerHit);
+                    }
+                }
                 break;
             case Step.KickPrepare:
                 // 끌어올림만0.1초에 완료하고 나머지 발차기 준비 시간은 유지.
@@ -160,6 +188,13 @@ public sealed class KagutsuchiGrabPattern : MonoBehaviour
         }
         if (player.hp <= 0f) Cancel();
         return Vector2.zero;
+    }
+
+    void BeginKickPrepare()
+    {
+        step = Step.KickPrepare; elapsed = 0f;
+        player.SetBossHoldProne(this, false);
+        showPose(stompReady, 0f);
     }
 
     static float EaseOutRise(float progress)

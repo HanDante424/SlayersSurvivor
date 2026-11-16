@@ -15,7 +15,7 @@ using UnityEngine;
 ///   → 입장 공격 시작부터 피격 가능, 입장 끝에 일반 패턴 시작. 카메라는 보스전 내내 맵 전체 (입장 때 걸어 들어오는 동안만 확대). 고정형 보스 — 멈춘 자리 (맵 중앙 위) 에서 움직이지 않음 (공격 패턴 미설계)
 /// 기획에 없는 값은 [임시].
 /// </summary>
-public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
+public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition, IDebugBoss, IDebugSprites
 {
     public const float FullMapCameraMargin = 0f; // [임시] 전체 맵 보기의 바깥 여백 1→0으로 확대
     public const float BattleViewScale = 0.6f; // 사용자: 기존 시야에서 40% 축소해 확대
@@ -350,7 +350,122 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         transform.position = Center + new Vector2(0f, Half.y + EnterStartOutside);
     }
 
-    void Start() => StartCoroutine(Intro());
+    void Start()
+    {
+        if (debugSkipIntro) { debugHome = transform.position; debugHomeSet = true; }   // DebugMap 이 맵 안으로 보정한 소환 위치 = 기본 위치
+        else StartCoroutine(Intro());
+    }
+
+    // ---------- 디버그 맵 (2026-11-16) ----------
+    // 입장 연출 없이 1 · 2페이즈 전투 대기 상태로 소환하고, 패턴을 하나씩 골라 실행. 평소 전투 흐름은 DebugAuto 가 true 일 때만.
+    bool debugSkipIntro;
+    string debugCurrent = "";
+    Vector2 debugHome;
+    bool debugHomeSet;
+    static readonly string[] Phase1Names =
+    {
+        "공격 1 · 반사 레이저", "공격 2 · 거울 부채꼴 레이저", "공격 3 · 검 횡베기 → 베기 10회", "공격 4 · 찌르기 → 회전",
+        "공격 5 · 회전 이동 ×2", "공격 6 · 화염장벽", "공격 7 · 부채꼴 반사 레이저", "특수 1 · 거울 방사 레이저", "특수 2 · 아메노무라쿠모 난무",
+    };
+
+    public bool DebugAuto { get; set; } = true;
+
+    // 스프라이트만 바꿔 보기 (디버그 맵 "스프라이트" 메뉴). 2페이즈 포즈만 지원 — 1페이즈는 방향 시트 애니메이션이라 제외.
+    static readonly string[] NoSprites = new string[0];
+    public string[] DebugSpriteNames => RaidStage.Phase == 2 && phase2 != null ? KagutsuchiPhase2.DebugSpriteNames : NoSprites;
+    public void DebugShowSprite(int index)
+    {
+        if (intro || RaidStage.InTransition || RaidStage.Phase != 2) return;
+        DebugAuto = false;
+        phase2?.DebugShowSprite(index);
+    }
+
+    public string[] DebugPatternNames => RaidStage.Phase == 2 ? KagutsuchiPhase2.DebugPatternNames : Phase1Names;
+
+    public string DebugStatus
+    {
+        get
+        {
+            if (RaidStage.Phase == 2) return phase2 != null ? phase2.DebugStatus : "대기";
+            return busy ? $"실행 중: {debugCurrent}" : "대기";
+        }
+    }
+
+    /// <summary>입장 연출을 건너뛰고 phase 페이즈 전투 대기로 (소환 직후, Start 전에 호출)</summary>
+    public void DebugBegin(int phase, bool playIntro)
+    {
+        if (playIntro && phase == 1) { DebugAuto = false; return; }   // 입장 연출 그대로 재생. 끝난 뒤 기본 위치 = 멈춘 자리
+        debugSkipIntro = true;
+        DebugAuto = false;
+        intro = false;
+        entering = false;
+        e.SetScripted(false);
+        CameraFollow.ClearFocus();
+        CameraFollow.FollowMap(BattleViewScale, FullMapCameraMargin);
+        if (phase >= 2)
+        {
+            StopBackFire();
+            var sr = GetComponentInChildren<SpriteRenderer>();
+            var stand = KagutsuchiPhase2.StandSprite() ?? SpriteFactory.TryGet("Kagutsuchi_P2_Stand");
+            if (sr != null && stand != null) sr.sprite = stand;
+            phase2?.Dispose();
+            phase2 = new KagutsuchiPhase2(e);
+        }
+        else
+        {
+            mirror = KagutsuchiMirror.Spawn(e, MirrorGap, MirrorTurnSpeed);
+            blade = KagutsuchiBlade.Spawn(e, SwordHpMul);
+            mirrorSpawned = bladeSpawned = true;
+        }
+    }
+
+    public void DebugRun(int index)
+    {
+        if (intro || RaidStage.InTransition) return;   // 등장 · 페이즈 전환 연출 중에는 패턴 실행 안 함
+        DebugCancel();
+        if (RaidStage.Phase == 2)
+        {
+            phase2?.DebugRun(index, ToPlayer);
+            return;
+        }
+        index = Mathf.Clamp(index, 0, Phase1Names.Length - 1);
+        IEnumerator body;
+        switch (index)
+        {
+            case 0: body = ReflectRoutine(); break;
+            case 1: if (!MirrorAlive) return; body = MirrorBeamRoutine(); break;
+            case 2: if (!BladeAlive) return; body = SwordCutRoutine(); break;
+            case 3: if (!BladeAlive) return; body = ThrustRoutine(); break;
+            case 4: if (!BladeAlive) return; body = MarchRoutine(); break;
+            case 5: body = FireWallRoutine(); break;
+            case 6: body = FanReflectRoutine(); break;
+            case 7: if (!MirrorAlive) return; body = Special1Routine(); break;
+            default: if (!BladeAlive) return; body = Special2Routine(); break;
+        }
+        debugCurrent = Phase1Names[index];
+        StartCoroutine(Run(body, null));
+    }
+
+    public void DebugCancel()
+    {
+        if (intro || RaidStage.InTransition) return;   // 연출 중에는 건드리지 않음
+        if (RaidStage.Phase == 2) { phase2?.DebugCancel(); return; }
+        StopAllCoroutines();
+        busy = false;
+        inSpecial1 = inSpecial2 = false;
+        special1Pending = special2Pending = false;
+        StopSpecial1Lasers();
+        foreach (var w in warnings) if (w != null) Destroy(w.gameObject);
+        warnings.Clear();
+        foreach (var w in fireWalls) if (w != null) { w.SetActive(false); Destroy(w); }
+        fireWalls.Clear();
+        ClearLasers();
+        comboSlashFx?.Clear();
+        if (mirror != null) mirror.Release();
+        if (blade != null) blade.Release();
+        if (debugHomeSet) transform.position = DebugMap.PlaceInMap(debugHome, e.radius);   // 회전 이동 패턴 등으로 움직였던 보스를 기본 위치로
+        debugCurrent = "";
+    }
 
     void StopBackFire()
     {
@@ -393,7 +508,12 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         face = intro ? Vector2.down : toPlayer;
         if (RaidStage.InTransition) return Vector2.zero;   // 전환 연출이 진행을 소유
         if (RaidStage.Phase == 2)
-            return phase2 != null ? phase2.Tick(Time.deltaTime, toPlayer) : Vector2.zero;
+        {
+            if (phase2 == null) return Vector2.zero;
+            phase2.DebugAuto = DebugAuto;
+            return phase2.Tick(Time.deltaTime, toPlayer);
+        }
+        if (!DebugAuto) return Vector2.zero;   // 디버그 맵: 지정한 패턴만
         if (!intro) { CheckSpecial1(); CheckSpecial2(); }
         if (!intro && !busy && special1Pending)
         {
@@ -1215,6 +1335,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
     IEnumerator Intro()
     {
         // 1) 맵 밖 중앙 위에서 천천히 걸어 들어옴 — 카메라가 보스를 확대해서 따라감
+        CameraFollow.ReleaseMapConstraint();   // 사용자 (2026-11-16): 입장 연출 동안 카메라 맵 제한 해제 (아래 FollowMap 에서 다시 제한)
         CameraFollow.Focus(transform, EnterZoom);
         Vector2 stop = Center + new Vector2(0f, Half.y - EnterStopInside);
         while (((Vector2)transform.position - stop).sqrMagnitude > 0.0001f)
@@ -1264,6 +1385,7 @@ public class KagutsuchiAI : MonoBehaviour, IRaidBossAI, IRaidPhaseTransition
         // 6) 입장 끝 → 일반 패턴 허용. 피격은 이미 입장 공격 시작 시 해제됨.
         // 카메라는 보스전 내내 맵 전체 (2026-11-13 사용자) — 시야를 되돌리지 않음.
         intro = false;
+        if (Stage.IsDebug) { debugHome = transform.position; debugHomeSet = true; }   // 디버그 맵: 입장 연출 뒤 기본 위치
     }
 
     /// <summary>

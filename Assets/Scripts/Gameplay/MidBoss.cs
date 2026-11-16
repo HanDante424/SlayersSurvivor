@@ -146,7 +146,7 @@ public static class MidBossArena
 /// 쿨타임은 패턴이 끝난 뒤부터. 패턴 중에 기절하면 그 패턴이 멈췄다가 기절이 끝나면 이어서 진행
 /// (단, 낙뢰는 경고 표시가 뜬 뒤 3초에 정확히 떨어짐).
 /// </summary>
-public class GoblinElderAI : MonoBehaviour
+public class GoblinElderAI : MonoBehaviour, IDebugBoss
 {
     // ---------- 기획 수치 ----------
     const float BoltCooldown = 1f;                                   // 마력탄 발사 (이동하며)
@@ -194,6 +194,40 @@ public class GoblinElderAI : MonoBehaviour
         FirstCooldown.CopyTo(cd, 0);
     }
 
+    // ---------- 디버그 맵 (2026-11-16) ----------
+    static readonly string[] DebugNames = { "마력탄 부채꼴", "마력탄 전방위", "낙뢰 발생", "얼음 지대", "순간이동 마력탄" };
+    string debugCurrent = "";
+    public bool DebugAuto { get; set; } = true;
+    public string[] DebugPatternNames => DebugNames;
+    public string DebugStatus => busy ? $"실행 중: {debugCurrent}" : "대기";
+    public void DebugBegin(int phase, bool playIntro) { DebugAuto = false; }
+
+    public void DebugRun(int index)
+    {
+        DebugCancel();
+        index = Mathf.Clamp(index, 0, DebugNames.Length - 1);
+        var p = (Pattern)index;
+        debugCurrent = DebugNames[index];
+        switch (p)
+        {
+            case Pattern.Fan: StartCoroutine(Run(p, FanRoutine())); break;
+            case Pattern.Nova: StartCoroutine(Run(p, NovaRoutine())); break;
+            case Pattern.Strike: StartCoroutine(Run(p, StrikeRoutine())); break;
+            case Pattern.Blink: StartCoroutine(Run(p, BlinkRoutine())); break;
+            case Pattern.Ice:
+                for (int i = 0, n = Enraged ? IceCountEnraged : IceCount; i < n; i++)
+                    IceZone.Spawn(MidBossArena.RandomNearPlayer(PlaceAround, IceRadius), IceRadius, IceSeconds, IceSlow);
+                break;
+        }
+    }
+
+    public void DebugCancel()
+    {
+        StopAllCoroutines();
+        busy = stopped = false;
+        debugCurrent = "";
+    }
+
     bool Enraged => e.hp <= e.maxHp * 0.5f;
     Vector2 Pos => transform.position;
     Vector2 AimAt => Player.I != null ? Player.I.HurtCenter : Pos + Vector2.down;
@@ -202,6 +236,7 @@ public class GoblinElderAI : MonoBehaviour
     public Vector2 Behave(Vector2 toPlayer, float moveSpeed, ref Vector2 face)
     {
         face = toPlayer;
+        if (!DebugAuto) return Vector2.zero;   // 디버그 맵: 지정한 패턴만, 제자리
         if (Enraged && !wasEnraged)
         {
             // 체력 50% 아래로 내려간 순간: 돌고 있던 쿨타임이 강화 쿨타임보다 길면 줄임

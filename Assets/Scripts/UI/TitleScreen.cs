@@ -29,6 +29,9 @@ public class TitleScreen : MonoBehaviour
         GameSettings.ApplySavedOnce();   // 저장된 화면 설정 (게임을 켤 때 한 번)
         items.Add(new MenuItem { label = "플레이", enabled = true, action = () => OpenCharacterSelect(StageKind.Survival) });
         items.Add(new MenuItem { label = "레이드 보스", enabled = true, action = OpenRaidSelect });
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        items.Add(new MenuItem { label = "디버그 맵", enabled = true, action = () => OpenCharacterSelect(StageKind.Debug) });   // 개발 빌드 전용 (정식 빌드에는 안 보임)
+#endif
         items.Add(new MenuItem { label = "설정", enabled = true, action = OpenSettings });
         items.Add(new MenuItem { label = "게임 종료", enabled = true, action = SceneLoader.Quit });
 
