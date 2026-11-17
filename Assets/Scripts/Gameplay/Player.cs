@@ -196,7 +196,7 @@ public class Player : MonoBehaviour
         var heldSprite = overrideFacing && anim != null ? anim.GetIdleFrame(heldFacing) : null;
         bossHoldRenderer.sprite = heldSprite != null ? heldSprite : sr.sprite;
         bossHoldRenderer.color = sr.color;
-        bossHoldRenderer.flipX = overrideFacing ? anim == null && heldFacing == Facing4.Left : sr.flipX;
+        bossHoldRenderer.flipX = overrideFacing ? (anim == null ? heldFacing == Facing4.Left : anim.IdleFrameNeedsFlip(heldFacing)) : sr.flipX;
         bossHoldRenderer.flipY = overrideFacing ? false : sr.flipY;
         // 반대 방향에서는 원화 방향과 회전 부호를 함께 바꿔 누운 결과도 좌우 반전.
         float proneRotation = heldFacing == Facing4.Left ? BossHoldProneRotation : -BossHoldProneRotation;
@@ -347,7 +347,17 @@ public class Player : MonoBehaviour
         public float attackCell, attackPivotY;
         /// <summary>공격 모션 재생 속도 (0 = 설정 파일 attackFps)</summary>
         public float attackFps;
+        /// <summary>
+        /// 측면 스탠드 한 장 {id}_Stand (왼쪽을 보는 3/4 옆면, 오른쪽은 좌우 반전 — 카구츠치 2페이즈 방식, Docs/Design/Sprite_Rules_v0.1.md 3장).
+        /// 그림 픽셀 측정값 (0 = 스탠드 없음, 기존 {id}_Idle 사용): 몸 키 (머리카락 끝 ~ 발끝) px · 발끝이 그림 아래에서 뜬 px · 두 발 가운데 x px
+        /// </summary>
+        public float standBodyPx, standFootPx, standFootX;
     }
+
+    /// <summary>스탠드 그림의 화면 키 (월드 유닛) — 기존 시트 규격 (몸 200px / 칸 256px × cell 2.07)과 같은 1.62</summary>
+    const float StandBodyWorld = 1.62f;
+    /// <summary>transform 이 놓이는 발 위 높이 (월드 유닛) — 기존 pivotY 0.372 계산과 같은 0.64</summary>
+    const float StandFootToTransform = 0.64f;
 
     /// <summary>
     /// 에른 스트레이 (2026-11-11 새 리소스 ErnStray_Complete_v2): 정지 4방향 · 달리기 4×8 (10fps) · 대각 내려베기 4×8.
@@ -360,6 +370,8 @@ public class Player : MonoBehaviour
     {
         id = "ErnStray", cell = 2.07f, pivotY = 0.372f, idleCols = 1, runCols = 8, idleFps = 1f, runFps = 10f,
         attackCols = 8, attackCell = 2.5875f, attackPivotY = 0.297f,
+        // ErnStray_Stand.png 1199 × 1312: 몸 y 35~1287 (키 1253), 발끝 = 아래 24px, 두 발 가운데 x = (356+713)/2 = 534.5 (2026-11-17 측정)
+        standBodyPx = 1253f, standFootPx = 24f, standFootX = 534.5f,
     };
 
     /// <summary>
@@ -436,6 +448,18 @@ public class Player : MonoBehaviour
         if (anim.LoadClip(SpriteSheetAnimator.Run, CharacterId + "_Run", 4, v.runCols, cell, pivotY, v.runFps, true))
         {
             anim.LoadClip(SpriteSheetAnimator.Idle, CharacterId + "_Idle", 4, v.idleCols, cell, pivotY, v.idleFps, true);
+            // 측면 스탠드 (있으면 정지 모습만 이것으로 교체, 달리기 · 베기는 기존 4방향 시트). 없으면 위 {id}_Idle 그대로
+            if (v.standBodyPx > 0f)
+            {
+                var stand = Resources.Load<Texture2D>("Sprites/" + CharacterId + "_Stand");
+                if (stand != null)
+                {
+                    float ppu = v.standBodyPx / StandBodyWorld;
+                    anim.LoadClip(SpriteSheetAnimator.Idle, CharacterId + "_Stand", 1, 1, stand.width / ppu,
+                                  (v.standFootPx + ppu * StandFootToTransform) / stand.height, 1f, true,
+                                  pivotX: v.standFootX / stand.width, globalSide: false);
+                }
+            }
             // 공격 모션 · 기본 공격 이펙트는 시트가 있는 캐릭터만 (없으면 LoadClip/LoadFrames 가 건너뜀)
             if (v.attackCols > 0)
                 anim.LoadClip(Slash, CharacterId + "_" + Slash, 4, v.attackCols, v.attackCell, v.attackPivotY,

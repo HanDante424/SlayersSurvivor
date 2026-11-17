@@ -62,3 +62,13 @@ Unity 6 (6000.3.22f1) 2D 뱀서라이크. 외부 패키지 없음, UI 는 IMGUI 
 - 레이드 보스 선택 화면에 **알레시오 생귄 · 아그니** 가 "개발 예정" 으로 표시됨 (`RaidBossInfo.locked`, 고를 수 없음, 실제 보스 없음). 가니악 · 카구츠치만 플레이 가능.
 - 가니악 1페이즈 스프라이트는 **왼쪽 측면 한 벌 + 좌우 반전만** 사용 (2026-11-16 사용자, 카구츠치 2페이즈와 같은 방식). 대기 · 걷기 · 돌진 · 횡베기 연결됨 (베기 · 전방위 베기는 기존 4방향 `Ganiac_Slash`), 화면 키 3.5 — `Docs/Design/Raid_Ganiac_Plan_v0.1.md` 맨 아래 참고.
 - 가니악은 노말의 2페이즈 전용 패턴이 아직 없음 (1페이즈 패턴 그대로) — 프로토타입 남은 큰 공백.
+
+## 플레이어블 스프라이트 전환 (2026-11-17 사용자, 진행 중)
+- 방침: 플레이어블 캐릭터 그림을 **왼쪽 3/4 측면 한 벌 + 좌우 반전**으로 다시 제작 (카구츠치 2페이즈 방식). 규칙 = `Docs/Design/Sprite_Rules_v0.1.md` 3장, 포즈 목록 = `Player_Poses_v0.1.md`, GPT 제작 명령문 = `GPT_Prompt_ErnStray_Run_v0.1.md`. 새 그림은 `Art/Incoming/{id}/` 에 넣고 검사 후 `Assets/Resources/Sprites/` 로.
+- **에른 `ErnStray_Stand` 적용됨** (정지 모습만, 달리기 · 베기는 기존 4방향 시트). `Player.ErnStrayVisual` 의 `standBodyPx` · `standFootPx` · `standFootX` + `SpriteSheetAnimator.LoadClip(pivotX, globalSide)`. 파일이 없으면 기존 `ErnStray_Idle`. **컴파일만 확인, Play 미확인.** 3/4 스탠드가 정식 (순수 옆면 그림은 참고용).
+- **에른 달리기 `ErnStray_RunSide` = 수정 중, 아직 게임에 없음.** GPT 작업본 v5 (512 × 512 × 8프레임, 4096 × 512) 를 검사만 함: 규격 · 잘림 OK, 눈으로 볼 때 5 ~ 8번이 1 ~ 4번과 거의 같은 자세 (반대 발이 앞서는 구간 없음) — 사용자 판단 대기. 2번 = 두 후보 중 첫 자세 선택됨, 4번 최종 승인 전. **사용자가 "수정 끝난 뒤 연결" 이라고 함 → 최종본이 `Art/Incoming/ErnStray/` 에 오기 전에는 로더 · 복사 금지.**
+  - 인계 ZIP (43MB, v1 ~ v5 · 생성 원본 · 제작 문서 · 스크립트) 은 **저장소에 없음**: `C:\Users\11\Desktop\Project Slayers\output\ErnStray_RunSide_Handoff_2026-11-17_v1.zip` — 데스크톱으로 직접 옮길 것. 풀면 `HANDOFF.md` 먼저 읽기 (현재 기준 v5, 다음 수정은 v6 이상 새 폴더).
+  - 연결 시 할 일: 수치 검사 → `ErnStray_RunSide.png` 로 복사 (기존 `ErnStray_Run` 덮어쓰기 금지) → 머리 크기 기준 크기 상수 측정 → 한 줄 시트 클립 로더 → 컴파일 → Play 확인 (발 미끄러짐 · 크기 · 반전).
+- 남은 것: 에른 공격 포즈 (`Atk_SlashReady` · `Atk_Slash` · `Atk_Smash` 우선), 레니아 전체, 캐릭터 선택 카드 (아직 기존 `_Idle` 정면).
+- **아이템 · 세트 효과 (노션 `세계관 관련 / 게임 관련 / 아이템` 기반) 는 스프라이트 전환 뒤에 진행.** 결정: 등급 = 1 ~ 6 정수, 능력치 보류, 몬스터 드랍 보류, 세트 효과만 구현 (마나 · 행운 · 적중 등 없는 시스템 의존 효과 제외). 코드는 아직 없음.
+- UI: 보스 체력바 아래 우측 "받는 최종 피해량 +N%" 표시 추가 (`GameManager.DrawBossTakenMul`, 소스 조건부 수정자는 미반영, 컴파일만 확인).

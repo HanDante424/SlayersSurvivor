@@ -709,6 +709,28 @@ public class GameManager : MonoBehaviour
         GUI.DrawTexture(new Rect(bx + bw * 0.5f - 1, by, 2, bh), UIStyles.White);   // 50% 눈금
         GUI.color = Color.white;
         GUI.Label(new Rect(bx, by, bw, bh), $"{Mathf.CeilToInt(Mathf.Max(0f, b.hp))} / {Mathf.CeilToInt(b.maxHp)}", bossHpStyle);
+        DrawBossTakenMul(b, bx, by + bh + 4f, bw);
+    }
+
+    static GUIStyle bossTakenStyle;
+
+    /// <summary>
+    /// 체력 바 아래 우측 정렬: 보스의 '받는 최종 피해량' (사용자 2026-11-16).
+    /// CombatMods.ReceivedMul 을 출처 없는 직접 피해 1 로 불러 현재 대상 상태 기준 배율을 구함
+    /// (보스 취약 · 화상 스택 · 기절 등. 특정 스킬 종류에서만 붙는 조건부 효과 (예: 투척 한정) 는 반영되지 않음).
+    /// 평소 +0% 는 흐리게, 증가는 주황 · 감소는 하늘색
+    /// </summary>
+    static void DrawBossTakenMul(Enemy b, float x, float y, float w)
+    {
+        float mul = CombatMods.ReceivedMul(b, new DamageInfo(1f));
+        int pct = Mathf.RoundToInt((mul - 1f) * 100f);
+        if (bossTakenStyle == null)
+            bossTakenStyle = new GUIStyle(UIStyles.Label) { fontSize = 15, alignment = TextAnchor.MiddleRight };
+        Color color = pct > 0 ? new Color(1f, 0.6f, 0.2f) : pct < 0 ? new Color(0.5f, 0.85f, 1f) : new Color(1f, 1f, 1f, 0.6f);
+        var prev = GUI.color;
+        GUI.color = color;
+        GUI.Label(new Rect(x, y, w, 22f), $"받는 최종 피해량 {(pct >= 0 ? "+" : "")}{pct}%", bossTakenStyle);
+        GUI.color = prev;
     }
 
     void OnGUI()
