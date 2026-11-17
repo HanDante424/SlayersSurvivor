@@ -70,8 +70,12 @@ public class SpriteSheetAnimator : MonoBehaviour
     /// <summary>시트를 불러와 클립으로 등록. 시트가 없으면 false.</summary>
     /// <param name="cellWorldSize">한 칸이 월드에서 차지할 크기(유닛)</param>
     /// <param name="pivotY">칸 안에서 transform 위치가 될 세로 지점 (0=아래, 1=위)</param>
+    /// <param name="pivotX">칸 안에서 transform 위치가 될 가로 지점 (0.5 = 가운데). 좌우 반전은 이 점을 기준으로 뒤집힘</param>
+    /// <param name="globalSide">true (기본) = 1행 시트이면 애니메이터 전체를 측면 전용 모드로. false = 이 클립만 좌우 반전 (같은 애니메이터의
+    /// 다른 4행 클립은 기존처럼 위 · 아래 행 사용 — 플레이어 측면 스탠드 + 기존 4방향 달리기 · 베기 혼용)</param>
     public bool LoadClip(string key, string sheetName, int rows, int columns,
-                         float cellWorldSize, float pivotY, float fps, bool loop)
+                         float cellWorldSize, float pivotY, float fps, bool loop,
+                         float pivotX = 0.5f, bool globalSide = true)
     {
         var tex = Resources.Load<Texture2D>("Sprites/" + sheetName);
         if (tex == null) return false;
@@ -84,11 +88,11 @@ public class SpriteSheetAnimator : MonoBehaviour
         {
             // 텍스처 좌표는 아래에서 위로 → 시트의 r행은 (rows-1-r)
             var rect = new Rect(c * cw, (rows - 1 - r) * ch, cw, ch);
-            frames[r, c] = Sprite.Create(tex, rect, new Vector2(0.5f, pivotY), ppu, 0, SpriteMeshType.FullRect);
+            frames[r, c] = Sprite.Create(tex, rect, new Vector2(pivotX, pivotY), ppu, 0, SpriteMeshType.FullRect);
             frames[r, c].name = $"{sheetName}_{r}_{c}";
         }
         clips[key] = new Clip { frames = frames, cols = columns, fps = fps, loop = loop };
-        if (rows == 1) sideMode = true;
+        if (rows == 1 && globalSide) sideMode = true;
 
         if (sr == null)
         {
@@ -113,14 +117,26 @@ public class SpriteSheetAnimator : MonoBehaviour
 
     Sprite FrameOf(Clip clip, int frame)
     {
-        if (sideMode) sr.flipX = Facing == Facing4.Right && clip.frames.GetLength(0) == 1;   // 4행 클립 (기존 베기) 은 행으로 방향 표현
+        // 1행 (왼쪽 옆면) 클립 = 오른쪽일 때 좌우 반전, 위 · 아래는 마지막 좌우 방향 유지. 4행 클립 (기존 달리기 · 베기) 은 행으로 방향 표현
+        bool oneRow = clip.frames.GetLength(0) == 1;
+        sr.flipX = oneRow && lastSide == Facing4.Right;
         return clip.frames[Row(clip, Facing), frame];
     }
+
+    /// <summary>대기 (없으면 달리기) 클립의 표시 프레임이 dir 방향에서 좌우 반전이 필요한가 (1행 옆면 클립 + 오른쪽)</summary>
+    public bool IdleFrameNeedsFlip(Facing4 facing)
+    {
+        if (!clips.TryGetValue(Idle, out var clip) && !clips.TryGetValue(Run, out clip)) return false;
+        return clip.frames.GetLength(0) == 1 && facing == Facing4.Right;
+    }
+
+    Facing4 lastSide = Facing4.Left;   // 마지막으로 바라본 좌우 방향 (1행 옆면 클립의 반전 기준)
 
     /// <summary>방향 갱신 (측면 전용 모드에서는 위 · 아래가 와도 좌우 방향을 유지)</summary>
     void SetFacing(Vector2 dir)
     {
         var f = ToFacing(dir);
+        if (f == Facing4.Left || f == Facing4.Right) lastSide = f;
         if (sideMode && (f == Facing4.Up || f == Facing4.Down)) { if (Facing != Facing4.Left && Facing != Facing4.Right) Facing = Facing4.Left; return; }
         Facing = f;
     }
