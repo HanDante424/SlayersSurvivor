@@ -1,0 +1,31 @@
+{
+  "file": "ErnStray_RearVerticalGuard.png",
+  "size": [
+    1172,
+    1635
+  ],
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-d2018d29-44d7-47b5-8112-e83c342dddde.png",
+  "sourceSha256": "b738b2498879706c50c2f5775ce8aa9a98c9718b8efdc02464feee6bcd20736a",
+  "outputSha256": "79c630bbe4905f460256bb0d5191562900041de2d96e771faa3ea5bf61dd0ad8",
+  "references": {
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Art\\Generated\\ErnStray_RearVerticalGuard_v1\\ErnStray_RearVerticalGuard.png": "1b781d1d1d767afdb1da8a68c65251eea5c7f31fd3443734fa047636593318ab",
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\ErnStray_Atk_HorizontalSlash.png": "6bb1b49a7b4d259fc9a4a7bd167f851f9dd08487d9e74d28557e9a9c588a011c"
+  },
+  "coordinateSpace": "screen-space",
+  "requestedChanges": [
+    "rear 3/4 angle matching HorizontalSlash",
+    "approximately double previous inter-leg gap",
+    "left upper arm 7-8 oclock",
+    "right upper arm 4-5 oclock"
+  ],
+  "preserved": [
+    "upright stance",
+    "hidden front hands/forearms",
+    "vertical blade behind body",
+    "empty scabbard foreground"
+  ],
+  "processing": "alpha <=16 cleared; 64px transparent padding each side; no limb transforms",
+  "edgeAlphaZero": true,
+  "referencesUnchanged": true,
+  "verification": "static visual review; exact joint angles and numerical gap ratio not measured; Unity not tested"
+}

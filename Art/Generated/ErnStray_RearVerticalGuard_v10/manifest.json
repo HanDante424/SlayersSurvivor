@@ -1,0 +1,23 @@
+{
+  "file": "ErnStray_RearVerticalGuard.png",
+  "size": [
+    1321,
+    1447
+  ],
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-29b355ac-bf05-45c2-a176-7c4f56aa0ba7.png",
+  "sourceSha256": "e136eaf8635373127fd2d7dd6b306bb37802974ea62e3cf92237670490c2eed2",
+  "outputSha256": "fedfe378ac5e59225cf305fcca732a21c214f69d9f7a5c94ca03abba1f4efa47",
+  "references": {
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Art\\Generated\\ErnStray_RearVerticalGuard_v9\\ErnStray_RearVerticalGuard.png": "e3089dc86171ffedf0059d613756d6042013f1d85e80b884f95e50453d7389ab",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\ErnStray_Stand.png": "285ffd450e9ddde5e2e7d76aad695f53c3ef34b846463724a8fe15b60279d3b9",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 마스터 시트.png": "6dbec7fd454c0684a6926b56417544705b22631ffca103543b915c916b0a5168",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 무기 시트.png": "4cb3f5be1103c5d9690958a3107f023479efc57610d686d2868ab480eefd9740",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 복장 시트.png": "c2ef97d925e8d952ddd2f0f30f01aee4c59fbcd33e8f0c1ba0f664c2e489719d"
+  },
+  "change": "face/hair linework, coat pattern and seams, cuff folds, leather and bronze fittings, steel blade surface; geometry preservation requested",
+  "preserved": "rear3/4 upright stance, wide legs, vertical blade behind body and empty back scabbard foreground",
+  "processing": "alpha<=16 cleared, 64px transparent padding all sides; no local anatomical drawing or limb transforms",
+  "transparentBoundary": true,
+  "referencesUnchanged": true,
+  "unityVerified": false
+}

@@ -1,0 +1,33 @@
+{
+  "file": "ErnStray_RearVerticalGuard.png",
+  "size": [
+    1152,
+    1664
+  ],
+  "mode": "RGBA",
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-b6c0588f-798a-46cb-9245-bd768349f8c6.png",
+  "sourceSha256": "d0108f5e292f41cd05076ed1dc638f407180b540906d12ceb8938420860234f8",
+  "outputSha256": "1b781d1d1d767afdb1da8a68c65251eea5c7f31fd3443734fa047636593318ab",
+  "references": {
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\ErnStray_Stand.png": "285ffd450e9ddde5e2e7d76aad695f53c3ef34b846463724a8fe15b60279d3b9",
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\ErnStray_Atk_HorizontalSlash.png": "6bb1b49a7b4d259fc9a4a7bd167f851f9dd08487d9e74d28557e9a9c588a011c",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 4면도 시트.png": "3d8e91d69ac6b5d0492ecad4ddd153b286edc461ad0986060292a08432d0ec8d",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 무기 시트.png": "4cb3f5be1103c5d9690958a3107f023479efc57610d686d2868ab480eefd9740",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 복장 시트.png": "c2ef97d925e8d952ddd2f0f30f01aee4c59fbcd33e8f0c1ba0f664c2e489719d"
+  },
+  "coordinateSpace": "screen-space",
+  "leftArm": "character-left, screen-left; hidden forearm and hand",
+  "rightArm": "character-right, screen-right; hidden forearm and hand",
+  "sword": "one sword, vertical 12 oclock, behind head/body",
+  "scabbard": "empty, foreground on back",
+  "processing": "alpha <=16 cleared; canvas padded 64px each side; no artwork resizing or limb transforms",
+  "alphaBoundsOver32": [
+    327,
+    75,
+    826,
+    1576
+  ],
+  "edgeAlphaZero": true,
+  "referenceHashesUnchanged": true,
+  "unityVerification": "not performed"
+}

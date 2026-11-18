@@ -1,0 +1,26 @@
+{
+  "method": "Manual approximate landmarks; sword excluded; whole-image resizing for comparison only",
+  "results": [
+    {
+      "label": "Stand",
+      "hairTop": 35,
+      "chin": 392,
+      "sole": 1288,
+      "approxBodyHeadRatio": 3.5098039215686274
+    },
+    {
+      "label": "v7",
+      "hairTop": 296,
+      "chin": 617,
+      "sole": 1352,
+      "approxBodyHeadRatio": 3.289719626168224
+    },
+    {
+      "label": "v8",
+      "hairTop": 307,
+      "chin": 607,
+      "sole": 1352,
+      "approxBodyHeadRatio": 3.4833333333333334
+    }
+  ]
+}

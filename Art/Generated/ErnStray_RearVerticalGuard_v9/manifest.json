@@ -1,0 +1,20 @@
+{
+  "file": "ErnStray_RearVerticalGuard.png",
+  "size": [
+    1315,
+    1454
+  ],
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-fc90ee7e-6244-4507-8ea4-4178b69c43a3.png",
+  "sourceSha256": "82bbe5e53e18f754936c2975ffb4781718f751c597794024f36adf7656856b59",
+  "outputSha256": "e3089dc86171ffedf0059d613756d6042013f1d85e80b884f95e50453d7389ab",
+  "references": {
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Art\\Generated\\ErnStray_RearVerticalGuard_v8\\ErnStray_RearVerticalGuard.png": "77229323e23f0b1640709746526567c1af08c730538250ebb545b5572005b3f2",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\ErnStray_Stand.png": "285ffd450e9ddde5e2e7d76aad695f53c3ef34b846463724a8fe15b60279d3b9"
+  },
+  "change": "redistributed lengths toward slightly longer torso/boot shafts and shorter trouser section; overall head-to-body proportions retained as generation goal",
+  "preserved": "rear3/4 upright stance, wide legs, vertical blade behind body and empty back scabbard foreground",
+  "processing": "alpha<=16 cleared, 64px transparent padding all sides; no local anatomical drawing or limb transforms",
+  "transparentBoundary": true,
+  "referencesUnchanged": true,
+  "unityVerified": false
+}

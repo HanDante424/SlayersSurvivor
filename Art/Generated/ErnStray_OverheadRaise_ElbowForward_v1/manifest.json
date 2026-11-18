@@ -1,0 +1,18 @@
+{
+  "file": "ErnStray_OverheadRaise.png",
+  "size": [
+    1015,
+    1902
+  ],
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-e02b4269-bde5-4263-83b0-dacc09e73d46.png",
+  "sourceSha256": "b5121abc1f19bd22d2ef0f1d7dea36f9a23278227dda9e035a9b818ec2a5257d",
+  "outputSha256": "97e2d85bed8d6442f32e7063aea7a3643dde89bf7dd8e716bbe10878d2f0a44a",
+  "references": {
+    "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-095947c0-8168-4f73-a68e-985760efc4ac.png": "8201210815ed66a2fbc43e2d450081202c3229c45dd504519f31c724e84cb2d3"
+  },
+  "pose": "left-facing upright standing, hands and hilt above crown, vertical overhead sword, elbows angled forward screen-left",
+  "userDecision": "overhead raise requested, then elbows slightly forward requested; chest-level upright pose remains a separate scene asset",
+  "processing": "alpha<=16 cleanup and 64px transparent padding only; model-generated artwork",
+  "verification": "static fullbody/grip and white background review; transparent boundary and unchanged source hashes; no Unity testing",
+  "status": "polish review candidate, specific scene/skill not assigned"
+}

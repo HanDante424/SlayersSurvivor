@@ -1,0 +1,41 @@
+{
+  "status": "proportion correction draft; original game assets preserved",
+  "sourceGenerated": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-45c1f8d7-6c69-4b9b-b63b-2f8445ddae66.png",
+  "sourceSize": [
+    1507,
+    1044
+  ],
+  "outputSize": [
+    1664,
+    1152
+  ],
+  "mode": "RGBA",
+  "bboxAlphaOver32": [
+    185,
+    61,
+    1553,
+    1080
+  ],
+  "alpha32BottomMargin": 72,
+  "edgeAlphaPixels": 0,
+  "transparentCorners": true,
+  "canvasTranslation": [
+    78,
+    50
+  ],
+  "artworkResized": false,
+  "smallDisconnectedAlphaPixelsRemoved": 7,
+  "referenceHashes": {
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\ErnStray_Atk_HorizontalSlash.png": "a2878e17c5e65e820aeb8115dc41f9f0dbc46cd8a530aa6a3a49465b153d70fb",
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\ErnStray_Stand.png": "285ffd450e9ddde5e2e7d76aad695f53c3ef34b846463724a8fe15b60279d3b9",
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\ErnStray_Atk_OneHandSlash.png": "086dd4191fd0309c0acc721771ce540bcb2ed05decee3bcb0106214a5171e7c7",
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\ErnStray_Atk_VerticalSlash.png": "ef85d6bd56907f05c57c4ce3c2de15d0899030de672b7a195d09842d1b4bd048"
+  },
+  "originalReferencesUnchanged": true,
+  "outputSha256": "6bb1b49a7b4d259fc9a4a7bd167f851f9dd08487d9e74d28557e9a9c588a011c",
+  "method": "Built-in image_gen proportion correction; Pillow alpha speck cleanup, transparent padding and review composites only",
+  "visualIntent": "same rear 3/4 attack pose, larger reference-matching head, compact torso and limbs",
+  "ratioVerification": "visual comparison only; exact anatomical ratio not numerically measured",
+  "unityCompilationExecuted": false,
+  "playModeExecuted": false
+}
