@@ -1,0 +1,19 @@
+{
+  "file": "ErnStray_OverheadRaise.png",
+  "size": [
+    1120,
+    1713
+  ],
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-a97ddb76-cf4d-419b-b8be-01dd27bfddeb.png",
+  "sourceSha256": "1e981703a4c01ecf6b01b9cbb2231d07933f99da6110b812de29b76e6ccd5fd3",
+  "outputSha256": "dbc64dae2ca66b986d5e636477f68f5732e9346b8864fc84a074066c9457bcb1",
+  "references": {
+    "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-49bbd367-e950-4d47-a3b6-9c53812edc1d.png": "2d5914ed692062fd6163ce4595cf7f510573bdb3fe36d14c60656e3415c067bd",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\ErnStray_Stand.png": "285ffd450e9ddde5e2e7d76aad695f53c3ef34b846463724a8fe15b60279d3b9"
+  },
+  "pose": "selected v5 overhead pose, arm chains shortened including occluded far upper arm",
+  "userDecision": "user chose original exec-49bbd367 pose over v6; preserve chosen pose and correct excessive arm length",
+  "processing": "alpha<=16 cleanup and 64px transparent padding only; model-generated artwork",
+  "verification": "static fullbody/grip and white background review; transparent boundary and unchanged source hashes; no Unity testing",
+  "status": "polish review candidate, specific scene/skill not assigned"
+}

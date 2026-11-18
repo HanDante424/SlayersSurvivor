@@ -1,0 +1,50 @@
+{
+  "status": "first candidate selected by user; no new generation; game not changed",
+  "sourceGenerated": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-b7d1176a-6c9d-4aa5-b1c5-aad7748db0e6.png",
+  "sourceSize": [
+    1507,
+    1044
+  ],
+  "outputSize": [
+    1664,
+    1152
+  ],
+  "mode": "RGBA",
+  "bboxAlphaOver32": [
+    313,
+    31,
+    1485,
+    1062
+  ],
+  "alpha32BottomMargin": 90,
+  "edgeAlphaPixels": 0,
+  "transparentCorners": true,
+  "canvasTranslation": [
+    0,
+    -6
+  ],
+  "artworkResized": true,
+  "uniformWholeCanvasScale": 1.103448275862069,
+  "normalizedSourceSize": [
+    1663,
+    1152
+  ],
+  "smallDisconnectedAlphaPixelsRemoved": 0,
+  "referenceHashes": {
+    "C:/Users/hanho/Desktop/SlayersSurvivor/Art/Generated/ErnStray_HorizontalSlashReady_v2/ErnStray_Atk_HorizontalSlashReady.png": "2b4d9ec923f87550b786e8a8f4b5ac6859c62a0e0598f039cf3bb54e64cfbc88",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\ErnStray_Stand.png": "285ffd450e9ddde5e2e7d76aad695f53c3ef34b846463724a8fe15b60279d3b9",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 무기 시트.png": "4cb3f5be1103c5d9690958a3107f023479efc57610d686d2868ab480eefd9740",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 헤어 시트.png": "8c7ac45d232b1673345885f8988005a5a3d11a403978c9b67e57f5bd2dff8fb3",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 복장 시트.png": "c2ef97d925e8d952ddd2f0f30f01aee4c59fbcd33e8f0c1ba0f664c2e489719d"
+  },
+  "originalReferencesUnchanged": true,
+  "outputSha256": "4e69a2f7c430cd8a1fbff9069e0852bfd976bd60919fcbed5c22009ac4c8691f",
+  "method": "Selection of existing built-in image_gen first candidate, no new generation; Pillow alpha speck cleanup, uniform whole-canvas resolution normalization, transparent padding and review composites only",
+  "visualIntent": "user selected first shallower sword-angle candidate over second steeper candidate; do not rotate again",
+  "poseVerification": "static visual review; no Unity or motion timing validation",
+  "unityCompilationExecuted": false,
+  "playModeExecuted": false,
+  "selectedCandidate": "first shallower candidate",
+  "newGenerationExecuted": false,
+  "selectedSourceCopySha256": "900a2e911163d97ebf0f0d6db730afe7ef48e79d3576d6baae0a666c78c985b5"
+}

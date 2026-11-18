@@ -63,6 +63,12 @@ public class SpriteSheetAnimator : MonoBehaviour
 
     public void ReleasePose() => heldPose = null;
 
+    /// <summary>재생 중인 한 번 재생 동작 · 고정 자세를 끊음 (디버그 맵: 같은 스킬 모션을 바로 다시 보려고)</summary>
+    public void StopOneShot()
+    {
+        oneShot = null; oneShotEnd = null; heldPose = null; current = null;
+    }
+
     /// <summary>기존 호환용: 이동(Run) 클립 하나를 불러옵니다. 없으면 false.</summary>
     public bool Load(string sheetName, int rows, int columns, float cellWorldSize, float pivotY)
         => LoadClip(Run, sheetName, rows, columns, cellWorldSize, pivotY, 12f, true);

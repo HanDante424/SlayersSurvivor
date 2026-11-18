@@ -1,0 +1,18 @@
+{
+  "file": "ErnStray_OverheadRaise.png",
+  "size": [
+    1120,
+    1714
+  ],
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-49bbd367-e950-4d47-a3b6-9c53812edc1d.png",
+  "sourceSha256": "2d5914ed692062fd6163ce4595cf7f510573bdb3fe36d14c60656e3415c067bd",
+  "outputSha256": "082dbcca08b20bae0b644d2cd4d8ce0811bb54ef4f41d5a648bfc0204adf34b1",
+  "references": {
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Art\\Generated\\ErnStray_OverheadRaise_LeftArmBack_v4\\ErnStray_OverheadRaise.png": "1b1b1d3871203e1d6d275b52be44a74e3adcb9c7eb4ec8f160fcc64bf7d01fd2"
+  },
+  "pose": "overhead two-handed vertical sword; screen-left far elbow moved slightly backward toward screen-right",
+  "userDecision": "screen-left arm slightly backward; overhead grip and opposite arm preserved as generation targets",
+  "processing": "alpha<=16 cleanup and 64px transparent padding only; model-generated artwork",
+  "verification": "static fullbody/grip and white background review; transparent boundary and unchanged source hashes; no Unity testing",
+  "status": "polish review candidate, specific scene/skill not assigned"
+}

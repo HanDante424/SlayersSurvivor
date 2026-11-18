@@ -1,0 +1,23 @@
+{
+  "file": "ErnStray_RearVerticalGuard.png",
+  "size": [
+    1235,
+    1549
+  ],
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-e84e3b4e-2910-402d-a0ad-553991b26239.png",
+  "sourceSha256": "275db6d4dc80630235d9c4c7951aa2bd0739158994ef8a6509739ff087101e5d",
+  "outputSha256": "3d63481fd05613cdc7a5b874ea398fd929c1b87bfceadb60d00635f3da8eb775",
+  "references": {
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Art\\Generated\\ErnStray_RearVerticalGuard_v5\\ErnStray_RearVerticalGuard.png": "16967c34c932971000d5dcf9dc88bf7c50dc7ed30b976087793208872b5fa75c",
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\ErnStray_Atk_HorizontalSlash.png": "6bb1b49a7b4d259fc9a4a7bd167f851f9dd08487d9e74d28557e9a9c588a011c",
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\ErnStray_Atk_SlashReady.png": "6737cddc2216b826a155689f514fd39268b0a51a3399c4e346ae107f61dbc238",
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\ErnStray_Atk_TwoHandPlant.png": "aba4ebb1e41a06069f03fa75a33265bd0ee451256c47555f715a2bce1a0f4c06",
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\ErnStray_Atk_VerticalSlash.png": "ef85d6bd56907f05c57c4ce3c2de15d0899030de672b7a195d09842d1b4bd048"
+  },
+  "change": "sleeves cover elbow bend and proximal forearm; screen-left forearm lower, screen-right forearm higher for stacked hidden two-hand grip",
+  "preserved": "rear3/4 upright stance, wide legs, vertical blade behind body and empty back scabbard foreground",
+  "processing": "alpha<=16 cleared, 64px transparent padding all sides; no local anatomical drawing or limb transforms",
+  "transparentBoundary": true,
+  "referencesUnchanged": true,
+  "unityVerified": false
+}

@@ -1,0 +1,10 @@
+Make a SUBTLE INTERNAL PROPORTION REBALANCE of image1 rear3/4 sword guard, referencing image2 Stand. Overall body/head height already matches; preserve HEAD SIZE, TOTAL HAIR-TOP TO SOLE HEIGHT, body WIDTH, pose and framing. Do not enlarge or shorten entire character.
+
+Fix segment distribution only:
+- Chin-to-waist-belt span is slightly short. Lengthen the torso modestly about6–8 percent of THAT torso span; belt moves slightly DOWN relative to unchanged head and shoulder height, not huge movement.
+- Boot shafts are slightly short: increase each boot's upper-rim-to-sole height roughly10 percent of THAT boot height by raising boot tops, soles stay grounded at same height. Preserve rear/side brown leather boot construction, straps, heel and width, no bigger feet.
+- Compensate for these modest changes by shortening the intervening BELT-TO-BOOT-TOP trouser section, not by changing total standing height or head. Adjust coat folds/hem naturally to coherent hips, retain long ragged coat covering thighs, not mini coat.
+These are small refinements toward Stand's torso and boot proportions, not a tall adult redesign or baby chibi. Keep current large head and young face exactly as image1; head width and hair volume already good.
+
+STRICT LOCKS: same rear three-quarter angle, left-facing eye/nose/mouth profile, brown wavy hair, upright wide planted nearly straight legs with rear heels. Left SCREEN LEFT forearm low, right SCREEN RIGHT forearm high, both bend inward to hidden hands in front holding same vertical sword. Sleeves cover elbow bends plus short proximal forearm, offwhite rolled cuffs, small visible skin sections, no exposed elbow knobs. Keep arm slopes and two-hand asymmetry, upper arms spread from ribs. Coat red cracked pattern/burgundy lining, harness/belt remain. EMPTY diagonal leather scabbard foreground above back/coat; held silver sword upper blade vertical12clock BEHIND head/body, same sword height relative head. No hands on back, no extra swords or props.
+One polished complete transparent game sprite. No scene, ground, shadow, glow, text or labels. Preserve safe transparent margins.

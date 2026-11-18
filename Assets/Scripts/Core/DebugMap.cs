@@ -355,6 +355,7 @@ public class DebugMapController : MonoBehaviour
         }   // 패턴 구역 끝
 
         DrawSpriteViewer(t);
+        DrawPlayerSkills();
 
         // ----- 보기 · 시간 · 플레이어 -----
         GUILayout.Space(6);
@@ -381,6 +382,39 @@ public class DebugMapController : MonoBehaviour
         GUILayout.EndArea();
 
         if (showSpriteInfo) DrawSpriteInfo();
+    }
+
+    // ----- 플레이어 스킬 (수동 · 이동 · 궁극기): 버튼을 누르면 그 스킬을 바로 사용 → 스킬 모션 · 이펙트 확인 (사용자 2026-11-18) -----
+    string skillStatus = "";
+
+    void DrawPlayerSkills()
+    {
+        var p = Player.I;
+        if (p == null) return;
+        GUILayout.Space(6);
+        if (!Section("플레이어 스킬 (버튼 = 바로 사용)")) return;
+        GUILayout.Label("<size=12><color=#888888>쿨타임 · 시전 중이어도 바로 사용, 안 가진 스킬은 획득 후 사용. 공격 모션은 매번 처음부터</color></size>", label);
+        bool any = false;
+        foreach (var entry in p.Catalog)
+        {
+            if (entry.kind != SkillKind.Manual && entry.kind != SkillKind.Movement && entry.kind != SkillKind.Ultimate) continue;
+            any = true;
+            var owned = p.GetSkill(entry.id);
+            string tag = $"<size=12>[{SkillCatalog.KindLabel(entry.kind)}{(owned == null ? " · 미보유" : "")}]</size>";
+            if (GUILayout.Button($"{entry.name}  {tag}", btn, GUILayout.Height(26))) skillStatus = RunSkill(p, entry);
+        }
+        if (!any) GUILayout.Label("<color=#888888>이 캐릭터에 수동 스킬이 없음</color>", label);
+        if (skillStatus.Length > 0) GUILayout.Label($"<color=#AAAAAA>{skillStatus}</color>", label);
+    }
+
+    static string RunSkill(Player p, SkillEntry entry)
+    {
+        var s = p.GetSkill(entry.id) ?? p.AddOrLevelSkill(entry);
+        if (s == null) return $"{entry.name}: 획득 실패";
+        p.DebugStopMotion();
+        s.DebugResetForCast();
+        if (entry.kind == SkillKind.Ultimate) GameManager.I?.DebugFillUltimate();
+        return s.TryActivate() ? $"{entry.name}: 사용함" : $"{entry.name}: 사용 불가 (이동 · 기절 · 잡힘 중이거나 스킬 금지 치트)";
     }
 
     void SetMap(MapPreset p)

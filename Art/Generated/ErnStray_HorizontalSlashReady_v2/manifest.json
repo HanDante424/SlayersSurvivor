@@ -1,0 +1,47 @@
+{
+  "status": "approved base pose; sword-angle and finishing correction; original assets preserved",
+  "sourceGenerated": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-396e441b-d9b1-42c9-8920-7861a381cd7a.png",
+  "sourceSize": [
+    1507,
+    1044
+  ],
+  "outputSize": [
+    1664,
+    1152
+  ],
+  "mode": "RGBA",
+  "bboxAlphaOver32": [
+    313,
+    30,
+    1483,
+    1062
+  ],
+  "alpha32BottomMargin": 90,
+  "edgeAlphaPixels": 0,
+  "transparentCorners": true,
+  "canvasTranslation": [
+    0,
+    -6
+  ],
+  "artworkResized": true,
+  "uniformWholeCanvasScale": 1.103448275862069,
+  "normalizedSourceSize": [
+    1663,
+    1152
+  ],
+  "smallDisconnectedAlphaPixelsRemoved": 0,
+  "referenceHashes": {
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Art\\Generated\\ErnStray_HorizontalSlashReady_v1\\ErnStray_Atk_HorizontalSlashReady.png": "d1889e26d0deb9be57219ce28c725c99bf44eca2e40135772b2d5e20fdc9275b",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\ErnStray_Stand.png": "285ffd450e9ddde5e2e7d76aad695f53c3ef34b846463724a8fe15b60279d3b9",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 무기 시트.png": "4cb3f5be1103c5d9690958a3107f023479efc57610d686d2868ab480eefd9740",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 헤어 시트.png": "8c7ac45d232b1673345885f8988005a5a3d11a403978c9b67e57f5bd2dff8fb3",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 복장 시트.png": "c2ef97d925e8d952ddd2f0f30f01aee4c59fbcd33e8f0c1ba0f664c2e489719d"
+  },
+  "originalReferencesUnchanged": true,
+  "outputSha256": "2b4d9ec923f87550b786e8a8f4b5ac6859c62a0e0598f039cf3bb54e64cfbc88",
+  "method": "Built-in image_gen reference-guided whole-character pose; Pillow alpha speck cleanup, uniform whole-canvas resolution normalization, transparent padding and review composites only",
+  "visualIntent": "preserve approved v1 pose and legs; sword raised to 2 oclock with natural dorsal grip; line and material finishing",
+  "poseVerification": "static visual review; no Unity or motion timing validation",
+  "unityCompilationExecuted": false,
+  "playModeExecuted": false
+}

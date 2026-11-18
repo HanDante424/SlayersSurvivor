@@ -1,0 +1,22 @@
+{
+  "file": "ErnStray_RearVerticalGuard.png",
+  "size": [
+    1221,
+    1567
+  ],
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-1c57a9de-1783-441a-a35d-89889171d42c.png",
+  "sourceSha256": "f8f65493d75900cfb689d46c0b526d3821e6d52aea578b51e34b4aab6fdf8472",
+  "outputSha256": "16967c34c932971000d5dcf9dc88bf7c50dc7ed30b976087793208872b5fa75c",
+  "references": {
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Art\\Generated\\ErnStray_RearVerticalGuard_v4\\ErnStray_RearVerticalGuard.png": "3b4641c7cfdb5ab01ef1bbe9114389ae64f3e2ff775786d5315bd1881276971c",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\ErnStray_Stand.png": "285ffd450e9ddde5e2e7d76aad695f53c3ef34b846463724a8fe15b60279d3b9",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 복장 시트.png": "c2ef97d925e8d952ddd2f0f30f01aee4c59fbcd33e8f0c1ba0f664c2e489719d",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 4면도 시트.png": "3d8e91d69ac6b5d0492ecad4ddd153b286edc461ad0986060292a08432d0ec8d"
+  },
+  "change": "elbow/cuff construction rebuilt with Stand and costume references; visible forearms rise inward toward ribs rather than belt",
+  "preserved": "rear3/4 upright stance, wide legs, vertical blade behind body and empty back scabbard foreground",
+  "processing": "alpha<=16 cleared, 64px transparent padding all sides; no local anatomical drawing or limb transforms",
+  "transparentBoundary": true,
+  "referencesUnchanged": true,
+  "unityVerified": false
+}

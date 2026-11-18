@@ -1,0 +1,20 @@
+{
+  "file": "ErnStray_RearVerticalGuard.png",
+  "size": [
+    1190,
+    1610
+  ],
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-838e6529-ee8f-443e-91f3-17830321ef9c.png",
+  "sourceSha256": "24785fa48e550ee05fc56337d312e24bffcbbe5854990f8edeec3fb598ef57d8",
+  "outputSha256": "8f5da73475efeecae1aa626196194f314383abb0d94b321227b8d8e58064911b",
+  "references": {
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Art\\Generated\\ErnStray_RearVerticalGuard_v2\\ErnStray_RearVerticalGuard.png": "79c630bbe4905f460256bb0d5191562900041de2d96e771faa3ea5bf61dd0ad8",
+    "C:\\Users\\hanho\\Downloads\\제목 없음.png": "7a1d498c434a321f7bdbe6a79ee50ea6e384a4b5737b91a8aa048aaf99588b9e"
+  },
+  "change": "bare forearm segments added from both rolled cuffs inward to torso, distal wrists/hands occluded",
+  "preserved": "rear3/4 upright stance, wide legs, vertical blade behind body and empty back scabbard foreground",
+  "processing": "alpha<=16 cleared, 64px transparent padding all sides; no local anatomical drawing or limb transforms",
+  "transparentBoundary": true,
+  "referencesUnchanged": true,
+  "unityVerified": false
+}

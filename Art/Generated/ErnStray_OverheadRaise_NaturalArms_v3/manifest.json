@@ -1,0 +1,19 @@
+{
+  "file": "ErnStray_OverheadRaise.png",
+  "size": [
+    1071,
+    1795
+  ],
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-015f51bd-f8ab-4c55-93ba-ab1dee084d08.png",
+  "sourceSha256": "2528e97f22e797f4878f73c5bccd268f9131139389ccf514e2e371c3f63cdefb",
+  "outputSha256": "b023619649f42be6ccc5abd0c4076fb905ccb77ad2eb9ee08306197a648d3aa3",
+  "references": {
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Art\\Generated\\ErnStray_OverheadRaise_ElbowForward_v2\\ErnStray_OverheadRaise.png": "61b57dcca85d7b6510268bc19f95696c5b3f589bdbb585b0784e01e01e4aaabc",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\ErnStray_Stand.png": "285ffd450e9ddde5e2e7d76aad695f53c3ef34b846463724a8fe15b60279d3b9"
+  },
+  "pose": "left-facing upright overhead two-hand sword lift; both arms rebuilt continuously from shoulders to wrists",
+  "userDecision": "latest user requests natural arms rather than isolated right-arm rotation",
+  "processing": "alpha<=16 cleanup and 64px transparent padding only; model-generated artwork",
+  "verification": "static fullbody/grip and white background review; transparent boundary and unchanged source hashes; no Unity testing",
+  "status": "polish review candidate, specific scene/skill not assigned"
+}

@@ -1,0 +1,21 @@
+{
+  "file": "ErnStray_RearVerticalGuard.png",
+  "size": [
+    1327,
+    1440
+  ],
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-bd20fa7e-5832-4d9a-9838-246e3d6532c2.png",
+  "sourceSha256": "1118132a8b76b1a0f12c483de338e4d6ed5d6978f5f2ae7df7f67460e6dd139a",
+  "outputSha256": "1569aece5dbc0eed6983ac348b1911f12147ae8975a449d61eddbcdbe11b022e",
+  "references": {
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Art\\Generated\\ErnStray_RearVerticalGuard_v6\\ErnStray_RearVerticalGuard.png": "3d63481fd05613cdc7a5b874ea398fd929c1b87bfceadb60d00635f3da8eb775",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\ErnStray_Stand.png": "285ffd450e9ddde5e2e7d76aad695f53c3ef34b846463724a8fe15b60279d3b9",
+    "C:\\Users\\hanho\\Desktop\\SlayersSurvivor\\Assets\\Resources\\Sprites\\ErnStray_Atk_HorizontalSlash.png": "6bb1b49a7b4d259fc9a4a7bd167f851f9dd08487d9e74d28557e9a9c588a011c"
+  },
+  "change": "larger head and face, compact torso and legs, proportionally shorter coat/scabbard; Stand and HorizontalSlash proportions referenced",
+  "preserved": "rear3/4 upright stance, wide legs, vertical blade behind body and empty back scabbard foreground",
+  "processing": "alpha<=16 cleared, 64px transparent padding all sides; no local anatomical drawing or limb transforms",
+  "transparentBoundary": true,
+  "referencesUnchanged": true,
+  "unityVerified": false
+}

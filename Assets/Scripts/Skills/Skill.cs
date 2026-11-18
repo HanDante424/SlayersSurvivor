@@ -289,6 +289,8 @@ public abstract class Skill : MonoBehaviour
     public virtual string Badge => null;
     /// <summary>키를 눌렀을 때. 사용했으면 true</summary>
     public virtual bool TryActivate() => false;
+    /// <summary>디버그 맵 버튼용: 쿨타임 · 시전 중 상태를 풀어 바로 TryActivate 가 되게 함 (기본은 아무것도 안 함)</summary>
+    public virtual void DebugResetForCast() { }
 
     protected static Enemy Nearest(Vector2 from, float maxDist)
     {
@@ -334,6 +336,8 @@ public abstract class ActiveSkill : Skill
     bool casting;
 
     protected virtual void OnDisable() => casting = false;
+
+    public override void DebugResetForCast() { casting = false; cdLeft = 0f; }
 
     public override float CooldownRemaining => casting ? Mathf.Max(0f, CooldownSeconds) : Mathf.Max(0f, cdLeft);
 

@@ -1,0 +1,22 @@
+{
+  "file": "ErnStray_SideTwoHandUpright.png",
+  "size": [
+    1152,
+    1664
+  ],
+  "source": "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-97fc7089-e173-4dad-b1e3-5ff825c5242a.png",
+  "sourceSha256": "7a8a9d626aa119ca419453fd429b9f7312c87f296896e3a5e84751195b4f6883",
+  "outputSha256": "0b58144b29832ece30c01fc582b447c5428e4d51382b3c1a608253cad9dbcfd8",
+  "references": {
+    "C:\\Users\\hanho\\.codex\\generated_images\\01a1d824-c400-7441-a07e-917bf0593926\\exec-5d5b7f34-c6e2-451a-aa49-3946b0e2a3d9.png": "df64fd83f6432c84f3e05b0a5db239b2c73d4b0589bbe06037ba595069f31173",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\ErnStray_Stand.png": "285ffd450e9ddde5e2e7d76aad695f53c3ef34b846463724a8fe15b60279d3b9",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 마스터 시트.png": "6dbec7fd454c0684a6926b56417544705b22631ffca103543b915c916b0a5168",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 무기 시트.png": "4cb3f5be1103c5d9690958a3107f023479efc57610d686d2868ab480eefd9740",
+    "C:\\Users\\hanho\\Desktop\\슬레이어즈 리소스\\슬레이어즈 서바이벌 용\\원화\\에른\\에른 복장 시트.png": "c2ef97d925e8d952ddd2f0f30f01aee4c59fbcd33e8f0c1ba0f664c2e489719d"
+  },
+  "pose": "left-facing standing, sword vertical in front, upper right/lower left grip",
+  "userDecision": "unexpected pose retained for a different scene; original overhead/raise intent not considered fulfilled",
+  "processing": "alpha<=16 cleanup and 64px transparent padding only; model-generated artwork",
+  "verification": "static fullbody/grip and white background review; transparent boundary and unchanged source hashes; no Unity testing",
+  "status": "polish review candidate, specific scene/skill not assigned"
+}
