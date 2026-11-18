@@ -137,6 +137,9 @@ public class SpriteSheetAnimator : MonoBehaviour
     {
         var f = ToFacing(dir);
         if (f == Facing4.Left || f == Facing4.Right) lastSide = f;
+        // 대각선 입력 (위 + 왼쪽 등) 은 세로가 우세 (또는 같음) 로 판정돼 좌우가 갱신되지 않았음 → 1행 옆면 클립이 반대쪽을 보고 이동.
+        // 플레이어 (측면 클립 + 4행 클립 혼용, sideMode 아님) 는 가로 성분이 있으면 그 쪽으로 반전. 측면 전용 모드 (보스) 는 기존 동작 유지
+        else if (!sideMode && Mathf.Abs(dir.x) > 0.01f) lastSide = dir.x < 0f ? Facing4.Left : Facing4.Right;
         if (sideMode && (f == Facing4.Up || f == Facing4.Down)) { if (Facing != Facing4.Left && Facing != Facing4.Right) Facing = Facing4.Left; return; }
         Facing = f;
     }

@@ -66,9 +66,9 @@ Unity 6 (6000.3.22f1) 2D 뱀서라이크. 외부 패키지 없음, UI 는 IMGUI 
 ## 플레이어블 스프라이트 전환 (2026-11-17 사용자, 진행 중)
 - 방침: 플레이어블 캐릭터 그림을 **왼쪽 3/4 측면 한 벌 + 좌우 반전**으로 다시 제작 (카구츠치 2페이즈 방식). 규칙 = `Docs/Design/Sprite_Rules_v0.1.md` 3장, 포즈 목록 = `Player_Poses_v0.1.md`, GPT 제작 명령문 = `GPT_Prompt_ErnStray_Run_v0.1.md`. 새 그림은 `Art/Incoming/{id}/` 에 넣고 검사 후 `Assets/Resources/Sprites/` 로.
 - **에른 `ErnStray_Stand` 적용됨** (정지 모습만, 달리기 · 베기는 기존 4방향 시트). `Player.ErnStrayVisual` 의 `standBodyPx` · `standFootPx` · `standFootX` + `SpriteSheetAnimator.LoadClip(pivotX, globalSide)`. 파일이 없으면 기존 `ErnStray_Idle`. **컴파일만 확인, Play 미확인.** 3/4 스탠드가 정식 (순수 옆면 그림은 참고용).
-- **에른 달리기 `ErnStray_RunSide` = 수정 중, 아직 게임에 없음.** GPT 작업본 v5 (512 × 512 × 8프레임, 4096 × 512) 를 검사만 함: 규격 · 잘림 OK, 눈으로 볼 때 5 ~ 8번이 1 ~ 4번과 거의 같은 자세 (반대 발이 앞서는 구간 없음) — 사용자 판단 대기. 2번 = 두 후보 중 첫 자세 선택됨, 4번 최종 승인 전. **사용자가 "수정 끝난 뒤 연결" 이라고 함 → 최종본이 `Art/Incoming/ErnStray/` 에 오기 전에는 로더 · 복사 금지.**
-  - 인계 ZIP (43MB, v1 ~ v5 · 생성 원본 · 제작 문서 · 스크립트) 은 **저장소에 없음**: `C:\Users\11\Desktop\Project Slayers\output\ErnStray_RunSide_Handoff_2026-11-17_v1.zip` — 데스크톱으로 직접 옮길 것. 풀면 `HANDOFF.md` 먼저 읽기 (현재 기준 v5, 다음 수정은 v6 이상 새 폴더).
-  - 연결 시 할 일: 수치 검사 → `ErnStray_RunSide.png` 로 복사 (기존 `ErnStray_Run` 덮어쓰기 금지) → 머리 크기 기준 크기 상수 측정 → 한 줄 시트 클립 로더 → 컴파일 → Play 확인 (발 미끄러짐 · 크기 · 반전).
+- **에른 달리기 `ErnStray_RunSide` 적용됨 (2026-11-18, GPT 작업본 v18 최종)**: 512 × 512 × 8프레임 한 줄 시트 (4096 × 512), 착지 프레임 발끝 아래 20 ~ 21px (공중 4 · 7 · 8번은 35 ~ 52px), 잘림 없음. `Player.ErnStrayVisual.runSideFootPx` + `RunSidePpu` (**[임시] 291px/유닛** — 머리 높이를 스탠드와 눈대중으로 맞춘 값, 칸 1.76유닛 · 몸 약 1.56유닛) + 한 줄 시트 클립 (`LoadClip(globalSide:false)`, 오른쪽 = 좌우 반전, 10fps [임시]). 파일이 없으면 기존 4방향 `ErnStray_Run`. 원본 = `Art/Incoming/ErnStray/ErnStray_RunSide.png` (= Assets 복사본과 해시 일치). **컴파일만 확인, Play 미확인** (크기 · 발 미끄러짐 · 반전 · `.meta` 는 Unity 에디터가 한 번 열려야 생성).
+  - 5 ~ 8번이 1 ~ 4번과 비슷한 자세로 보임 (반대 발이 앞서는 구간 약함) — 사용자가 v18 을 완성으로 확정함. 어색하면 Play 후 재요청.
+  - 인계 ZIP (v1 ~ v5 까지, 43MB) 은 저장소에 없음: `C:\Users\11\Desktop\Project Slayers\output\ErnStray_RunSide_Handoff_2026-11-17_v1.zip`. v18 작업 폴더 = `...\Project Slayers\output\ErnStray_RunSide_v18\` (생성 기록 · 검사 · GIF 포함, 저장소에 없음).
 - 남은 것: 에른 공격 포즈 (`Atk_SlashReady` · `Atk_Slash` · `Atk_Smash` 우선), 레니아 전체, 캐릭터 선택 카드 (아직 기존 `_Idle` 정면).
 - **아이템 · 세트 효과 (노션 `세계관 관련 / 게임 관련 / 아이템` 기반) 는 스프라이트 전환 뒤에 진행.** 결정: 등급 = 1 ~ 6 정수, 능력치 보류, 몬스터 드랍 보류, 세트 효과만 구현 (마나 · 행운 · 적중 등 없는 시스템 의존 효과 제외). 코드는 아직 없음.
 - UI: 보스 체력바 아래 우측 "받는 최종 피해량 +N%" 표시 추가 (`GameManager.DrawBossTakenMul`, 소스 조건부 수정자는 미반영, 컴파일만 확인).

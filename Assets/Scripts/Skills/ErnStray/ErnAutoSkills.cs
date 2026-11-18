@@ -136,9 +136,7 @@ public class FireSlash : AutoSkill
         Vector2 from = P.transform.position;
         var dirs = BaseDirections(from);
 
-        // 수평베기 모션은 첫 방향으로 1번만 (시트가 없으면 모션의 기본 이펙트가 대신)
-        var frames = ErnSkillFx.FireSlash;
-        P.PlayAttack(dirs[0], baseFx: frames == null);
+        // 공격 모션은 수동 스킬 사용 때만 (2026-11-18 사용자) — 자동 스킬은 이펙트만. 스킬 이펙트 시트가 없을 때 쓰던 기본 베기 이펙트 대체도 모션과 함께 빠짐 (시트는 있음)
 
         // 첫 방향 = 직접 사용, 난사 · 양방향의 나머지 방향 = 간접 사용 (같은 사용 번호)
         var use = DirectCast;
@@ -479,7 +477,7 @@ public class SolarSlash : AutoSkill
     // ---------- 발동 ----------
     protected override bool Fire()
     {
-        P.PlayAttack();
+        // 공격 모션 없음 (자동 스킬, 2026-11-18 사용자: 모션은 수동 스킬만)
         StartCoroutine(Burning ? BurnRoutine() : CastWhole());
         return true;
     }
@@ -528,8 +526,7 @@ public class SolarSlash : AutoSkill
         if (!isEcho && HasSpecial(Echo))
         {
             yield return new WaitForSeconds(T.solarEchoGap);
-            P.PlayAttack();
-            yield return Sequence(true);
+            yield return Sequence(true);   // 공격 모션 없음 (자동 스킬)
         }
     }
 

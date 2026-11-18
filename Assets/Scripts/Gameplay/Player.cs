@@ -352,7 +352,17 @@ public class Player : MonoBehaviour
         /// 그림 픽셀 측정값 (0 = 스탠드 없음, 기존 {id}_Idle 사용): 몸 키 (머리카락 끝 ~ 발끝) px · 발끝이 그림 아래에서 뜬 px · 두 발 가운데 x px
         /// </summary>
         public float standBodyPx, standFootPx, standFootX;
+        /// <summary>
+        /// 측면 달리기 한 줄 시트 {id}_RunSide (왼쪽 보기, 정사각 칸 8프레임, 2026-11-18 v18): 착지 프레임 발끝이 칸 아래에서 뜬 px (0 = 없음, 기존 {id}_Run 사용)
+        /// </summary>
+        public float runSideFootPx;
     }
+
+    /// <summary>
+    /// [임시] 달리기 시트 크기: 월드 1유닛당 px. 스탠드 (머리 끝 ~ 턱 약 365px = 몸 1253px ↔ 1.62유닛, 773.5px/유닛) 와 달리기 프레임 (머리 약 138px) 의
+    /// 머리 높이를 맞춘 눈대중 값 = 773.5 × 138/365 ≈ 291 → 칸 512px = 1.76유닛, 몸 약 454px = 1.56유닛. Play 로 보고 조정
+    /// </summary>
+    const float RunSidePpu = 291f;
 
     /// <summary>스탠드 그림의 화면 키 (월드 유닛) — 기존 시트 규격 (몸 200px / 칸 256px × cell 2.07)과 같은 1.62</summary>
     const float StandBodyWorld = 1.62f;
@@ -372,6 +382,8 @@ public class Player : MonoBehaviour
         attackCols = 8, attackCell = 2.5875f, attackPivotY = 0.297f,
         // ErnStray_Stand.png 1199 × 1312: 몸 y 35~1287 (키 1253), 발끝 = 아래 24px, 두 발 가운데 x = (356+713)/2 = 534.5 (2026-11-17 측정)
         standBodyPx = 1253f, standFootPx = 24f, standFootX = 534.5f,
+        // ErnStray_RunSide.png 4096 × 512 (칸 512 × 8): 착지 프레임 (1 · 2 · 3 · 5 · 6) 발끝 = 아래 20 ~ 21px, 공중 프레임 (4 · 7 · 8) 은 더 높음 (2026-11-18 측정)
+        runSideFootPx = 21f,
     };
 
     /// <summary>
@@ -448,6 +460,19 @@ public class Player : MonoBehaviour
         if (anim.LoadClip(SpriteSheetAnimator.Run, CharacterId + "_Run", 4, v.runCols, cell, pivotY, v.runFps, true))
         {
             anim.LoadClip(SpriteSheetAnimator.Idle, CharacterId + "_Idle", 4, v.idleCols, cell, pivotY, v.idleFps, true);
+            // 측면 달리기 (있으면 달리기를 이것으로 교체, 오른쪽은 좌우 반전). 없으면 위 {id}_Run (4방향) 그대로
+            if (v.runSideFootPx > 0f)
+            {
+                var runSide = Resources.Load<Texture2D>("Sprites/" + CharacterId + "_RunSide");
+                if (runSide != null)
+                {
+                    float rppu = RunSidePpu;
+                    float cellPx = runSide.height;   // 정사각 칸
+                    anim.LoadClip(SpriteSheetAnimator.Run, CharacterId + "_RunSide", 1, Mathf.RoundToInt(runSide.width / cellPx),
+                                  cellPx / rppu, (v.runSideFootPx + rppu * StandFootToTransform) / cellPx, v.runFps, true,
+                                  pivotX: 0.5f, globalSide: false);
+                }
+            }
             // 측면 스탠드 (있으면 정지 모습만 이것으로 교체, 달리기 · 베기는 기존 4방향 시트). 없으면 위 {id}_Idle 그대로
             if (v.standBodyPx > 0f)
             {
