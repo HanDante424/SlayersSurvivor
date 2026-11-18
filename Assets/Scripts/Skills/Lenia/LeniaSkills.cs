@@ -51,7 +51,7 @@ public abstract class ThrowSkill : AutoSkill
     {
         var t = LeniaFx.Nearest(P.transform.position, ThrowRange);
         if (t == null) return false;
-        P.PlayAttack((Vector2)t.transform.position - (Vector2)P.transform.position);
+        // 공격 모션 없음 (자동 스킬, 2026-11-18 사용자: 모션은 수동 스킬만 — 대상 쪽으로 돌아보는 것도 모션과 함께 빠짐)
         Casting = true;   // 마지막 투사체까지 쿨타임 대기
         // 공구 벨트: 예비 공구 '투사체 증가' +1, 과잉 장전 (직접 사용 3회마다 다음 사용 +5)
         int extra = ExtraShots + (ToolBelt.I != null ? ToolBelt.I.ExtraThrows + ToolBelt.I.OnThrowUse() : 0);
@@ -369,7 +369,7 @@ public abstract class TurretSkill : AutoSkill
         // 터렛 '사거리' = 1 + (자동화 공정 '사거리' % + 공구 벨트 '투사체 사거리' %) — 같은 '사거리' 증가끼리 합연산
         float rangeMul = 1f + (auto != null ? auto.TurretRangePct : 0f) + (ToolBelt.I != null ? ToolBelt.I.ProjectileRangePct : 0f);
         if (LeniaFx.Nearest(from, Turret.Range * RangeScale * rangeMul) == null) return false;
-        P.PlayAttack();
+        // 공격 모션 없음 (자동 스킬, 2026-11-18 사용자: 모션은 수동 스킬만)
         var use = DirectCast;
         // 기본 강화 '범위' = 터렛 사거리 · 미사일 폭발 반경 · 도탄 거리에 적용 (설치 시점 값)
         // 자동화 공정: '지속 시간' · '사거리' · '투사체 증가' · '발동 횟수' (설치 시점 값), 공격 간격 · 피해량은 터렛에서 실시간

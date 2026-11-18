@@ -18,10 +18,12 @@ public class SpriteImportSettings : AssetPostprocessor
     /// <summary>압축하지 않을 그림 (확장자 없는 이름) — 압축 때문에 품질이 거슬리는 그림을 여기에 추가</summary>
     static readonly System.Collections.Generic.HashSet<string> NoCompress = new System.Collections.Generic.HashSet<string>
     {
+        // 플레이어 스탠드 (2026-11-18): 몸 키 1253px 을 화면에서 약 1/14 로 줄여 그림 → 밉맵 없으면 가장자리가 지글거려 달리기 (밉맵 켬) 와 질감이 달랐음. 되돌리려면 이 줄 삭제
+        "ErnStray_Stand",
     };
 
     // 설정을 바꾸면 숫자를 올려서 기존 이미지도 다시 임포트되게 함
-    public override uint GetVersion() => 3;
+    public override uint GetVersion() => 4;
 
     static bool IsPowerOfTwo(int v) => v > 0 && (v & (v - 1)) == 0;
 
