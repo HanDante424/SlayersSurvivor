@@ -39,3 +39,6 @@ crashlytics-build.properties
 # OS
 .DS_Store
 Thumbs.db
+
+# GPT/Codex 생성 작업본 (보관 안 함, 이미 커밋된 파일은 추적 유지)
+Art/Generated/
