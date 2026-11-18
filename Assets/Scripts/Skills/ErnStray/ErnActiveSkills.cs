@@ -187,6 +187,8 @@ public class FireStream : Skill
         if (recharge <= 0f) { stacks++; recharge = stacks < MaxStacks ? StackCooldown : 0f; }
     }
 
+    public override void DebugResetForCast() { if (stacks <= 0) stacks = 1; }   // 디버그 맵 버튼: 스택이 없어도 사용
+
     public override bool TryActivate()
     {
         if (CheatDisabled) return false;   // 치트: 스킬별 사용 금지

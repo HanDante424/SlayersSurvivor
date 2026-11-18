@@ -424,6 +424,9 @@ public class Player : MonoBehaviour
         return true;
     }
 
+    /// <summary>디버그 맵: 재생 중인 공격 모션을 끊음 (같은 스킬을 연달아 눌러도 모션이 매번 나오게)</summary>
+    public void DebugStopMotion() => anim?.StopOneShot();
+
     void SpawnSlashFx()
     {
         var frames = fxSlash;
