@@ -76,3 +76,20 @@
 ## 어퍼컷 풍압 v9 인게임 연결
 
 v9가 현재 사용 중. 일반3·연계5·잡기6·7의 어퍼컷에서 앞뒤 동기 재생. 다른 버전은 제작 이력으로 보존. 상세는 v9 제작 README 및 2페이즈 기획서 참조.
+
+## 가니악 기본 대기 화풍 재제작
+
+[Ganiak_Stand_KagutsuchiStyle_v1](Ganiak_Stand_KagutsuchiStyle_v1/README.md): 카구츠치에 맞춘 가니악 왼쪽 대기 제작 후보. 오른쪽은 수평반전 검수, 인게임 미연결.
+
+## 가니악 걷기 재제작
+
+[Ganiak_Walk_KagutsuchiStyle_v1](Ganiak_Walk_KagutsuchiStyle_v1/manifest.json): 새 대기 원화를 기준으로 왼쪽 걷기14프레임 제작. 4키포즈+8중간포즈는 이미지 생성, 시작/끝은 표준화 대기 원본. 투명 시트·프레임·흰 배경 GIF·검수 시트 포함. 오른쪽은 좌우반전 사용. 제작본·인게임 미연결.
+
+## 가니악 측면 걷기8프레임 재시도
+
+[Ganiak_Walk_Side_8_v1](Ganiak_Walk_Side_8_v1/README.md): 사용자 제공 명령에 따른8프레임 A/B1254시트 검수 후보. 이전14프레임은 미채택, 보존만 함. 인게임 미연결.
+
+
+## Ganiak_Stand_Profile_v1
+
+왼쪽 정측면 단일 대기 기준 후보. 사용자 외형 검수 대기, 인게임 미연결. 비교 이미지·반전 미리보기·프롬프트·검수 정보를 함께 보관합니다.
