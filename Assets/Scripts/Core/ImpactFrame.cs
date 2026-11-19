@@ -113,8 +113,106 @@ public class ImpactFrame : MonoBehaviour
                 SpriteEffect.Spawn(frames, ParticleFps, null, at, 0f, false, ParticleSortingOrder, width);
             }
             CameraFollow.Shake(ShakeTime, ShakeAmp);
+            Vector2 hitAt = follow != null ? (Vector2)follow.position : fallbackPos;
+            ImpactSlashOverlay.Spawn(hitAt);   // 화면을 가르는 일직선 참격 (맞은 위치를 지남)
+            ImpactScreenFlow.Spawn();          // 화면 전체 불꽃 (파티클과 같은 순간)
         }
 
         if (this != null) Destroy(gameObject);
+    }
+}
+
+/// <summary>
+/// 임팩트 프레임이 끝날 때 화면 전체를 가르는 일직선 참격 (2026-11-20 사용자 요청).
+/// 기존 일섬 시트 (ErnStray_SkillTripleSlashIlseom, 2행 x 3열, 6프레임, 칸 512x512, 참격이 약 45° 대각선) 를 그대로 재사용.
+/// 월드 이펙트가 아니라 화면 위에 직접 그림 → 카메라 확대와 상관없이 항상 화면 전체를 가로지름.
+/// 칸 한 변 = 화면 대각선 x SizeOfDiagonal, 칸 중심 = 맞은 위치 (참격이 맞은 곳을 지나감).
+/// 같은 순간에 ImpactScreenFlow (화면 전체 불꽃) 도 함께 나옴.
+/// </summary>
+public class ImpactSlashOverlay : MonoBehaviour
+{
+    const string Sheet = "Sprites/ErnStray_SkillTripleSlashIlseom";
+    const int Cols = 3, Rows = 2;
+    const float Fps = 20f;                  // 6프레임 → 0.3초
+    const float SizeOfDiagonal = 0.9f;      // [임시] 칸 한 변 / 화면 대각선 (참격 길이가 칸 가로의 약 1.27배라 대각선보다 길어짐)
+
+    Texture2D tex;
+    Rect rect;
+    float born;
+
+    public static void Spawn(Vector2 worldPos)
+    {
+        var cam = Camera.main;
+        if (cam == null) return;
+        var tex = Resources.Load<Texture2D>(Sheet);
+        if (tex == null) return;
+        var go = new GameObject("ImpactSlashOverlay");
+        var o = go.AddComponent<ImpactSlashOverlay>();
+        o.tex = tex;
+        o.born = Time.unscaledTime;
+        Vector3 c = cam.WorldToScreenPoint(worldPos);
+        float side = Mathf.Sqrt((float)Screen.width * Screen.width + (float)Screen.height * Screen.height) * SizeOfDiagonal;
+        o.rect = new Rect(c.x - side * 0.5f, Screen.height - c.y - side * 0.5f, side, side);   // GUI 는 위가 0
+    }
+
+    void Update()
+    {
+        if (Time.unscaledTime - born >= Cols * Rows / Fps) Destroy(gameObject);
+    }
+
+    void OnGUI()
+    {
+        if (tex == null) return;
+        int f = Mathf.FloorToInt((Time.unscaledTime - born) * Fps);
+        if (f < 0 || f >= Cols * Rows) return;
+        int col = f % Cols, row = f / Cols;   // 시트 위쪽이 0행
+        var uv = new Rect(col / (float)Cols, 1f - (row + 1) / (float)Rows, 1f / Cols, 1f / Rows);
+        GUI.depth = -500;
+        // 좌우 반전 (2026-11-20 사용자 요청): 시트의 왼쪽 아래 → 오른쪽 위 대각선이 오른쪽 아래 → 왼쪽 위가 됨. 칸 중심 기준으로 뒤집어 위치는 그대로
+        var prev = GUI.matrix;
+        GUIUtility.ScaleAroundPivot(new Vector2(-1f, 1f), rect.center);
+        GUI.DrawTextureWithTexCoords(rect, tex, uv, true);
+        GUI.matrix = prev;
+    }
+}
+
+/// <summary>
+/// 임팩트 프레임이 끝날 때 화면 전체에 깔리는 불꽃 (2026-11-20 사용자 요청: 파티클과 함께 나올 화면 전체 표기용 이펙트).
+/// 시트 ErnStray_ScreenImpact: 4열 x 3행, 칸 960x540 (16:9), 마지막 칸은 비어 있음 → 12칸 재생.
+/// 칸 하나가 화면 한 장이라 화면 전체에 늘려 그림 (모서리에 붙어 흘러가는 모양). 월드 위치와 무관, 카메라 확대와도 무관.
+/// </summary>
+public class ImpactScreenFlow : MonoBehaviour
+{
+    const string Sheet = "Sprites/ErnStray_ScreenImpact";
+    const int Cols = 4, Rows = 3;
+    const float Fps = 30f;   // 미리보기 GIF 기준 (칸당 약 0.033초 → 전체 약 0.4초)
+
+    Texture2D tex;
+    float born;
+
+    public static void Spawn()
+    {
+        var tex = Resources.Load<Texture2D>(Sheet);
+        if (tex == null) return;
+        var go = new GameObject("ImpactScreenFlow");
+        var o = go.AddComponent<ImpactScreenFlow>();
+        o.tex = tex;
+        o.born = Time.unscaledTime;
+    }
+
+    void Update()
+    {
+        if (Time.unscaledTime - born >= Cols * Rows / Fps) Destroy(gameObject);
+    }
+
+    void OnGUI()
+    {
+        if (tex == null) return;
+        int f = Mathf.FloorToInt((Time.unscaledTime - born) * Fps);
+        if (f < 0 || f >= Cols * Rows) return;
+        int col = f % Cols, row = f / Cols;   // 시트 위쪽이 0행
+        var uv = new Rect(col / (float)Cols, 1f - (row + 1) / (float)Rows, 1f / Cols, 1f / Rows);
+        GUI.depth = -501;   // 일직선 참격 (-500) 보다 뒤
+        GUI.DrawTextureWithTexCoords(new Rect(0, 0, Screen.width, Screen.height), tex, uv, true);
     }
 }

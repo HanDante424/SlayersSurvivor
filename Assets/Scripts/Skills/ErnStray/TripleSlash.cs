@@ -39,6 +39,9 @@ public class TripleSlash : ActiveSkill
     const float TsubameAngle = 39f;     // [해석] 시트 안 참격 각도 = 가장 큰 프레임 양끝을 이은 직선
     const float TsubameWidth = 2.7f;    // [임시] 한 칸 가로 = 범위 x 이 값 (일섬 이펙트와 같은 길이)
     const float TsubameStep = 120f;     // 참격 사이 회전 각도
+    // 시트 가장 큰 프레임 (3번째) 에서 참격 무게중심이 칸 중심에서 떨어진 정도 (칸 가로 단위, 오른쪽 · 위쪽이 +): (283-224)/448, -(229-176)/448
+    static readonly Vector2 TsubameCentroid = new Vector2(0.132f, -0.118f);
+    const float TsubameGather = 0.9f;   // [임시] 3개를 가운데로 모으는 정도 (0 = 그대로, 1 = 무게중심을 한 점에 겹침). 2026-11-20 "좀더 가운데로"
     const int TsubameSlashes = 3;       // 한 번의 공격에 즉시 띄우는 참격 수 (2026-11-20: 발동마다가 아니라 공격 한 번에 3개 즉시)
     // 적중 임팩트 프레임 (일섬 + 츠바메가에시): 직접 사용이 적에게 맞으면 시간 정지 + 흑백
     const float ImpactSeconds = 0.25f;  // 시간이 멈추는 길이 (사용자 지정)
@@ -211,7 +214,11 @@ public class TripleSlash : ActiveSkill
     void SpawnTsubameFx(Sprite[] frames, Vector2 from, Vector2 dir, float r, int slashIndex)
     {
         float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - TsubameAngle + TsubameStep * slashIndex;
-        SpriteEffect.Spawn(frames, TsubameFps, null, from + dir * (r * FxForward), angle, false, 11, r * TsubameWidth);
+        float width = r * TsubameWidth;
+        // 칸 중심을 기준으로 돌리면 호의 무게중심이 중심에서 떨어져 있어 3개가 삼각형 고리로 퍼져 보임 →
+        // 각 참격을 (돌린 뒤의) 무게중심 방향 반대로 옮겨 가운데로 모음. TsubameGather 0 = 옮기지 않음, 1 = 무게중심을 중심에 겹침
+        Vector2 gather = -(Vector2)(Quaternion.Euler(0f, 0f, angle) * TsubameCentroid) * (width * TsubameGather);
+        SpriteEffect.Spawn(frames, TsubameFps, null, from + dir * (r * FxForward) + gather, angle, false, 11, width);
     }
 
     void SpawnIlseomFx(Sprite[] frames, Vector2 from, Vector2 dir, float r)
