@@ -22,11 +22,13 @@ public class TripleSlash : ActiveSkill
     const float FxWidth = 3.5f;         // [임시] 한 칸 가로 = 범위 x 이 값 (신규 시트 칸 대비 그림이 작아 예전 시트의 최대 크기에 맞춤)
     const float FxForward = 1.2f;       // [임시] 이펙트 중심 = 플레이어 앞 범위 x 이 값
 
-    // 일섬 전용 이펙트 (2행 x 3열, 6프레임). 참격이 약 45° 대각선(왼쪽 아래 → 오른쪽 위)으로 그려져 있어 각도 보정
-    const string IlseomSheet = "ErnStray_SkillTripleSlashIlseom";
-    const float IlseomFps = 18f;        // [임시] 6프레임 → 약 0.33초
-    const float IlseomAngle = 45f;      // 시트 안 참격 각도
-    const float IlseomWidth = 2.2f;     // [임시] 한 칸 가로 = 범위 x 이 값
+    // 일섬 전용 이펙트: 2026-11-20 신규 시트 (1행 x 5열, 칸 448x352, 20fps, 1회 재생).
+    // 참격이 왼쪽 아래 → 오른쪽 위로 휜 호 (가장 큰 프레임의 양끝을 이은 각도 약 39°)라 각도 보정.
+    // 예전 시트 "ErnStray_SkillTripleSlashIlseom" (2행 x 3열, 45°) 는 되돌릴 수 있게 Resources 에 그대로 둠.
+    const string IlseomSheet = "ErnStray_SkillTripleSlashIlseomAnim";
+    const float IlseomFps = 20f;        // 신규 시트 제작 사양 (5프레임 → 0.25초)
+    const float IlseomAngle = 39f;      // [해석] 시트 안 참격 각도 = 가장 큰 프레임 양끝을 이은 직선 (호가 휘어 있어 시작은 더 완만, 끝은 더 가파름)
+    const float IlseomWidth = 2.7f;     // [임시] 한 칸 가로 = 범위 x 이 값 (예전 시트의 최대 참격 길이에 맞춤)
 
     // 특수 강화 id
     public const string Frenzy = "T5A", Spread = "T5B", QuickPrep = "T5C";
@@ -134,7 +136,7 @@ public class TripleSlash : ActiveSkill
         float interval = hits > BaseHits ? T.tripleSlashInterval * (BaseHits - 1) / (hits - 1) : T.tripleSlashInterval;
         bool ilseom = HasSpecial(Ilseom);
         var sheet = ilseom ? null : ErnSkillFx.TripleSlash;
-        var ilseomFrames = ilseom ? SpriteEffect.LoadFrames(IlseomSheet, 2, 3, 1f) : null;
+        var ilseomFrames = ilseom ? SpriteEffect.LoadFrames(IlseomSheet, 1, 5, 1f) : null;
 
         for (int i = 0; i < hits; i++)
         {
