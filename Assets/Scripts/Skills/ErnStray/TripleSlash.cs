@@ -18,8 +18,8 @@ public class TripleSlash : ActiveSkill
     const float DamagePerHit = 8f;
     const int BaseHits = 3;
 
-    const float FxFps = 20f;            // [임시] 10프레임 → 0.5초 (3타 전체를 한 시트로)
-    const float FxWidth = 3f;           // [임시] 한 칸 가로 = 범위 x 이 값
+    const float FxFps = 16f;            // 신규 시트 제작 사양 (8프레임 → 0.5초, 3타 전체를 한 시트로)
+    const float FxWidth = 3.5f;         // [임시] 한 칸 가로 = 범위 x 이 값 (신규 시트 칸 대비 그림이 작아 예전 시트의 최대 크기에 맞춤)
     const float FxForward = 1.2f;       // [임시] 이펙트 중심 = 플레이어 앞 범위 x 이 값
 
     // 일섬 전용 이펙트 (2행 x 3열, 6프레임). 참격이 약 45° 대각선(왼쪽 아래 → 오른쪽 위)으로 그려져 있어 각도 보정
