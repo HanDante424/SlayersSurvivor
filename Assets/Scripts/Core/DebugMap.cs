@@ -204,6 +204,7 @@ public class DebugMapController : MonoBehaviour
     void LateUpdate()
     {
         if (GameManager.I == null || GameManager.I.State != GameState.Playing) return;
+        if (ImpactFrame.Frozen) return;   // 임팩트 프레임 (시간 정지) 중에는 시간 배속을 덮어쓰지 않음
         // 한 프레임 진행: 이번 LateUpdate 에서 1 로 올려 다음 프레임이 진행되고, 그 프레임의 LateUpdate 에서 다시 정지
         if (stepFrames > 0)
         {
@@ -356,6 +357,7 @@ public class DebugMapController : MonoBehaviour
 
         DrawSpriteViewer(t);
         DrawPlayerSkills();
+        DrawSpecialUpgrades();
 
         // ----- 보기 · 시간 · 플레이어 -----
         GUILayout.Space(6);
@@ -405,6 +407,56 @@ public class DebugMapController : MonoBehaviour
         }
         if (!any) GUILayout.Label("<color=#888888>이 캐릭터에 수동 스킬이 없음</color>", label);
         if (skillStatus.Length > 0) GUILayout.Label($"<color=#AAAAAA>{skillStatus}</color>", label);
+    }
+
+    // ----- 스킬 특수 강화 바로 적용: 스킬을 고른 뒤 Lv.5 · 10 · 15 강화를 눌러 적용 · 교체 · 해제 (사용자 2026-11-20) -----
+    string spSkillId = "";
+
+    void DrawSpecialUpgrades()
+    {
+        var p = Player.I;
+        if (p == null) return;
+        GUILayout.Space(6);
+        if (!Section("스킬 특수 강화 (바로 적용)")) return;
+        GUILayout.Label("<size=12><color=#888888>스킬을 고르면 안 가진 스킬은 획득 (슬롯 제한 무시). 특수 강화는 누르면 적용 · 다른 것을 누르면 교체 · 해제 가능. 필요하면 스킬 레벨을 그 단계로 올림. 선택 불가 후보 · 조합 경고도 무시. 융해 · 영원의 불꽃은 교체해도 효과가 남을 수 있음 (R 재시작)</color></size>", label);
+
+        var entries = new List<SkillEntry>();
+        foreach (var e in p.Catalog) if (e.kind != SkillKind.Ultimate) entries.Add(e);
+        for (int i = 0; i < entries.Count; i += 2)
+        {
+            GUILayout.BeginHorizontal();
+            for (int j = i; j < Mathf.Min(i + 2, entries.Count); j++)
+            {
+                var e = entries[j];
+                var have = p.GetSkill(e.id);
+                string mark = have != null && have.SpecialSummary.Length > 0 ? " ★" : "";
+                if (GUILayout.Button(e.name + mark, spSkillId == e.id ? btnOn : btn, GUILayout.Height(24))) spSkillId = e.id;
+            }
+            GUILayout.EndHorizontal();
+        }
+
+        SkillEntry sel = null;
+        foreach (var e in entries) if (e.id == spSkillId) sel = e;
+        if (sel == null) return;
+        var s = p.GetSkill(sel.id) ?? p.AddOrLevelSkill(sel);
+        if (s == null) { GUILayout.Label($"<color=#AAAAAA>{sel.name}: 획득 실패</color>", label); return; }
+
+        string summary = s.SpecialSummary;
+        GUILayout.Label($"<b>{sel.name}</b>  Lv.{s.level}  <color=#AAAAAA>{(summary.Length > 0 ? summary : "특수 강화 없음")}</color>", label);
+        foreach (int lv in Skill.MilestoneLevels)
+        {
+            var opts = s.SpecialOptions(lv);
+            GUILayout.Label($"Lv.{lv} 특수 강화", label);
+            if (opts.Length == 0) { GUILayout.Label("<color=#888888>미설계 (선택지 없음)</color>", label); continue; }
+            string picked = s.DebugPickId(lv);
+            for (int k = 0; k < opts.Length; k++)
+            {
+                var o = opts[k];
+                string t = o.locked ? $"{o.title}  <size=11>(선택 불가 후보)</size>" : o.title;
+                if (GUILayout.Button(t, picked == o.id ? btnOn : btn, GUILayout.Height(24))) s.DebugApplySpecial(lv, k);
+            }
+            if (picked.Length > 0 && GUILayout.Button("해제", btn, GUILayout.Height(22))) s.DebugClearSpecial(lv);
+        }
     }
 
     static string RunSkill(Player p, SkillEntry entry)

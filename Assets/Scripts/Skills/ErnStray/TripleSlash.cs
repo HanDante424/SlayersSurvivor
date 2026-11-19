@@ -18,15 +18,32 @@ public class TripleSlash : ActiveSkill
     const float DamagePerHit = 8f;
     const int BaseHits = 3;
 
-    const float FxFps = 20f;            // [임시] 10프레임 → 0.5초 (3타 전체를 한 시트로)
-    const float FxWidth = 3f;           // [임시] 한 칸 가로 = 범위 x 이 값
+    const float FxFps = 16f;            // 신규 시트 제작 사양 (8프레임 → 0.5초, 3타 전체를 한 시트로)
+    const float FxWidth = 3.5f;         // [임시] 한 칸 가로 = 범위 x 이 값 (신규 시트 칸 대비 그림이 작아 예전 시트의 최대 크기에 맞춤)
     const float FxForward = 1.2f;       // [임시] 이펙트 중심 = 플레이어 앞 범위 x 이 값
 
-    // 일섬 전용 이펙트 (2행 x 3열, 6프레임). 참격이 약 45° 대각선(왼쪽 아래 → 오른쪽 위)으로 그려져 있어 각도 보정
-    const string IlseomSheet = "ErnStray_SkillTripleSlashIlseom";
-    const float IlseomFps = 18f;        // [임시] 6프레임 → 약 0.33초
-    const float IlseomAngle = 45f;      // 시트 안 참격 각도
-    const float IlseomWidth = 2.2f;     // [임시] 한 칸 가로 = 범위 x 이 값
+    // 일섬 전용 이펙트: 2026-11-20 신규 시트 (1행 x 5열, 칸 448x352, 20fps, 1회 재생).
+    // 참격이 왼쪽 아래 → 오른쪽 위로 휜 호 (가장 큰 프레임의 양끝을 이은 각도 약 39°)라 각도 보정.
+    // 예전 시트 "ErnStray_SkillTripleSlashIlseom" (2행 x 3열, 45°) 는 되돌릴 수 있게 Resources 에 그대로 둠.
+    const string IlseomSheet = "ErnStray_SkillTripleSlashIlseomAnim";
+    const float IlseomFps = 20f;        // 신규 시트 제작 사양 (5프레임 → 0.25초)
+    const float IlseomAngle = 39f;      // [해석] 시트 안 참격 각도 = 가장 큰 프레임 양끝을 이은 직선 (호가 휘어 있어 시작은 더 완만, 끝은 더 가파름)
+    const float IlseomWidth = 2.7f;     // [임시] 한 칸 가로 = 범위 x 이 값 (예전 시트의 최대 참격 길이에 맞춤)
+
+    // 일섬 + 츠바메가에시를 함께 가졌을 때 전용 이펙트 (2026-11-20 사용자 정정: "츠바메가에시 전용"이 아니라 둘의 조합 전용).
+    // 1행 x 5열, 칸 448x352, 20fps, 1회 재생. 일섬보다 더 휜 호.
+    // 발동(총 3회)마다 한 번씩 이 이펙트를 중심 기준 120° 간격으로 돌려 띄움 → 3발동이 끝나면 참격 3개가 보임 (이펙트만, 판정 방향은 그대로).
+    // 일섬만 있으면 일섬 이펙트, 츠바메가에시만 있으면 기본 3타 이펙트.
+    const string TsubameSheet = "ErnStray_SkillTsubameGaeshi";
+    const float TsubameFps = 20f;       // 신규 시트 제작 사양 (5프레임 → 0.25초)
+    const float TsubameAngle = 39f;     // [해석] 시트 안 참격 각도 = 가장 큰 프레임 양끝을 이은 직선
+    const float TsubameWidth = 2.7f;    // [임시] 한 칸 가로 = 범위 x 이 값 (일섬 이펙트와 같은 길이)
+    const float TsubameStep = 120f;     // 참격 사이 회전 각도
+    const int TsubameSlashes = 3;       // 한 번의 공격에 즉시 띄우는 참격 수 (2026-11-20: 발동마다가 아니라 공격 한 번에 3개 즉시)
+    // 적중 임팩트 프레임 (일섬 + 츠바메가에시): 직접 사용이 적에게 맞으면 시간 정지 + 흑백
+    const float ImpactSeconds = 0.25f;  // 시간이 멈추는 길이 (사용자 지정)
+    const float ImpactParticleWidth = 6.6f;   // [임시] 적중 파티클 한 칸 가로 = 범위 x 이 값 (임팩트 프레임이 끝난 뒤 맞은 적 위치에 재생). 처음 2.2 의 3배 (사용자 지정)
+    const float ImpactDelay = 0.1f;    // [임시] 적중 뒤 이만큼 (게임 시간) 기다렸다가 정지 — 참격이 가장 커지는 프레임 (20fps 의 3번째) 이 화면에 남도록
 
     // 특수 강화 id
     public const string Frenzy = "T5A", Spread = "T5B", QuickPrep = "T5C";
@@ -107,6 +124,7 @@ public class TripleSlash : ActiveSkill
     {
         public readonly List<Strike> strikes = new List<Strike>();   // 검흔 위치용 공격 위치
         public float lastHitAmount;   // 잔화의 검흔 참조값 = 마지막 공격 1타의 스킬 최종 피해량 (대상 의존 효과 제외)
+        public bool impacted;         // 임팩트 프레임을 이미 걸었는지 (사용 1번에 한 번)
     }
 
     IEnumerator Run()
@@ -121,20 +139,22 @@ public class TripleSlash : ActiveSkill
                 if (TsubameGap > 0) yield return new WaitForSeconds(TsubameGap);
                 if (CheatDisabled) break;
             }
-            yield return CastOnce(c == 0 ? first : first.AsIndirect, use);   // 츠바메가에시 추가분 = 간접 사용 (같은 사용 번호)
+            yield return CastOnce(c == 0 ? first : first.AsIndirect, use, c);   // 츠바메가에시 추가분 = 간접 사용 (같은 사용 번호)
         }
         if (HasSpecial(Embers) && !CheatDisabled) SpawnEmbers(use);
     }
 
     /// <summary>스킬 1회 발동 = 내부 공격 AttackCount 회 (난개면 공격마다 3방향)</summary>
-    IEnumerator CastOnce(CastRef cast, UseState use)
+    IEnumerator CastOnce(CastRef cast, UseState use, int castIndex)
     {
         int hits = AttackCount;
         // [임시] 난도질로 공격이 늘어도 한 번 사용 시간은 기본(3타)과 비슷하게: 간격 = 기본 간격 × 2 / (횟수 − 1)
         float interval = hits > BaseHits ? T.tripleSlashInterval * (BaseHits - 1) / (hits - 1) : T.tripleSlashInterval;
         bool ilseom = HasSpecial(Ilseom);
         var sheet = ilseom ? null : ErnSkillFx.TripleSlash;
-        var ilseomFrames = ilseom ? SpriteEffect.LoadFrames(IlseomSheet, 2, 3, 1f) : null;
+        var ilseomFrames = ilseom ? SpriteEffect.LoadFrames(IlseomSheet, 1, 5, 1f) : null;
+        // 일섬 + 츠바메가에시 조합: 일섬 이펙트 대신 전용 이펙트 (시트가 없으면 일섬 이펙트로)
+        var tsubameFrames = ilseom && HasSpecial(Tsubame) ? SpriteEffect.LoadFrames(TsubameSheet, 1, 5, 1f) : null;
 
         for (int i = 0; i < hits; i++)
         {
@@ -146,7 +166,13 @@ public class TripleSlash : ActiveSkill
             foreach (var dir in Directions(facing))
             {
                 // 이펙트: 일섬 = 전용 시트, 그 외 = 3타 시트를 3타마다 한 번 (시트 1장 = 3타 연출)
-                if (ilseomFrames != null) SpawnIlseomFx(ilseomFrames, from, dir, r);
+                if (tsubameFrames != null)
+                {
+                    // 일섬 + 츠바메가에시: 첫 발동에서 참격 3개를 즉시 한꺼번에 (이후 발동 · 추가 사용은 이펙트 없음)
+                    if (castIndex == 0 && i == 0)
+                        for (int k = 0; k < TsubameSlashes; k++) SpawnTsubameFx(tsubameFrames, from, dir, r, k);
+                }
+                else if (ilseomFrames != null) SpawnIlseomFx(ilseomFrames, from, dir, r);
                 else if (sheet != null && i % BaseHits == 0)
                     ErnSkillFx.SpawnDirected(sheet, FxFps, from + dir * (r * FxForward), dir, r * FxWidth);
                 else if (sheet == null) Fx.Arc(from, dir, r, i == hits - 1 ? Fx.FireBright : Fx.Fire, 0.15f);
@@ -154,7 +180,15 @@ public class TripleSlash : ActiveSkill
                 var dmg = MakeDamage(DamagePerHit, cast);
                 if (HasSpecial(Searing)) dmg.perTarget = SearingMul;   // 고열 절삭: 맞은 적마다 (대상 단계)
                 use.lastHitAmount = dmg.amount;
-                SkillHits.Directed(Hit, from, dir, RangeScale, dmg);   // 모양은 SkillTuning.tripleSlash
+                Enemy firstHit = null;
+                int hitCount = SkillHits.Directed(Hit, from, dir, RangeScale, dmg, e => { if (firstHit == null) firstHit = e; });   // 모양은 SkillTuning.tripleSlash
+                // 적중 시 (= 직접 사용 + 직접 피해 + 피해 적용): 첫 발동만 직접 사용 → 임팩트 프레임 (사용 1번에 1회)
+                if (hitCount > 0 && tsubameFrames != null && castIndex == 0 && !use.impacted)
+                {
+                    use.impacted = true;
+                    Vector2 hitAt = firstHit != null ? (Vector2)firstHit.transform.position : from + dir * (r * FxForward);
+                    ImpactFrame.Play(ImpactDelay, ImpactSeconds, firstHit != null ? firstHit.transform : null, hitAt, r * ImpactParticleWidth);
+                }
                 use.strikes.Add(new Strike { from = from, dir = dir });
             }
             if (i < hits - 1) yield return new WaitForSeconds(interval);
@@ -172,6 +206,13 @@ public class TripleSlash : ActiveSkill
 
     /// <summary>고열 절삭: 대상 화상 스택 합계 1당 +5% (내부 합연산 → 배율 1개)</summary>
     static float SearingMul(Enemy e) => 1f + SearingPerStack * FlameSword.StacksOn(e);
+
+    /// <summary>일섬 + 츠바메가에시 이펙트: 일섬과 같은 방식으로 방향을 맞춘 뒤, 순서 x 120° 만큼 중심 기준으로 더 돌림</summary>
+    void SpawnTsubameFx(Sprite[] frames, Vector2 from, Vector2 dir, float r, int slashIndex)
+    {
+        float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - TsubameAngle + TsubameStep * slashIndex;
+        SpriteEffect.Spawn(frames, TsubameFps, null, from + dir * (r * FxForward), angle, false, 11, r * TsubameWidth);
+    }
 
     void SpawnIlseomFx(Sprite[] frames, Vector2 from, Vector2 dir, float r)
     {

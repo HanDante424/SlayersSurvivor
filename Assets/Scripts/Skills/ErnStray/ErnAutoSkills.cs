@@ -13,12 +13,19 @@ using UnityEngine;
 /// </summary>
 public static class ErnSkillFx
 {
-    public const string FireSlashSheet = "ErnStray_SkillFireSlash";     // 2행 x 4열, 7프레임 (마지막 칸 비어 있음)
-    public const string TripleSlashSheet = "ErnStray_SkillTripleSlash"; // 2행 x 5열
+    // 파이어 슬래시 이펙트: 2026-11-20 신규 시트로 교체 (1행 x 6열, 칸 384x192, 16fps, 1회 재생).
+    // 예전 시트 "ErnStray_SkillFireSlash" (2행 x 4열, 7프레임) 는 되돌릴 수 있게 Resources 에 그대로 둠.
+    public const string FireSlashSheet = "ErnStray_SkillFireSlashAnim";
+    // 검기 발사 (파이어 슬래시 Lv.10): 2026-11-20 신규 시트 (1행 x 6열, 칸 320x512, 12fps 반복). 예전에는 슬래시 이펙트를 그대로 날렸음
+    public const string FireBladeWaveSheet = "ErnStray_FireBladeWave";
+    // 트리플 슬래시 이펙트: 2026-11-20 신규 시트 (2행 x 4열, 8프레임, 칸 288x288, 16fps, 1회 재생 — 3타 전체를 한 시트로).
+    // 예전 시트 "ErnStray_SkillTripleSlash" (2행 x 5열) 는 되돌릴 수 있게 Resources 에 그대로 둠.
+    public const string TripleSlashSheet = "ErnStray_SkillTripleSlashAnim";
     public const string SolarSlashSheet = "ErnStray_SkillSolarSlash";   // 4행 x 3열
 
-    public static Sprite[] FireSlash => SpriteEffect.LoadFrames(FireSlashSheet, 2, 4, 1f, 7);
-    public static Sprite[] TripleSlash => SpriteEffect.LoadFrames(TripleSlashSheet, 2, 5, 1f);
+    public static Sprite[] FireSlash => SpriteEffect.LoadFrames(FireSlashSheet, 1, 6, 1f);
+    public static Sprite[] FireBladeWave => SpriteEffect.LoadFrames(FireBladeWaveSheet, 1, 6, 1f);
+    public static Sprite[] TripleSlash => SpriteEffect.LoadFrames(TripleSlashSheet, 2, 4, 1f);
     public static Sprite[] SolarSlash => SpriteEffect.LoadFrames(SolarSlashSheet, 4, 3, 1f);
 
     /// <summary>
@@ -52,8 +59,8 @@ public class FireSlash : AutoSkill
     const float BaseCooldown = 2f;
     const float BaseDamage = 10f;
 
-    const float FxFps = 24f;            // [임시] 시트 재생 속도 (7프레임 → 약 0.3초)
-    const float FxWidth = 3f;         // [임시] 이펙트 한 칸 가로 = 범위 x 이 값
+    const float FxFps = 16f;            // 신규 시트 제작 사양 (6프레임 → 약 0.38초)
+    const float FxWidth = 3.5f;         // [임시] 이펙트 한 칸 가로 = 범위 x 이 값 (신규 시트는 가장 큰 프레임이 칸의 84% → 예전 시트의 최대 길이에 맞춤)
     const float FxForward = 1.2f;      // [임시] 이펙트 중심 = 플레이어 앞 범위 x 이 값
 
     // 특수 강화 id
@@ -205,7 +212,7 @@ public class FireSlash : AutoSkill
         if (Blocked) yield break;
         FireWave.Spawn(from, dir, T.fireWaveSpeed, T.fireWaveDistance * RangeScale,
                        Hit.width * RangeScale * T.fireWaveWidth * 0.5f, MakeDamage(BaseDamage, cast),
-                       Enemy.KnockSpeed(Hit.knockback), ErnSkillFx.FireSlash, Radius * FxWidth);
+                       Enemy.KnockSpeed(Hit.knockback), ErnSkillFx.FireBladeWave);
     }
 
     IEnumerator ChainAfter(Vector2 at, Vector2 dir, CastRef cast)
@@ -313,8 +320,12 @@ public class FireWave : MonoBehaviour
     Sprite[] frames;
     SpriteRenderer sr;
 
+    const float WaveFps = 12f;          // 신규 시트 제작 사양 (6프레임 반복)
+    const float WaveHeightMul = 1.1f;   // [임시] 이펙트 세로 길이 = 판정 너비 x 이 값 (그림 세로 높이가 칸의 약 90%)
+    const float WaveCellAspect = 512f / 320f;   // 신규 시트 한 칸 세로 / 가로 (LoadFrames 는 칸 가로를 1유닛으로 자름)
+
     public static void Spawn(Vector2 from, Vector2 dir, float speed, float distance, float halfWidth,
-                             DamageInfo dmg, float knock, Sprite[] frames, float fxWidth)
+                             DamageInfo dmg, float knock, Sprite[] frames)
     {
         var go = new GameObject("FireWave");
         go.transform.position = from;
@@ -327,9 +338,10 @@ public class FireWave : MonoBehaviour
             bool flip = dir.x < 0f;
             if (flip) angle -= 180f;
             go.transform.rotation = Quaternion.Euler(0, 0, angle);
-            go.transform.localScale = Vector3.one * fxWidth * 0.8f;
+            // 세로(반달의 길이)를 판정 너비에 맞춤: 칸 세로 = 가로 x 비율 → scale = 목표 높이 / 비율
+            go.transform.localScale = Vector3.one * (halfWidth * 2f * WaveHeightMul / WaveCellAspect);
             w.sr = go.AddComponent<SpriteRenderer>();
-            w.sr.sprite = frames[Mathf.Min(3, frames.Length - 1)];
+            w.sr.sprite = frames[0];
             w.sr.flipX = flip;
             w.sr.sortingOrder = 11;
         }
@@ -352,11 +364,11 @@ public class FireWave : MonoBehaviour
             e.Hit(dmg, dir, knock);
         }
 
-        // 날아가는 동안 중간 프레임(3~5)을 반복 재생
-        if (sr != null && frames != null && frames.Length > 5)
+        // 날아가는 동안 전체 프레임을 반복 재생
+        if (sr != null && frames != null && frames.Length > 0)
         {
             fxTime += Time.deltaTime;
-            sr.sprite = frames[3 + (int)(fxTime * 18f) % 3];
+            sr.sprite = frames[(int)(fxTime * WaveFps) % frames.Length];
         }
         if (HitboxView.Show && (debugTimer -= Time.deltaTime) <= 0f)
         {

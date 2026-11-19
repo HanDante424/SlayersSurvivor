@@ -157,6 +157,27 @@ public abstract class Skill : MonoBehaviour
 
     protected virtual void OnSpecialUpgrade(int lv, string id) { }
 
+    // ---------- 디버그 맵 전용: 특수 강화를 선택 화면 없이 바로 적용 · 교체 · 해제 ----------
+    /// <summary>이 단계에서 고른 특수 강화 id (없으면 빈 문자열)</summary>
+    public string DebugPickId(int lv) => specialPicks.TryGetValue(lv, out var id) ? (id ?? "") : "";
+
+    /// <summary>
+    /// 특수 강화를 바로 적용 (이미 고른 것이 있으면 교체). 선택 불가 후보 · 조합 경고도 무시 (테스트용).
+    /// 스킬 레벨이 그 단계보다 낮으면 단계 레벨로 올림. 융해 등 OnSpecialUpgrade 에서 등록하는 효과는 교체해도 남을 수 있음.
+    /// </summary>
+    public void DebugApplySpecial(int lv, int option)
+    {
+        if (!IsGeneral) return;
+        var opts = SpecialOptions(lv);
+        if (option < 0 || option >= opts.Length) return;
+        specialPicks[lv] = opts[option].id;
+        if (level < lv) { level = lv; OnLevelChanged(); }
+        OnSpecialUpgrade(lv, opts[option].id);
+    }
+
+    /// <summary>특수 강화 해제 (선택 전 상태로)</summary>
+    public void DebugClearSpecial(int lv) => specialPicks.Remove(lv);
+
     // 특수 강화가 더하는 수치 (스킬별 override). 키워드별 결합 규칙은 Docs/Design/Combat_Decisions_v1.0.md
     /// <summary>특수 강화 '피해량' % 합계 (기본 강화 피해량과 합연산)</summary>
     protected virtual float SpecialDamageBonus => 0f;
