@@ -23,7 +23,7 @@ public enum DamageType
     Special,
 }
 
-/// <summary>발동 구분: 직접 = 플레이어가 최초 발동 (쿨타임 자동 발동 · 키 입력), 간접 = 연쇄로 발동 (죽음의 메아리 · 솔라 메아리 · 츠바메가에시 추가분)</summary>
+/// <summary>발동 구분: 직접 = 플레이어가 최초 발동 (쿨타임 자동 발동 · 키 입력), 간접 = 연쇄로 발동 (죽음의 메아리 · 솔라 메아리 · 트리플 슬래시 삼연발 추가분)</summary>
 public enum CastKind { Direct, Indirect }
 
 /// <summary>피해 1건. amount 는 공격자 단계까지 끝난 값 (내림 전)</summary>

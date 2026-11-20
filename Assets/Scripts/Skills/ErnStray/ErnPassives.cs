@@ -152,7 +152,7 @@ public class FlameSword : Skill
             case 10: return new[]
             {
                 new SpecialUpgradeOption { id = Detonate, title = "일촉즉발", desc = "화상이 최대 스택에 도달하면 모든 스택을 소모하고 남은 화상 피해를 즉시 적용" },
-                new SpecialUpgradeOption { id = Bomb, title = "살아있는 폭탄", desc = "화상 상태의 적이 직접 피해를 받을 때마다 주변에 화상 초당 피해만큼 폭발 (지속 피해)" },
+                new SpecialUpgradeOption { id = Bomb, title = "살아있는 폭탄", keywords = new[] { "간접 사용", "지속 피해", "고정 피해" }, desc = "화상 상태의 적이 직접 피해를 받을 때마다 주변에 화상 초당 피해만큼 폭발 (지속 피해)" },
                 new SpecialUpgradeOption { id = Sticky, title = "끈적한 화염", desc = "화상 상태의 적 이동속도 50% 감소 (다른 감속과 곱연산)" },
             };
             case 15: return new[]

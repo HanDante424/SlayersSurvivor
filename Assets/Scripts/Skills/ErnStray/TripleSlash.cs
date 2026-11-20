@@ -5,8 +5,10 @@ using UnityEngine;
 /// <summary>
 /// M01 트리플 슬래시 (기획 v0.2 + 통합 기획서 v1.0 6장 + 결정 기록 5장): 수동 · 쿨타임 8초 · 3타 · 타당 피해 8 · 바라보는 방향.
 ///
-/// 1회 사용 = 스킬 발동(SkillCastCount, 기본 1 · 츠바메가에시 3) × 내부 공격(AttackCount, 기본 3 · 난도질 9 · 일섬 1).
-///   - 첫 발동 = 직접 발동, 츠바메가에시 추가 2회 = 간접 발동 (각 발동에 모든 강화 적용)
+/// 1회 사용 = 스킬 발동(SkillCastCount, 기본 1 · 삼연발 3) × 내부 공격(AttackCount, 기본 3 · 난도질 9 · 일섬 1).
+///   - 첫 발동 = 직접 발동, 삼연발 추가 2회 = 간접 발동 (각 발동에 모든 강화 적용)
+/// 특수 조합 츠바메가에시 (일섬 + 삼연발, 2026-11-20 노션): 최종 피해량 +500% · 쿨타임 감소 무효화 (1%당 최종 피해량 +10%) · 쿨타임 +200%
+///   + 전용 이펙트 · 임팩트 프레임. 조합을 사용하지 않으면 일섬 + 삼연발 효과만 (일섬 이펙트).
 ///   - 난개: 공격마다 바라보는 방향 + 120° 간격 2방향
 /// 피해 적용(적 1명 1타)마다: 빠른 준비(남은 쿨타임 2.5%↓) · 강제 발화(그 적의 화상 전체 총 피해를 고정 피해로)
 /// 사용이 끝나면: 잔화의 검흔 3개 (최종 피해량 20% 고정 피해, 1초 간격 3초, 지속 피해)
@@ -30,10 +32,9 @@ public class TripleSlash : ActiveSkill
     const float IlseomAngle = 39f;      // [해석] 시트 안 참격 각도 = 가장 큰 프레임 양끝을 이은 직선 (호가 휘어 있어 시작은 더 완만, 끝은 더 가파름)
     const float IlseomWidth = 2.7f;     // [임시] 한 칸 가로 = 범위 x 이 값 (예전 시트의 최대 참격 길이에 맞춤)
 
-    // 일섬 + 츠바메가에시를 함께 가졌을 때 전용 이펙트 (2026-11-20 사용자 정정: "츠바메가에시 전용"이 아니라 둘의 조합 전용).
-    // 1행 x 5열, 칸 448x352, 20fps, 1회 재생. 일섬보다 더 휜 호.
-    // 발동(총 3회)마다 한 번씩 이 이펙트를 중심 기준 120° 간격으로 돌려 띄움 → 3발동이 끝나면 참격 3개가 보임 (이펙트만, 판정 방향은 그대로).
-    // 일섬만 있으면 일섬 이펙트, 츠바메가에시만 있으면 기본 3타 이펙트.
+    // 특수 조합 츠바메가에시 전용 이펙트 (2026-11-20 사용자: 15레벨 "츠바메가에시" → "삼연발" 로 이름 변경, 일섬 + 삼연발 = 특수 조합 츠바메가에시 → 이 연출을 조합에 귀속).
+    // 1행 x 5열, 칸 448x352, 20fps, 1회 재생. 일섬보다 더 휜 호. 공격 한 번에 참격 3개를 중심 기준 120° 간격으로 즉시 띄움 (이펙트만, 판정 방향은 그대로).
+    // 조합을 사용하지 않으면: 일섬 있으면 일섬 이펙트, 삼연발만 있으면 기본 3타 이펙트.
     const string TsubameSheet = "ErnStray_SkillTsubameGaeshi";
     const float TsubameFps = 20f;       // 신규 시트 제작 사양 (5프레임 → 0.25초)
     const float TsubameAngle = 39f;     // [해석] 시트 안 참격 각도 = 가장 큰 프레임 양끝을 이은 직선
@@ -42,8 +43,9 @@ public class TripleSlash : ActiveSkill
     // 시트 가장 큰 프레임 (3번째) 에서 참격 무게중심이 칸 중심에서 떨어진 정도 (칸 가로 단위, 오른쪽 · 위쪽이 +): (283-224)/448, -(229-176)/448
     static readonly Vector2 TsubameCentroid = new Vector2(0.132f, -0.118f);
     const float TsubameGather = 0.9f;   // [임시] 3개를 가운데로 모으는 정도 (0 = 그대로, 1 = 무게중심을 한 점에 겹침). 2026-11-20 "좀더 가운데로"
-    const int TsubameSlashes = 3;       // 한 번의 공격에 즉시 띄우는 참격 수 (2026-11-20: 발동마다가 아니라 공격 한 번에 3개 즉시)
-    // 적중 임팩트 프레임 (일섬 + 츠바메가에시): 직접 사용이 적에게 맞으면 시간 정지 + 흑백
+    const int TsubameSlashes = 3;       // 한 번의 공격에 띄우는 참격 수 (2026-11-20: 발동마다가 아니라 공격 한 번에 3개)
+    const float TsubameSlashInterval = 0.05f;  // 참격 3개 사이 간격 (게임 시간, 2026-11-20 사용자 지정: 0.1 → 0.05)
+    // 적중 임팩트 프레임 (특수 조합 츠바메가에시): 직접 사용이 적에게 맞으면 시간 정지 + 흑백
     const float ImpactSeconds = 0.25f;  // 시간이 멈추는 길이 (사용자 지정)
     const float ImpactParticleWidth = 6.6f;   // [임시] 적중 파티클 한 칸 가로 = 범위 x 이 값 (임팩트 프레임이 끝난 뒤 맞은 적 위치에 재생). 처음 2.2 의 3배 (사용자 지정)
     const float ImpactDelay = 0.1f;    // [임시] 적중 뒤 이만큼 (게임 시간) 기다렸다가 정지 — 참격이 가장 커지는 프레임 (20fps 의 3번째) 이 화면에 남도록
@@ -51,7 +53,9 @@ public class TripleSlash : ActiveSkill
     // 특수 강화 id
     public const string Frenzy = "T5A", Spread = "T5B", QuickPrep = "T5C";
     public const string Overload = "T10A", Ilseom = "T10B", Searing = "T10C";
-    public const string Tsubame = "T15A", Ignite = "T15B", Embers = "T15C";
+    public const string TripleCast = "T15A", Ignite = "T15B", Embers = "T15C";   // T15A = 삼연발 (구 츠바메가에시, id 유지)
+    // 특수 조합 id
+    public const string Tsubame = "TC1";   // 츠바메가에시 = 일섬 + 삼연발
 
     // 특수 강화 확정 수치
     const int FrenzyMul = 3;            // 난도질: 총 공격 횟수 3배 (다른 공격 횟수 배수와는 합연산)
@@ -60,13 +64,17 @@ public class TripleSlash : ActiveSkill
     const float OverloadRange = 0.5f, OverloadDamage = 1f, OverloadCooldown = 0.25f;   // 과부화
     const float IlseomPerHit = 1.25f;   // 일섬: 공격 횟수 1회당 피해량 +125%
     const float SearingPerStack = 0.05f;    // 고열 절삭: 대상 화상 스택당 최종 피해량 +5% (내부 합연산)
-    const int TsubameExtra = 2;         // 츠바메가에시: 발동 횟수 +2
+    const int TripleCastExtra = 2;      // 삼연발: 발동 횟수 +2
+    // 특수 조합 츠바메가에시 (노션 2026-11-20)
+    const float TsubameFinal = 5f;          // 최종 피해량 +500%
+    const float TsubamePerReduction = 10f;  // 무효화된 쿨타임 감소 1%당 최종 피해량 +10% (+500% 와 합쳐 최종 배율 1개 — 묵직한 일격 방식)
+    const float TsubameCooldown = 2f;       // 쿨타임 +200%
     const float EmbersShare = 0.2f;     // 잔화의 검흔: 최종 피해량의 20%
     const float EmbersDuration = 3f, EmbersInterval = 1f;
     const int EmbersCount = 3;
 
     // [임시] 기획서에 없는 값
-    const float TsubameGap = 0.12f;     // 츠바메가에시: 발동 사이 간격(초)
+    const float TripleCastGap = 0.12f;  // 삼연발: 발동 사이 간격(초)
     const float EmbersSpread = 25f;     // 잔화의 검흔: 공격이 1~2방향뿐일 때 검흔을 벌리는 각도
 
     static SkillHitbox Hit => T.tripleSlash;
@@ -77,11 +85,37 @@ public class TripleSlash : ActiveSkill
     /// <summary>실제 내부 공격 횟수 (일섬이면 1)</summary>
     int AttackCount => HasSpecial(Ilseom) ? 1 : AttackCountBeforeIlseom;
     /// <summary>스킬 자체 발동 횟수</summary>
-    int SkillCastCount => 1 + (HasSpecial(Tsubame) ? TsubameExtra : 0);
+    int SkillCastCount => 1 + (HasSpecial(TripleCast) ? TripleCastExtra : 0);
+    bool TsubameOn => HasCombo(Tsubame);
 
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
     protected override float SpecialCooldownMul => HasSpecial(Overload) ? 1f + OverloadCooldown : 1f;
     protected override float SpecialRangeBonus => HasSpecial(Overload) ? OverloadRange : 0f;
+
+    /// <summary>
+    /// 츠바메가에시가 무효화한 쿨타임 감소율 (0.3 = 30%): 기본 강화 · 전역(옥염 · 흡수 가열 등) · 플레이어 쿨타임 감소. 90% 상한 그대로.
+    /// [해석] '쿨타임 감소'만 무효화 — 과부화의 쿨타임 +25% (증가)는 무효화 대상이 아니라 그대로 곱함.
+    /// </summary>
+    public float TsubameConvertedReduction
+    {
+        get
+        {
+            float m = Mathf.Max(1f - T.cooldownReductionCap, BasicCooldownMul * CombatMods.CooldownMul(this) * P.cooldownMul);
+            return Mathf.Round(Mathf.Max(0f, 1f - m) * 10000f) / 10000f;
+        }
+    }
+
+    /// <summary>츠바메가에시: 쿨타임 감소 무효화 → 과부화 배율 × (1 + 200%)</summary>
+    protected override float CooldownMultiplier => TsubameOn ? SpecialCooldownMul * (1f + TsubameCooldown) : GeneralCooldownMultiplier;
+    /// <summary>츠바메가에시: '최종 피해량' +500% 와 전환분 (1%당 +10%) 을 합쳐 최종 배율 1개 (예: 30% → 1 + 5 + 3 = ×9)</summary>
+    protected override float SpecialFinalDamageMul => TsubameOn ? 1f + TsubameFinal + TsubameConvertedReduction * TsubamePerReduction : 1f;
+
+    /// <summary>[해석] 츠바메가에시 = 쿨타임 감소 무효화 → '남은 쿨타임 감소' (빠른 준비 · 불길의 순환)도 받지 않음</summary>
+    public override void ReduceRemainingCooldown(float ratio)
+    {
+        if (TsubameOn) return;
+        base.ReduceRemainingCooldown(ratio);
+    }
     /// <summary>'피해량' %: 과부화 +100% · 일섬 (일섬 전 공격 횟수 × 125%)</summary>
     protected override float SpecialDamageBonus =>
         (HasSpecial(Overload) ? OverloadDamage : 0f)
@@ -109,13 +143,26 @@ public class TripleSlash : ActiveSkill
             };
             case 15: return new[]
             {
-                new SpecialUpgradeOption { id = Tsubame, title = "츠바메가에시", desc = "스킬 발동 횟수 +2 (총 3회, 각 발동에 모든 강화 적용)" },
-                new SpecialUpgradeOption { id = Ignite, title = "강제 발화", desc = "피해 적용 시 대상 화상의 전체 지속시간 총 피해를 고정 피해로 추가 (스택 소모 없음)" + NeedsFlameSword },
-                new SpecialUpgradeOption { id = Embers, title = "잔화의 검흔", desc = "사용이 끝나면 참격 3개가 3초간 남아 매초 최종 피해량의 20% 고정 피해 (지속 피해)" },
+                new SpecialUpgradeOption { id = TripleCast, title = "삼연발", desc = "스킬 발동 횟수 +2 (총 3회, 각 발동에 모든 강화 적용)" },
+                new SpecialUpgradeOption { id = Ignite, title = "강제 발화", keywords = new[] { "간접 사용", "지속 피해", "고정 피해" }, desc = "피해 적용 시 대상 화상의 전체 지속시간 총 피해를 고정 피해로 추가 (스택 소모 없음)" + NeedsFlameSword },
+                new SpecialUpgradeOption { id = Embers, title = "잔화의 검흔", keywords = new[] { "간접 사용", "지속 피해", "고정 피해" }, desc = "사용이 끝나면 참격 3개가 3초간 남아 매초 최종 피해량의 20% 고정 피해 (지속 피해)" },
             };
         }
         return base.SpecialOptions(lv);
     }
+
+    // ---------- 특수 조합 ----------
+    public override SpecialComboOption[] SpecialCombos() => new[]
+    {
+        new SpecialComboOption
+        {
+            id = Tsubame, title = "츠바메가에시", recipe = "일섬 + 삼연발",
+            requires = new[] { Ilseom, TripleCast },
+            keywords = new[] { "수동", "피해 스킬", "근거리", "직접 사용", "직접 피해" },
+            desc = "한순간에 3번의 베기를 사용하는 궁극의 비기",
+            specs = new[] { "'최종 피해량' +500%", "'쿨타임 감소' '무효화'", "'쿨타임 감소' 1% 당 '최종 피해량' +10%", "'쿨타임' +200%" },
+        },
+    };
 
     // ---------- 발동 ----------
     protected override void Activate() => StartCoroutine(Run());
@@ -139,10 +186,10 @@ public class TripleSlash : ActiveSkill
         {
             if (c > 0)
             {
-                if (TsubameGap > 0) yield return new WaitForSeconds(TsubameGap);
+                if (TripleCastGap > 0) yield return new WaitForSeconds(TripleCastGap);
                 if (CheatDisabled) break;
             }
-            yield return CastOnce(c == 0 ? first : first.AsIndirect, use, c);   // 츠바메가에시 추가분 = 간접 사용 (같은 사용 번호)
+            yield return CastOnce(c == 0 ? first : first.AsIndirect, use, c);   // 삼연발 추가분 = 간접 사용 (같은 사용 번호)
         }
         if (HasSpecial(Embers) && !CheatDisabled) SpawnEmbers(use);
     }
@@ -156,8 +203,8 @@ public class TripleSlash : ActiveSkill
         bool ilseom = HasSpecial(Ilseom);
         var sheet = ilseom ? null : ErnSkillFx.TripleSlash;
         var ilseomFrames = ilseom ? SpriteEffect.LoadFrames(IlseomSheet, 1, 5, 1f) : null;
-        // 일섬 + 츠바메가에시 조합: 일섬 이펙트 대신 전용 이펙트 (시트가 없으면 일섬 이펙트로)
-        var tsubameFrames = ilseom && HasSpecial(Tsubame) ? SpriteEffect.LoadFrames(TsubameSheet, 1, 5, 1f) : null;
+        // 특수 조합 츠바메가에시: 일섬 이펙트 대신 전용 이펙트 (시트가 없으면 일섬 이펙트로)
+        var tsubameFrames = TsubameOn ? SpriteEffect.LoadFrames(TsubameSheet, 1, 5, 1f) : null;
 
         for (int i = 0; i < hits; i++)
         {
@@ -171,9 +218,8 @@ public class TripleSlash : ActiveSkill
                 // 이펙트: 일섬 = 전용 시트, 그 외 = 3타 시트를 3타마다 한 번 (시트 1장 = 3타 연출)
                 if (tsubameFrames != null)
                 {
-                    // 일섬 + 츠바메가에시: 첫 발동에서 참격 3개를 즉시 한꺼번에 (이후 발동 · 추가 사용은 이펙트 없음)
-                    if (castIndex == 0 && i == 0)
-                        for (int k = 0; k < TsubameSlashes; k++) SpawnTsubameFx(tsubameFrames, from, dir, r, k);
+                    // 츠바메가에시: 첫 발동에서 참격 3개를 0.1초 간격으로 (이후 발동 · 추가 사용은 이펙트 없음)
+                    if (castIndex == 0 && i == 0) StartCoroutine(SpawnTsubameSequence(tsubameFrames, from, dir, r));
                 }
                 else if (ilseomFrames != null) SpawnIlseomFx(ilseomFrames, from, dir, r);
                 else if (sheet != null && i % BaseHits == 0)
@@ -210,7 +256,20 @@ public class TripleSlash : ActiveSkill
     /// <summary>고열 절삭: 대상 화상 스택 합계 1당 +5% (내부 합연산 → 배율 1개)</summary>
     static float SearingMul(Enemy e) => 1f + SearingPerStack * FlameSword.StacksOn(e);
 
-    /// <summary>일섬 + 츠바메가에시 이펙트: 일섬과 같은 방식으로 방향을 맞춘 뒤, 순서 x 120° 만큼 중심 기준으로 더 돌림</summary>
+    /// <summary>
+    /// 츠바메가에시 참격 3개를 TsubameSlashInterval 간격으로 띄움 (이펙트만, 피해 판정은 그대로).
+    /// [해석] 위치 · 방향은 첫 참격 때 잡은 값 고정 (그사이 플레이어가 움직여도 같은 자리에 모임)
+    /// </summary>
+    IEnumerator SpawnTsubameSequence(Sprite[] frames, Vector2 from, Vector2 dir, float r)
+    {
+        for (int k = 0; k < TsubameSlashes; k++)
+        {
+            if (k > 0) yield return new WaitForSeconds(TsubameSlashInterval);
+            SpawnTsubameFx(frames, from, dir, r, k);
+        }
+    }
+
+    /// <summary>츠바메가에시 (특수 조합) 이펙트: 일섬과 같은 방식으로 방향을 맞춘 뒤, 순서 x 120° 만큼 중심 기준으로 더 돌림</summary>
     void SpawnTsubameFx(Sprite[] frames, Vector2 from, Vector2 dir, float r, int slashIndex)
     {
         float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg - TsubameAngle + TsubameStep * slashIndex;

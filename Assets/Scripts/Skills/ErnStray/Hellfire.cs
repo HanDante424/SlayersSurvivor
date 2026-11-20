@@ -129,7 +129,7 @@ public class Hellfire : Skill
             };
             case 15: return new[]
             {
-                new SpecialUpgradeOption { id = Incinerate, title = "소각", desc = "지속 피해가 적용될 때마다 대상 최대 체력의 1% (보스 0.4%) 고정 피해 (특수 피해)" },
+                new SpecialUpgradeOption { id = Incinerate, title = "소각", keywords = new[] { "지속 시간", "고정 피해" }, desc = "지속 피해가 적용될 때마다 대상 최대 체력의 1% (보스 0.4%) 고정 피해 (특수 피해)" },
                 new SpecialUpgradeOption { id = Overburn, title = "극한 연소", desc = "최종 피해량 +75%" },
                 new SpecialUpgradeOption { id = Resonance, title = "화염 공명", desc = "'직접 사용'한 스킬이 적중 시 궁극기 게이지 +1% (사용 1번당 1회)" },
             };

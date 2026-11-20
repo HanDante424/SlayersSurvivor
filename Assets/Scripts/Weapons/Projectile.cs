@@ -7,6 +7,8 @@ public class Projectile : MonoBehaviour
     float speed, life, radius;
     DamageInfo damage;
     int pierce;
+    /// <summary>적중할 때마다 (맞은 적, 투사체 위치). 피해 적용 직후 · 투사체가 사라지기 전에 호출 (파이어 볼 폭발 등)</summary>
+    public System.Action<Enemy, Vector2> onHit;
     readonly HashSet<Enemy> hitSet = new HashSet<Enemy>();
     static readonly List<Enemy> targets = new List<Enemy>();   // 투사체끼리 공유 (Update 는 겹쳐 돌지 않음)
 
@@ -39,6 +41,7 @@ public class Projectile : MonoBehaviour
             {
                 hitSet.Add(e);
                 e.Hit(damage, dir);
+                onHit?.Invoke(e, pos);
                 if (--pierce <= 0) { Destroy(gameObject); return; }
             }
         }

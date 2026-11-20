@@ -126,6 +126,14 @@ public class FireExecution : ActiveSkill
     const int Hits = 30;
     const float BaseDamage = 5f, BaseCooldown = 30f;
 
+    // 연속 베기 고리 이펙트 (FireSlash_OmniCombo_v2 원본): 6열 × 5행 · 칸 640px · 30프레임 · 반복 재생
+    const string SlashLoopSheet = "ErnStray_FireSlashOmniCombo";
+    const int SlashLoopRows = 5, SlashLoopCols = 6;
+    const float SlashLoopFps = 25f;       // 초안 프레임 40ms (한 바퀴 1.2초)
+    const float SlashLoopCellPx = 640f;
+    const float SlashLoopRadiusPx = 290f; // 그림 범위 반지름 (프레임별 알파 범위 34~623px 에서 잰 값)
+    const int SlashLoopOrder = 11;
+
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
 
     protected override void Activate() => StartCoroutine(Run());
@@ -135,16 +143,22 @@ public class FireExecution : ActiveSkill
         P.Root(Duration);
         // [해석] 키워드 '고정' '피해' 의 의미 미확정 → 일반 직접 피해로 처리
         DamageInfo per = MakeDamage(BaseDamage, DirectCast);
+        // [임시] 그림 반지름 = 판정 반경 (범위 중간). 발동 동안 플레이어를 따라감
+        var frames = SpriteEffect.LoadFrames(SlashLoopSheet, SlashLoopRows, SlashLoopCols, 1f);
+        float r0 = Range(Tier.Mid);
+        var loop = SpriteLoopEffect.Spawn(frames, SlashLoopFps, P.transform, Vector2.zero, SlashLoopOrder,
+                                          r0 * SlashLoopCellPx / SlashLoopRadiusPx);
         for (int i = 0; i < Hits; i++)
         {
             Vector2 at = P.transform.position;
             float r = Range(Tier.Mid);
             P.PlayAttack();
-            Fx.Circle(at, r, i == Hits - 1 ? Fx.FireBright : Fx.Fire, 0.25f);
+            if (loop == null) Fx.Circle(at, r, i == Hits - 1 ? Fx.FireBright : Fx.Fire, 0.25f);   // 그림이 없을 때만 예전 원
             SkillHits.Circle(at, r, per, i == Hits - 1 ? 6f : 1f);
             if (i == Hits - 1) CameraFollow.Shake(0.15f, 0.15f);
             yield return new WaitForSeconds(Duration / Hits);
         }
+        if (loop != null) loop.Stop();
     }
 }
 
