@@ -331,7 +331,7 @@ public class GameManager : MonoBehaviour
                     apply = () => ShowSpecialWarning(s, lv, idx, o),
                 });
             else   // 제목 → 키워드 → 설명 → 세부 스펙
-                list.Add(new Upgrade { title = o.title, desc = o.Text.Body(), apply = () => s.ApplySpecial(lv, idx) });
+                list.Add(new Upgrade { title = o.title, desc = o.Text.Body() + ComboHint(s, o.id), apply = () => FinishSpecial(s, lv, idx) });
         }
         if (list.Count == 0)
             list.Add(new Upgrade
@@ -349,10 +349,47 @@ public class GameManager : MonoBehaviour
     {
         var list = new List<Upgrade>
         {
-            new Upgrade { title = $"그래도 {o.title} 선택", desc = o.Text.Body(), apply = () => s.ApplySpecial(lv, idx) },
+            new Upgrade { title = $"그래도 {o.title} 선택", desc = o.Text.Body(), apply = () => FinishSpecial(s, lv, idx) },
             new Upgrade { title = "취소", desc = "다른 특수 강화를 고릅니다", apply = () => ShowSpecialUpgrade(s) },
         };
         ShowMenu("경고", $"<color=#FF9A50>{o.warning}</color>", list);
+    }
+
+    /// <summary>특수 강화 확정 → 그 강화로 특수 조합 조건을 채웠으면 후속 선택 (사용 / 사용하지 않음)</summary>
+    void FinishSpecial(Skill s, int lv, int idx)
+    {
+        s.ApplySpecial(lv, idx);
+        var c = s.PendingCombo;
+        if (c != null) ShowComboChoice(s, c);
+    }
+
+    /// <summary>특수 조합 후속 선택 (2026-11-20 사용자: 일섬을 가진 상태에서 삼연발을 얻으면 츠바메가에시 사용 여부 선택)</summary>
+    void ShowComboChoice(Skill s, SpecialComboOption c)
+    {
+        var list = new List<Upgrade>
+        {
+            new Upgrade { title = $"{c.title} 사용", desc = c.Text.Body(), apply = () => s.DecideCombo(c.id, true) },
+            new Upgrade
+            {
+                title = "사용하지 않음",
+                desc = $"<color=#AAAAAA>{c.recipe} 효과만 유지합니다\n(다시 선택할 수 없음)</color>",
+                apply = () => s.DecideCombo(c.id, false),
+            },
+        };
+        ShowMenu($"{s.Entry.name} 특수 조합", $"<color=#F2BF4C>{c.recipe}</color> 조합 조건 달성", list);
+    }
+
+    /// <summary>특수 강화 선택지 아래 안내: 이 강화를 고르면 특수 조합 조건이 채워지는 경우</summary>
+    static string ComboHint(Skill s, string pickId)
+    {
+        foreach (var c in s.SpecialCombos())
+        {
+            if (c.requires == null || System.Array.IndexOf(c.requires, pickId) < 0) continue;
+            bool rest = true;
+            foreach (var r in c.requires) if (r != pickId && !s.HasSpecial(r)) { rest = false; break; }
+            if (rest) return $"\n<color=#F2BF4C>선택 시 특수 조합 \"{c.title}\" 선택이 이어집니다</color>";
+        }
+        return "";
     }
 
     static string Pct(float v) => $"{Mathf.Round(v * 1000f) / 10f:0.#}%";   // 소수 첫째 자리까지 (2.5%)

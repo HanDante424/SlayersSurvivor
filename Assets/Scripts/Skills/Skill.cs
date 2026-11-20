@@ -23,6 +23,22 @@ public class SpecialUpgradeOption
     public SkillText Text => new SkillText(keywords, desc, specs);
 }
 
+/// <summary>
+/// 특수 조합 1개 (2026-11-20 사용자): 정해진 특수 강화를 모두 얻으면 후속 선택지로 "사용 / 사용하지 않음"을 고름.
+/// 사용을 고르면 HasCombo(id) = true. 고르지 않으면 다시 묻지 않음 ([해석] 1회 선택).
+/// </summary>
+public class SpecialComboOption
+{
+    public string id;
+    public string title, desc;
+    /// <summary>조합에 필요한 특수 강화 id (모두 보유해야 함)</summary>
+    public string[] requires;
+    /// <summary>조합법 표기용 이름 (예: "일섬 + 삼연발")</summary>
+    public string recipe;
+    public string[] keywords, specs;
+    public SkillText Text => new SkillText(keywords, desc, specs);
+}
+
 /// <summary>패시브 고유 기본 강화 선택지 1개</summary>
 public class PassiveUpgradeOption
 {
@@ -151,11 +167,56 @@ public abstract class Skill : MonoBehaviour
                 if (!specialPicks.TryGetValue(lv, out var id) || string.IsNullOrEmpty(id)) continue;
                 foreach (var o in SpecialOptions(lv)) if (o.id == id) { names.Add(o.title); break; }
             }
+            foreach (var c in SpecialCombos()) if (HasCombo(c.id)) names.Add($"[조합] {c.title}");
             return string.Join(" · ", names);
         }
     }
 
     protected virtual void OnSpecialUpgrade(int lv, string id) { }
+
+    // ---------- 특수 조합 (특수 강화 여러 개를 모두 얻으면 후속 선택) ----------
+    static readonly SpecialComboOption[] NoCombos = new SpecialComboOption[0];
+    readonly System.Collections.Generic.HashSet<string> comboOn = new System.Collections.Generic.HashSet<string>();
+    readonly System.Collections.Generic.HashSet<string> comboDecided = new System.Collections.Generic.HashSet<string>();
+
+    /// <summary>이 스킬의 특수 조합 목록 (스킬별 override)</summary>
+    public virtual SpecialComboOption[] SpecialCombos() => NoCombos;
+
+    /// <summary>특수 조합을 사용 중인지 (필요한 특수 강화를 지금도 모두 가지고 있어야 함 — 디버그 해제 대비)</summary>
+    public bool HasCombo(string id)
+    {
+        if (string.IsNullOrEmpty(id) || !comboOn.Contains(id)) return false;
+        foreach (var c in SpecialCombos()) if (c.id == id) return RequirementsMet(c);
+        return false;
+    }
+
+    bool RequirementsMet(SpecialComboOption c)
+    {
+        if (c.requires == null || c.requires.Length == 0) return false;
+        foreach (var r in c.requires) if (!HasSpecial(r)) return false;
+        return true;
+    }
+
+    /// <summary>조건을 막 채워 아직 사용 여부를 고르지 않은 특수 조합 (없으면 null)</summary>
+    public SpecialComboOption PendingCombo
+    {
+        get
+        {
+            foreach (var c in SpecialCombos())
+                if (!comboDecided.Contains(c.id) && RequirementsMet(c)) return c;
+            return null;
+        }
+    }
+
+    /// <summary>특수 조합 사용 여부 확정 (사용 = true)</summary>
+    public void DecideCombo(string id, bool use)
+    {
+        comboDecided.Add(id);
+        if (use) comboOn.Add(id); else comboOn.Remove(id);
+        OnComboChanged(id, use);
+    }
+
+    protected virtual void OnComboChanged(string id, bool on) { }
 
     // ---------- 디버그 맵 전용: 특수 강화를 선택 화면 없이 바로 적용 · 교체 · 해제 ----------
     /// <summary>이 단계에서 고른 특수 강화 id (없으면 빈 문자열)</summary>
@@ -177,6 +238,10 @@ public abstract class Skill : MonoBehaviour
 
     /// <summary>특수 강화 해제 (선택 전 상태로)</summary>
     public void DebugClearSpecial(int lv) => specialPicks.Remove(lv);
+
+    /// <summary>디버그 맵: 특수 조합 켜기 · 끄기 (조건 특수 강화가 없으면 켜도 효과 없음 — HasCombo 가 조건을 다시 확인)</summary>
+    public void DebugSetCombo(string id, bool on) => DecideCombo(id, on);
+    public bool DebugComboOn(string id) => comboOn.Contains(id);
 
     // 특수 강화가 더하는 수치 (스킬별 override). 키워드별 결합 규칙은 Docs/Design/Combat_Decisions_v1.0.md
     /// <summary>특수 강화 '피해량' % 합계 (기본 강화 피해량과 합연산)</summary>
@@ -218,7 +283,7 @@ public abstract class Skill : MonoBehaviour
         public CastRef(CastKind kind, int id) { this.kind = kind; this.id = id; }
         /// <summary>어떤 사용에도 속하지 않는 간접 사용 (죽음의 메아리 · 솔라 메아리 재발동처럼 새 조건으로 생긴 공격)</summary>
         public static CastRef Indirect => new CastRef(CastKind.Indirect, 0);
-        /// <summary>같은 사용에서 나온 추가 공격 (난사 나머지 방향 · 검기 · 연속 공격 · 삼연발 · 츠바메가에시 …): 간접 사용이지만 사용 번호는 유지</summary>
+        /// <summary>같은 사용에서 나온 추가 공격 (난사 나머지 방향 · 검기 · 연속 공격 · 삼연발 (파이어 슬래시 · 트리플 슬래시) …): 간접 사용이지만 사용 번호는 유지</summary>
         public CastRef AsIndirect => new CastRef(CastKind.Indirect, id);
     }
 

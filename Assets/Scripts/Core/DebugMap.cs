@@ -457,6 +457,14 @@ public class DebugMapController : MonoBehaviour
             }
             if (picked.Length > 0 && GUILayout.Button("해제", btn, GUILayout.Height(22))) s.DebugClearSpecial(lv);
         }
+        // 특수 조합: 켜기 · 끄기 (조건 특수 강화를 모두 가져야 효과가 남 — 없으면 회색 안내)
+        foreach (var c in s.SpecialCombos())
+        {
+            bool on = s.DebugComboOn(c.id), active = s.HasCombo(c.id);
+            GUILayout.Label($"특수 조합  <color=#AAAAAA>({c.recipe})</color>", label);
+            string t = on && !active ? $"{c.title}  <size=11>(조건 강화 없음 → 효과 없음)</size>" : c.title;
+            if (GUILayout.Button(t, on ? btnOn : btn, GUILayout.Height(24))) s.DebugSetCombo(c.id, !on);
+        }
     }
 
     static string RunSkill(Player p, SkillEntry entry)

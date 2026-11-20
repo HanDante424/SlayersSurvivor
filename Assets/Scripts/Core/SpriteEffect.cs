@@ -72,3 +72,40 @@ public class SpriteEffect : MonoBehaviour
         sr.sprite = frames[i];
     }
 }
+
+/// <summary>
+/// 멈출 때까지 반복 재생하는 스프라이트 시트 이펙트 (선택: 계속 회전). 끝낼 때는 Stop().
+/// 예: 솔라 슬래시 중간 고리 (반복 + 시계 반대 회전)
+/// </summary>
+public class SpriteLoopEffect : MonoBehaviour
+{
+    Sprite[] frames;
+    float fps, spin, t;
+    SpriteRenderer sr;
+
+    /// <param name="spinDegPerSec">회전 속도 (도/초, + = 시계 반대 방향)</param>
+    public static SpriteLoopEffect Spawn(Sprite[] frames, float fps, Transform parent, Vector2 localPos,
+                                         int sortingOrder, float scale, float spinDegPerSec = 0f)
+    {
+        if (frames == null || frames.Length == 0) return null;
+        var go = new GameObject("FXLoop_" + frames[0].name);
+        go.transform.SetParent(parent, false);
+        go.transform.localPosition = localPos;
+        go.transform.localScale = Vector3.one * scale;
+        var fx = go.AddComponent<SpriteLoopEffect>();
+        fx.frames = frames; fx.fps = fps; fx.spin = spinDegPerSec;
+        fx.sr = go.AddComponent<SpriteRenderer>();
+        fx.sr.sprite = frames[0];
+        fx.sr.sortingOrder = sortingOrder;
+        return fx;
+    }
+
+    public void Stop() { if (this != null) Destroy(gameObject); }
+
+    void Update()
+    {
+        t += Time.deltaTime;
+        sr.sprite = frames[(int)(t * fps) % frames.Length];
+        if (spin != 0f) transform.Rotate(0f, 0f, spin * Time.deltaTime);
+    }
+}
