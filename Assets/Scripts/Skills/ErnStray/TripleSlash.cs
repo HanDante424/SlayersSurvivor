@@ -11,7 +11,7 @@ using UnityEngine;
 ///   + 전용 이펙트 · 임팩트 프레임. 조합을 사용하지 않으면 일섬 + 삼연발 효과만 (일섬 이펙트).
 ///   - 난개: 공격마다 바라보는 방향 + 120° 간격 2방향
 /// 피해 적용(적 1명 1타)마다: 빠른 준비(남은 쿨타임 2.5%↓) · 강제 발화(그 적의 화상 전체 총 피해를 고정 피해로)
-/// 사용이 끝나면: 잔화의 검흔 3개 (최종 피해량 20% 고정 피해, 1초 간격 3초, 지속 피해)
+/// 사용이 끝나면: 잔화의 검흔 3개 (최종 피해량 40% 고정 피해, 1초 간격 3초, 지속 피해)
 /// </summary>
 public class TripleSlash : ActiveSkill
 {
@@ -64,12 +64,13 @@ public class TripleSlash : ActiveSkill
     const float OverloadRange = 0.5f, OverloadDamage = 1f, OverloadCooldown = 0.25f;   // 과부화
     const float IlseomPerHit = 1.25f;   // 일섬: 공격 횟수 1회당 피해량 +125%
     const float SearingPerStack = 0.05f;    // 고열 절삭: 대상 화상 스택당 최종 피해량 +5% (내부 합연산)
+    const float SearingCap = 0.75f;         // 고열 절삭: 효과 상한 75% (노션)
     const int TripleCastExtra = 2;      // 삼연발: 발동 횟수 +2
     // 특수 조합 츠바메가에시 (노션 2026-11-20)
     const float TsubameFinal = 5f;          // 최종 피해량 +500%
     const float TsubamePerReduction = 10f;  // 무효화된 쿨타임 감소 1%당 최종 피해량 +10% (+500% 와 합쳐 최종 배율 1개 — 묵직한 일격 방식)
     const float TsubameCooldown = 2f;       // 쿨타임 +200%
-    const float EmbersShare = 0.2f;     // 잔화의 검흔: 최종 피해량의 20%
+    const float EmbersShare = 0.4f;     // 잔화의 검흔: 최종 피해량의 40% (노션)
     const float EmbersDuration = 3f, EmbersInterval = 1f;
     const int EmbersCount = 3;
 
@@ -139,13 +140,13 @@ public class TripleSlash : ActiveSkill
             {
                 new SpecialUpgradeOption { id = Overload, title = "과부화", desc = "범위 +50% · 피해량 +100% · 쿨타임 +25%" },
                 new SpecialUpgradeOption { id = Ilseom, title = "일섬", desc = "공격을 1회로 합침 · 원래 공격 횟수 1회당 피해량 +125%" },
-                new SpecialUpgradeOption { id = Searing, title = "고열 절삭", desc = "대상의 화상 스택 1당 최종 피해량 +5%" + NeedsFlameSword },
+                new SpecialUpgradeOption { id = Searing, title = "고열 절삭", desc = "대상의 화상 스택 1당 최종 피해량 +5% (상한 75%)" + NeedsFlameSword },
             };
             case 15: return new[]
             {
                 new SpecialUpgradeOption { id = TripleCast, title = "삼연발", desc = "스킬 발동 횟수 +2 (총 3회, 각 발동에 모든 강화 적용)" },
                 new SpecialUpgradeOption { id = Ignite, title = "강제 발화", keywords = new[] { "간접 사용", "지속 피해", "고정 피해" }, desc = "피해 적용 시 대상 화상의 전체 지속시간 총 피해를 고정 피해로 추가 (스택 소모 없음)" + NeedsFlameSword },
-                new SpecialUpgradeOption { id = Embers, title = "잔화의 검흔", keywords = new[] { "간접 사용", "지속 피해", "고정 피해" }, desc = "사용이 끝나면 참격 3개가 3초간 남아 매초 최종 피해량의 20% 고정 피해 (지속 피해)" },
+                new SpecialUpgradeOption { id = Embers, title = "잔화의 검흔", keywords = new[] { "간접 사용", "지속 피해", "고정 피해" }, desc = "사용이 끝나면 참격 3개가 3초간 남아 매초 최종 피해량의 40% 고정 피해 (지속 피해)" },
             };
         }
         return base.SpecialOptions(lv);
@@ -253,8 +254,8 @@ public class TripleSlash : ActiveSkill
         yield return Rotate(facing, -SpreadAngle);
     }
 
-    /// <summary>고열 절삭: 대상 화상 스택 합계 1당 +5% (내부 합연산 → 배율 1개)</summary>
-    static float SearingMul(Enemy e) => 1f + SearingPerStack * FlameSword.StacksOn(e);
+    /// <summary>고열 절삭: 대상 화상 스택 합계 1당 +5%, 상한 +75% (내부 합연산 → 배율 1개)</summary>
+    static float SearingMul(Enemy e) => 1f + Mathf.Min(SearingCap, SearingPerStack * FlameSword.StacksOn(e));
 
     /// <summary>
     /// 츠바메가에시 참격 3개를 TsubameSlashInterval 간격으로 띄움 (이펙트만, 피해 판정은 그대로).

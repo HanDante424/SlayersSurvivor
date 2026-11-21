@@ -95,7 +95,7 @@ public class FireSlash : AutoSkill
             case 10: return new[]
             {
                 new SpecialUpgradeOption { id = Wave, title = "검기 발사", keywords = new[] { "원거리", "간접 사용", "직접 피해", "고정 피해", "투사체", "추가 사용" }, desc = "같은 피해의 검기가 추가로 날아가 피해를 입힙니다." },
-                new SpecialUpgradeOption { id = Chain, title = "연속 공격 생성", desc = "공격 방향 이외에 2개의 공격이 추가 발생합니다." },
+                new SpecialUpgradeOption { id = Chain, title = "연속 공격", desc = "공격 방향 이외에 2개의 공격이 추가 발생합니다." },
                 new SpecialUpgradeOption { id = Quick, title = "빠른 공격", desc = "사용 후 남은 쿨타임이 절반 감소합니다." },
             };
             case 15: return new[]
