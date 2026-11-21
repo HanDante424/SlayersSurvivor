@@ -198,9 +198,13 @@ public class SpriteSheetAnimator : MonoBehaviour
         return dir.y < 0 ? Facing4.Down : Facing4.Up;
     }
 
+    /// <summary>true = 궁극기 중 WorldSlow 로 전체가 느려져도 이 애니메이터는 정상 속도 (플레이어용)</summary>
+    public bool ignoreWorldSlow;
+
     void Update()
     {
         if (sr == null) return;
+        float dt = ignoreWorldSlow ? WorldSlow.PlayerDelta : Time.deltaTime;
 
         // 0) 고정 자세 (돌진 등)
         if (heldPose != null)
@@ -212,7 +216,7 @@ public class SpriteSheetAnimator : MonoBehaviour
         // 1) 한 번 재생 중인 동작
         if (oneShot != null)
         {
-            oneShotTime += Time.deltaTime;
+            oneShotTime += dt;
             int f = (int)(oneShotTime * oneShot.fps);
             if (f < oneShot.cols || oneShot.loop)
             {
@@ -238,7 +242,7 @@ public class SpriteSheetAnimator : MonoBehaviour
         // 클립이 바뀌면 첫 프레임부터
         if (clip != current || frozen) { current = clip; time = 0f; }
         int frame = frozen ? 0 : (int)(time * clip.fps) % clip.cols;
-        if (!frozen) time += Time.deltaTime;
+        if (!frozen) time += dt;
 
         sr.sprite = FrameOf(clip, frame);
     }

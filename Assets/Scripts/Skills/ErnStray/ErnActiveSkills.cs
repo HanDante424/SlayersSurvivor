@@ -477,7 +477,22 @@ public class FireStream : Skill
 /// </summary>
 public class BlazingStorm : Skill
 {
-    const float Duration = 1.5f;        // [임시] 연출 시간 (기획 미정)
+    // 연출 길이 (기획 미정, 모두 [임시]). 기 모으기 → ① 토네이도 생성 → 밑단 확장 → 낙하 → ② 지면 폭발 (피해 · 기절은 폭발 순간)
+    // ① 토네이도 시간 = Tornado1Life, ② 지면 폭발 토네이도 시간 = BigLife. Duration = 기 모으기 뒤 전체 (무적 길이)
+    const float ConnectTail = 0.35f;            // [임시] 지면에 닿은 뒤 첫 토네이도가 남아 서서히 사라지는 시간 (후속 토네이도가 자라는 동안 겹침 → 자연스러운 연결). 0.8 로 늘렸다가 사용자 요청으로 0.35 로 되돌림
+    const float Tornado1Life = FallStart + FallTime + ConnectTail;   // 낙하가 끝난 뒤 ConnectTail 동안 겹치고 사라짐
+    const float BigLife = 1.6f;                 // 3.2 → 1.6 (사용자: 후속 토네이도 지속시간 절반). 생성 · 떠오름 · 사라짐도 같은 비율로 줄임
+    // 연출 포즈 (2026-11-21 사용자): 준비 동작 (포즈당 0.25초) → 기 모으기 (UltCharge) → 토네이도 생성 (OverheadRaise) → 낙하 (VerticalSlash) → 지면에 닿은 뒤 마무리 동작 (포즈당 0.25초) → 궁극기 종료
+    const float PoseStep = 0.15f;               // 포즈 하나가 보이는 시간 (사용자 2026-11-21: 각 스프라이트 0.25 → 0.15초)
+    const float OutroStep = 0.1f;               // 마무리 동작 앞 3장의 포즈당 시간 (사용자 2026-11-21: 0.15 → 0.1초). 준비 동작은 PoseStep 그대로
+    const float RearReachHold = 1.0f;           // 마무리 마지막 포즈 (RearReach) 만 1초 (사용자 2026-11-21)
+    const float PoseIntro = PoseStep * 3f;      // 준비 동작: Atk_SlashReady → Atk_HorizontalSlashReady → UltCharge (3장 = 0.45초)
+    const float PoseOutro = OutroStep * 3f + RearReachHold;   // 마무리 동작: Atk_OneHandSlash → Atk_HorizontalSlashReady → Atk_HorizontalSlash (각 0.1초) → RearReach (1초)
+    // 궁극기 (플레이어 멈춤 · 무적 · 슬로우) 가 이어지는 시간: 준비 + 기 모으기 + 첫 토네이도가 닿을 때까지 + 마무리. 후속 토네이도 연출은 그 뒤로 계속됨
+    // + 후속 토네이도가 끝나면 바로 마무리 동작 PoseOutro (Atk_VerticalSlash 는 토네이도가 끝나는 순간까지만)
+    const float FocusZoom = 0.6f;               // [임시] 플레이어 확대 시야 배율 (1 = 기본, 작을수록 확대). 준비 동작 ~ 기 모으기, 토네이도가 끝난 뒤 마무리에서 사용
+    const float FinishZoomLead = 1.0f;          // 후속 토네이도가 끝나기 이만큼 전부터 플레이어 확대 (사용자 2026-11-21: 끝난 뒤 0.5초 → 끝나기 1초 전)
+    const float CastTotal = PoseIntro + ChargeTime + FallStart + FallTime + BigLife + PoseOutro;
     const int Hits = 1;                 // 초기 피해량 500 을 한 번에
     const float BaseDamage = 500f;
     const float StunSeconds = 2f;       // [임시] 기절 시간 (기획 미정, 보스 규칙 미정 → 동일 적용)
@@ -485,15 +500,102 @@ public class BlazingStorm : Skill
     readonly List<Enemy> targets = new List<Enemy>();
     bool running;
 
-    // 불꽃 토네이도 (RibbonTornadoFx): 곧은 리본 그림을 원뿔 나선으로 휘어 돌림. 크기 값은 모두 [임시] (카메라 세로 반 = 7)
-    // [임시] 리본 재료 = 오버 드라이브 화염검 시트 (칼끝 = 머리). 전용 리본 그림이 오면 이 부분만 교체
+    // ---------- 불꽃 토네이도 (RibbonTornadoFx) ----------
+    // 곧은 불꽃 줄기 그림 여러 종류를 섞어 원뿔 나선으로 휘어 돌림 (2026-11-21 재구성, 사용자가 모은 재료 4묶음 사용).
+    // 재료 원본 = Art/Incoming/ErnStray/BlazingStorm/ (01 조각 · 02 굵기 팩 · 03 · 04 낱장), 게임용 사본 = Resources/Sprites/ErnStray_Storm*.png (원본 그대로 복사).
+    // 크기 · 굵기 · 가중치 값은 모두 [임시] (카메라 세로 반 = 7). 재료가 하나도 없으면 예전 시험판 (화염검 시트) 으로 대체.
+    // 2026-11-21 사용자: "매우 빽빽해서 정말 거대한 화염 폭풍" → 리본 수 · 두께 · 크기 · 겹 수를 크게 늘림 (모두 [임시], 한 줄씩 조정)
+    // 후속 (지면 폭발) 거대 토네이도 생성 시간 (2026-11-21 사용자: 늘려라). 가운데에서 바깥으로 퍼지는 시간 + 밑단부터 차오르는 시간
+    const float BigFromRadius = 0.3f;           // [임시] 후속 토네이도가 자라기 시작할 때 반지름 비율 (0.04 → 0.3: 막 닿은 첫 토네이도 밑단 (반지름 9) 과 비슷한 크기에서 시작해 바깥으로 퍼지며 이어짐)
+    const float BigGrowTime = 0.65f;            // [임시] 반지름이 작게 → 원래 크기로 퍼지는 시간 (0.45 → 1.3 → 0.65, 지속시간 절반에 맞춤)
+    const float BigBuildUpTime = 0.35f;         // [임시] 맨 아래 리본 시작 → 맨 위 리본 시작
+    const float BigBuildUpGrow = 0.25f;         // [임시] 리본 하나가 나타나는 시간
+    const float BigRiseDistance = 36f;          // [임시] 떠오르는 거리 (월드). 16 → 36: 더 빠르게 상승 (사용자)
+    const float BigRiseEase = 1.15f;            // [임시] 떠오르는 가속 지수 (1.6 → 1.15: 처음부터 빠르게, 1 = 일정 속도)
+    // 후속 토네이도를 화면 쪽으로 눕힘 (2026-11-21 사용자: 화면 평면에서 옆으로 기울이는 게 아니라 화면 쪽으로 각도를 돌림). 축이 보는 사람 쪽으로 기울면
+    // ① 보는 각도가 올라가 고리가 더 둥글게 열려 보이고 (squash = sin 각도) ② 세로 길이가 짧아 보임 (cos 비율). 첫 토네이도는 10도 그대로
+    const float BigViewAngle = 35f;             // [임시] 후속 토네이도를 보는 각도 (도). 10 → 35. 90 에 가까울수록 위에서 내려다본 원
+    static readonly float BigVerticalScale = Mathf.Cos(35f * Mathf.Deg2Rad) / Mathf.Cos(10f * Mathf.Deg2Rad);   // 세로 단축 (BigViewAngle 와 같은 각도로)
+    const float BigSpreadScale = 1.9f;          // [임시] 떠오르는 동안 반지름이 이 배율까지 더 퍼짐
+    const float BigFadeTime = 0.55f;            // [임시] 끝에서 이 시간 동안 서서히 사라짐 (오르는 동안 같이)
+    const int BigRibbons = 280;                 // [임시] 지면 폭발 토네이도 리본 수 (더 크고 빽빽하게)
+    const int TornadoRibbons = 180;             // [임시] 리본 수 (처음 28 → 34 → 150 → 180, 토네이도가 커져서 밀도 유지)
+    const float LoopFps = 16f;                  // [임시] 반복 시트 재생 속도 (제작 초안 70ms ≈ 14fps 보다 약간 빠르게)
+    // 보는 각도 (2026-11-21 사용자: 더 2D 느낌으로, 완전 평면은 안 되고 10도 가량 남김). 위에서 본 원을 옆에서 볼 때 세로로 납작해지는 비 = sin(각도).
+    // 0도 = 완전 평면 (정면에서 본 선), 90도 = 위에서 본 원. 처음 값은 약 17.5도 (squash 0.3)
+    const float TornadoViewAngle = 10f;
+    // 시전 연출 (2026-11-21 사용자): 카메라를 축소하고 토네이도를 플레이어 위로 5 올림
+    // 연출 순서 (2026-11-21 사용자): ① 기 모으기 (화염 소용돌이가 플레이어를 타고 올라가며 사라짐) → ② 급격하게 본 토네이도 생성 + 피해
+    const float ChargeTime = 1.5f;              // 기 모으기 길이 (사용자 지정 1.5초, 천천히). 이 동안 무적, 피해는 ② 시작 때
+    const float ChargeRise = 1.5f;              // [임시] 소용돌이 줄기 하나가 발밑에서 머리 위까지 오르는 시간 (0.55 → 1.0 → 1.5: 상승 속도 3.8/1.5 ≈ 2.5 월드/초). 줄기가 끊기지 않고 계속 피어오르도록 시작 시각을 전체에 고르게 나눔 (끝 무렵 시작한 줄기는 오르던 중에 토네이도로 넘어감)
+    const int ChargeRibbons = 44;               // [임시] 느려진 만큼 줄여 한꺼번에 많이 보이지 않게
+    // 기 모으는 동안 조금씩 피어오르는 불꽃 파티클 (FireParticlePop 재사용, 위로 천천히 떠오르며 사라짐). 뒤로 갈수록 많이 나옴
+    const int EmberCount = 40;                  // [임시]
+    const float EmberFps = 14f;                 // [임시] 12프레임 → 약 0.86초 (원래 33fps 0.36초를 늘림)
+    const float EmberRiseSpeed = 1.3f;          // [임시] 떠오르는 속도 (월드/초)
+    const float EmberRadius = 1.5f;             // [임시] 플레이어 둘레 퍼짐
+    const float EmberSizeMin = 0.45f, EmberSizeMax = 0.95f;   // [임시] 크기 배율 (1 = 폭발 파티클 기본 0.6 월드)
+    const float ChargeHeight = 3.8f;            // [임시] 오르는 높이 (발밑 -0.9 ~ 머리 위 약 2.9)
+    // 기 모으기 → 토네이도 자연스러운 연결 (2026-11-21 사용자 요청)
+    // 밑단부터 자연스럽게 생성 (2026-11-21 사용자: 시간은 상관없음): 아래 리본이 먼저, 위로 갈수록 늦게 시작해 각자 작게 → 크게 나타남 → 아래에서 위로 차오르는 모양
+    const float BuildUpTime = 0.5f;             // [임시] 맨 아래 리본이 시작한 뒤 맨 위 리본이 시작하기까지 (토네이도가 다 만들어지는 데 걸리는 시간). 1.0 → 0.5 (사용자: 생성 시간 절반)
+    const float BuildUpGrow = 0.175f;           // [임시] 리본 하나가 작게 → 원래 크기로 커지는 시간 (0.35 → 0.175, 절반)
+    const float BurstFromRadius = 0.2f;         // [임시] 리본이 나타나기 시작할 때 반지름 비율 (0.08 → 0.2)
+    // 밑단 확장 → 낙하 → 지면 폭발 (2026-11-21 사용자): 토네이도 밑단이 넓어지고, 지면으로 떨어지고, 닿으면 더 큰 토네이도가 지면에서 바깥으로 퍼지며 터지듯 생성
+    const float ExpandStart = 0.65f;            // [임시] ① 시작 뒤 밑단이 넓어지기 시작하는 시각 (생성이 거의 끝난 뒤)
+    const float ExpandTime = 0.5f;              // [임시] 밑단이 넓어지는 시간
+    const float ExpandedBottomRadius = 9f;      // [임시] 넓어진 밑단 반지름 (처음 2.2)
+    const float FallGap = 1.0f;                 // 토네이도가 다 만들어진 뒤 (BuildUpTime) 낙하가 시작하기까지의 간격 (사용자 2026-11-21: 0.5 → 0.75 → 1.0초)
+    const float FallStart = BuildUpTime + FallGap;   // ① 시작 뒤 낙하가 시작하는 시각 = 1.5초 (밑단 확장이 끝나기 전에 겹쳐 시작)
+    const float FallTime = 0.18f;               // [임시] 낙하 시간 (점점 빨라짐). 0.35 → 0.18: 더 빠르게 내려옴 (사용자)
+    const float GroundAnchor = 0.7f;            // [해석] 낙하가 끝났을 때 토네이도 기준점 높이 (플레이어 기준). 밑단 -1.6 + 0.7 = -0.9 = 발밑 근처 지면
+    const float LiftTime = 0.35f;               // [임시] 토네이도가 플레이어 몸에서 TornadoLift 위치로 솟아오르는 시간 (0.35 → 0.7 → 0.35: 생성 시간과 같이 절반)
+    const float ChargeTail = 0.35f;             // [임시] 기 모으던 줄기가 토네이도가 터진 뒤에도 이만큼 더 올라가다 사라짐 (끊기지 않게 토네이도 속으로 겹침)
+    const float ZoomLead = 0.35f;               // [임시] 토네이도가 터지기 이만큼 전에 카메라 축소를 시작 (축소가 미리 진행되어 터질 때 시야가 갑자기 바뀌지 않게)
+    const float CastZoomOut = 2f;               // [임시] 시전 중 시야 배율 (세로 반 7 → 14). 끝나면 원래대로
+    const float TornadoLift = 3f;               // 토네이도 기준점을 플레이어 위로 올린 거리 (월드). 5 → 2.5 → 3 (사용자). 위쪽 끝은 플레이어 위 약 21.4 = 시전 시야 (위쪽 14) 를 크게 넘어감
+    const float StripThick = 3.2f;              // [임시] 불꽃이 칸 두께의 24~41% 만 차지해서 리본 두께를 키움 (2.2 → 3.2)
+
+    // 반복 시트 (01 · 02): 4열 x 3행 12프레임, 칸 384 x 288, 오른쪽이 머리 (머리 끝 x 336~340), 꼬리 x 19~24 부터
+    const float LoopCellW = 384f, LoopCellH = 288f;
+    const float LoopAlongX0 = 18f, LoopAlongX1 = 342f;
+    // 낱장 (03 · 04): 960 x 192 한 장, 오른쪽이 머리
+    const float StillH = 192f;
+
+    // [임시] 예전 시험판 재료 = 오버 드라이브 화염검 시트 (칼끝 = 머리). 새 재료가 없을 때만
     const string TornadoRibbonSheet = "ErnStray_OverFlameBlade";
     const int TornadoRibbonRows = 4, TornadoRibbonCols = 4;
     const float TornadoCellW = 256f, TornadoCellH = 768f;
     const float TornadoRibbonX = 88f, TornadoRibbonW = 74f;    // 칼 알파 범위 x 88~162
     const float TornadoRibbonTop = 54f, TornadoRibbonH = 674f; // 칼 알파 범위 y 54~728 (위 기준)
 
-    static RibbonTornadoFx.Settings TornadoSettings(float life)
+    static RibbonTornadoFx.Source LoopSource(string sheet, float weight)
+    {
+        var tex = Resources.Load<Texture2D>("Sprites/" + sheet);
+        if (tex == null) return null;
+        const int cols = 4, rows = 3;
+        var frames = new Rect[cols * rows];
+        for (int k = 0; k < frames.Length; k++)
+        {
+            int col = k % cols, row = k / cols;
+            float yBottom = tex.height - (row + 1) * LoopCellH;   // 텍스처 좌표는 아래 기준
+            frames[k] = new Rect((col * LoopCellW + LoopAlongX0) / tex.width, yBottom / tex.height,
+                                 (LoopAlongX1 - LoopAlongX0) / tex.width, LoopCellH / tex.height);
+        }
+        return new RibbonTornadoFx.Source { texture = tex, frames = frames, lengthAlongY = false, fps = LoopFps, weight = weight, thickMul = StripThick };
+    }
+
+    /// <summary>낱장 줄기: 불꽃이 있는 가로 구간 x0~x1 만 잘라 꼬리 → 머리로 씀</summary>
+    static RibbonTornadoFx.Source StillSource(string sheet, float x0, float x1, float weight)
+    {
+        var tex = Resources.Load<Texture2D>("Sprites/" + sheet);
+        if (tex == null) return null;
+        var frames = new[] { new Rect(x0 / tex.width, 0f, (x1 - x0) / tex.width, 1f) };
+        // 칸 세로가 288 이 아니라 192 라서 같은 굵기로 보이게 두께를 맞춤
+        return new RibbonTornadoFx.Source { texture = tex, frames = frames, lengthAlongY = false, weight = weight, thickMul = StripThick * StillH / LoopCellH };
+    }
+
+    static RibbonTornadoFx.Source SwordSource()
     {
         var tex = Resources.Load<Texture2D>("Sprites/" + TornadoRibbonSheet);
         if (tex == null) return null;
@@ -506,13 +608,93 @@ public class BlazingStorm : Skill
             float yBottom = tex.height - (row * TornadoCellH + TornadoRibbonTop + TornadoRibbonH);   // 텍스처 좌표는 아래 기준
             frames[k] = new Rect(x / tex.width, yBottom / tex.height, TornadoRibbonW / tex.width, TornadoRibbonH / tex.height);
         }
+        return new RibbonTornadoFx.Source { texture = tex, frames = frames, lengthAlongY = true, fps = 20f };
+    }
+
+    /// <summary>토네이도와 기 모으기가 함께 쓰는 줄기 재료 목록 (없으면 null)</summary>
+    static List<RibbonTornadoFx.Source> StormSources()
+    {
+        var list = new List<RibbonTornadoFx.Source>();
+        void Add(RibbonTornadoFx.Source x) { if (x != null) list.Add(x); }
+        // 움직이는 줄기 (일렁임): 굵기 3단계가 주력, 갈고리 · 불씨는 포인트
+        Add(LoopSource("ErnStray_StormStreamNarrow", 3f));
+        Add(LoopSource("ErnStray_StormStreamMedium", 3f));
+        Add(LoopSource("ErnStray_StormStreamWide", 2f));
+        Add(LoopSource("ErnStray_StormHook", 1f));
+        Add(LoopSource("ErnStray_StormEmbers", 1f));
+        // 낱장 줄기: 불꽃이 있는 가로 구간 (원본 알파 범위 ±2px)
+        Add(StillSource("ErnStray_StormStillThin", 39f, 926f, 1f));
+        Add(StillSource("ErnStray_StormStillMedium", 40f, 928f, 1f));
+        Add(StillSource("ErnStray_StormStillWide", 35f, 927f, 1f));
+        Add(StillSource("ErnStray_StormStillCrest", 31f, 929f, 2f));
+        Add(StillSource("ErnStray_StormStillRising", 32f, 698f, 1f));
+        Add(StillSource("ErnStray_StormStillCurl", 32f, 304f, 1f));
+        Add(StillSource("ErnStray_StormStillDip", 31f, 499f, 1f));
+        if (list.Count == 0) Add(SwordSource());   // 새 재료가 하나도 없으면 예전 시험판
+        return list.Count == 0 ? null : list;
+    }
+
+    /// <summary>② 본 토네이도: 밑단부터 차례로 생성 (BuildUpTime · BuildUpGrow · BurstFromRadius)</summary>
+    static RibbonTornadoFx.Settings TornadoSettings(float life)
+    {
+        var list = StormSources();
+        if (list == null) return null;
         return new RibbonTornadoFx.Settings
         {
-            texture = tex, frames = frames, lengthAlongY = true, fps = 20f,
-            ribbons = 28, baseY = -1.5f, height = 7.5f, bottomRadius = 0.4f, topRadius = 4.2f, squash = 0.28f,
-            arcMin = 60f, arcMax = 130f, thickBottom = 0.2f, thickTop = 0.7f, endThickness = 0.35f, riseJitter = 0.4f,
-            spin = 420f, spinJitter = 0.3f, segments = 20,
-            growTime = 0.3f, fadeTime = 0.35f, life = life,
+            sources = list,
+            ribbons = TornadoRibbons, baseY = -1.6f, height = 20f, bottomRadius = 2.2f, topRadius = 12f, squash = Mathf.Sin(TornadoViewAngle * Mathf.Deg2Rad),
+            radiusJitter = 0.22f,   // 같은 높이에서도 안팎으로 겹겹이
+            arcMin = 90f, arcMax = 210f, thickBottom = 0.45f, thickTop = 1.6f, endThickness = 0.4f, riseJitter = 0.8f,
+            spin = 440f, spinJitter = 0.45f, segments = 16,
+            growTime = 0f, buildUpTime = BuildUpTime, buildUpGrow = BuildUpGrow, growFromRadius = BurstFromRadius, life = life,
+            fadeFromTop = true, fadeTime = FallTime + ConnectTail,   // 내려오기 시작할 때부터 위쪽 리본부터 차례로 사라져 아래가 마지막에 사라짐 (사용자 2026-11-21)
+            bottomRadiusEnd = ExpandedBottomRadius, expandStart = ExpandStart, expandTime = ExpandTime,
+            spawnOffset = new Vector2(0f, -TornadoLift), offsetTime = LiftTime,   // 플레이어 몸에서 솟아오름
+        };
+    }
+
+    /// <summary>
+    /// ③ 지면 폭발 토네이도: 지면에 닿은 자리에서 첫 토네이도보다 훨씬 크게, 가운데에서 바깥으로 퍼지며 터지듯 생성 (전체가 작은 반지름 → 원래 반지름으로 빠르게 커짐).
+    /// 밑단이 지면에 붙어 있고 위쪽 반지름이 더 큼. 크기 · 두께 · 높이 모두 [임시]
+    /// </summary>
+    static RibbonTornadoFx.Settings BigTornadoSettings(float life)
+    {
+        var list = StormSources();
+        if (list == null) return null;
+        return new RibbonTornadoFx.Settings
+        {
+            sources = list,
+            // 하나의 거대한 토네이도: 밑단 반지름 14 (지면을 따라 24 까지 더 번짐) → 위쪽 반지름 110, 높이 32 (보는 각도 35도로 세로 약 25 로 보임) 로 극단적으로 넓게 퍼지는 깔때기 (벌어진 각도 약 75°, 72 일 때 약 66°, 처음 토네이도는 약 21°)
+            ribbons = BigRibbons, baseY = -0.9f, height = 32f, bottomRadius = 14f, topRadius = 110f, squash = Mathf.Sin(BigViewAngle * Mathf.Deg2Rad),
+            radiusJitter = 0.25f,
+            arcMin = 90f, arcMax = 210f, thickBottom = 1.1f, thickTop = 6.5f, endThickness = 0.4f, riseJitter = 1.0f,
+            spin = 380f, spinJitter = 0.45f, segments = 16,
+            // 생성 시간을 길게 (사용자 2026-11-21): 가운데에서 바깥으로 퍼지는 것 (growTime) 과 밑단부터 차오르는 것 (buildUp) 을 함께 천천히
+            growTime = BigGrowTime, growFromRadius = BigFromRadius, buildUpTime = BigBuildUpTime, buildUpGrow = BigBuildUpGrow, life = life,
+            // 생성이 끝난 뒤 (BigGrowTime) 위로 떠오르며 더 퍼지고 서서히 사라짐 (사용자 2026-11-21)
+            driftStart = BigGrowTime, driftDistance = BigRiseDistance, driftEase = BigRiseEase, spreadEndScale = BigSpreadScale, fadeTime = BigFadeTime,
+            verticalScale = BigVerticalScale,   // 화면 쪽으로 눕혀 세로가 짧아 보임
+            bottomRadiusEnd = 24f, expandStart = 0.15f, expandTime = 0.5f,   // 밑단이 지면을 따라 더 넓게 번짐 (12 → 18)
+        };
+    }
+
+    /// <summary>
+    /// ① 기 모으기: 플레이어 발밑에서 작은 화염 소용돌이 줄기들이 시간차로 하나씩 플레이어를 감싸고 머리 위까지 타고 올라가며 사라짐.
+    /// 위로 갈수록 반지름이 줄어 (기를 모으듯 몸으로 빨려 드는 느낌). 보는 각도는 본 토네이도와 같음.
+    /// </summary>
+    static RibbonTornadoFx.Settings ChargeSettings(float life)
+    {
+        var list = StormSources();
+        if (list == null) return null;
+        return new RibbonTornadoFx.Settings
+        {
+            sources = list, climb = true, riseTime = ChargeRise,
+            climbSpread = 0.8f * ChargeTime / life,   // 줄기 시작 시각 분포는 기 모으는 시간 (ChargeTime) 안에서 그대로. life 는 ChargeTail 만큼 더 길다
+            ribbons = ChargeRibbons, baseY = -0.9f, height = ChargeHeight, bottomRadius = 1.7f, topRadius = 0.7f, squash = Mathf.Sin(TornadoViewAngle * Mathf.Deg2Rad),
+            radiusJitter = 0.25f,
+            arcMin = 140f, arcMax = 260f, thickBottom = 0.1f, thickTop = 0.06f, endThickness = 0.4f, riseJitter = 0.2f,
+            spin = 520f, spinJitter = 0.3f, segments = 14,
+            growTime = 0f, fadeTime = 0f, life = life,
         };
     }
 
@@ -529,25 +711,215 @@ public class BlazingStorm : Skill
         return true;
     }
 
+    // 마무리 동작의 반시계 불꽃 줄기 (OrbitFlameFx). 그림 = ErnStray_StormStillCurl (03/04 묶음 낱장 줄기, 머리 = 오른쪽, 불꽃 구간 x 32~304). 모두 [임시]
+    const float OrbitLength = 2.2f;             // 줄기 하나의 길이 (월드)
+    const float OrbitEmitTime = 0.15f;           // 파티클 생성 총 시간 (사용자 2026-11-21: 0.3 → 0.21 → 0.15초). 마무리 시작부터 Atk_HorizontalSlash 끝 (0.3초) 안에 모두 생성
+    const float OrbitSparkStart = 0.10f;        // 불티가 시작되는 시점 = 생성 총 시간 (0.15초) 의 마지막 0.05초. 줄기 파티클은 그대로 0.15초 내내 나오고 불티를 추가로 흩뿌림 (사용자 2026-11-21)
+    const string OrbitSlashSheet = "ErnStray_SkillTsubameGaeshi";   // 휘두를 때 이펙트 (기존 줄기 대신, 5프레임 1x5)
+    const float OrbitSlashFps = 20f / 0.7f;      // 5프레임 = 0.175초 (사용자 2026-11-21: 지속시간 30% 단축, 원래 20fps = 0.25초)
+    static readonly Vector2 OrbitSlashOffset = new Vector2(-0.75f, 0.6f);   // 플레이어 기준 위치 (사용자 2026-11-21: x -0.2 → -0.5 → -1 → -0.75, y 0.6 은 이전 계산값 유지)
+    const float OrbitSlashRotation = -170f;     // 회전 z (도, 사용자 2026-11-21 확정)
+    const float OrbitSlashWidth = 2.6f;         // [임시] 참격 한 칸 가로 (월드)
+    const int OrbitSparkCount = 48;             // [임시] 마지막 0.05초에 흩뿌리는 불티 수 (16 → 3배 = 48)
+    const float OrbitSparkScaleMin = 0.08f, OrbitSparkScaleMax = 0.18f;   // [임시] 불티 크기 배율 (아주 작게)
+    const float OrbitSparkSpeed = 3.5f;         // [임시] 불티가 바깥으로 튀는 속도 (월드/초)
+    const float OrbitSparkFps = 40f;            // [임시] 불티 재생 속도 (12프레임 = 0.3초)
+    const float OrbitDegPerParticle = 6f;       // 각도 몇 도당 파티클 1개 (사용자 2026-11-21: 4 → 6도당 1개 = 55개)
+    const float OrbitRate = OrbitSweepDegrees / OrbitDegPerParticle / OrbitEmitTime;   // 초당 발사 수: 발사 시간 (0.15초) 안에 55개 = 약 367개/초 
+    const float OrbitLife = 0.05f;              // 초반 줄기 수명 (사용자 2026-11-21: 초반 0.05 · 중반 0.1 · 후반 0.15초)
+    const float OrbitLifeMid = 0.1f, OrbitLifeLate = 0.15f;   // 중반 (발사 시간의 1/3~2/3) · 후반 (2/3~)
+    const float OrbitScaleMin = 0.35f, OrbitScaleMax = 0.65f;   // 작은 파티클 크기 배율 (줄기 길이 2.2 x 이 값)
+    const float OrbitOmegaMin = 0f, OrbitOmegaMax = 0f;     // 파티클 하나가 제자리에서 도는 속도 (도/초, 반시계). 작게 해서 금방 사라지기 전에 조금만 번짐
+    const float OrbitJitter = 10f;              // 발사 각도 흔들림 (±도)
+    const float OrbitSweepStart = 240f;         // 시작 = 7시 (3시 = 0도, 12시 = 90도, 반시계가 +)
+    const float OrbitSweepDegrees = 330f;       // 반시계로 330도 훑어 끝 = 570 = 210도 = 8시
+    const float OrbitRadiusMin = 1.6f, OrbitRadiusMax = 3.4f;   // 플레이어 중심에서의 시작 거리 (사용자 2026-11-21: 폭 1.4 → 0.7, 외곽 2.6 → 1.9 부터 절반)
+    const float OrbitSpreadRandom = 0.6f;      // 퍼지는 거리 무작위 폭 (0.4~1.6 배)
+    const float OrbitSpread = 2.0f;             // [임시] 수명 동안 바깥쪽으로 퍼지는 거리 (월드). 줄기가 바깥 방향을 향하며 퍼져 나감
+    const float OrbitSquash = 0.5f;             // 타원 세로 / 가로
+    static Sprite orbitSprite;
+
+    static Sprite OrbitSprite()
+    {
+        if (orbitSprite != null) return orbitSprite;
+        var tex = Resources.Load<Texture2D>("Sprites/ErnStray_StormStillCurl");
+        if (tex == null) return null;
+        const float x0 = 32f, x1 = 304f;
+        orbitSprite = Sprite.Create(tex, new Rect(x0, 0f, x1 - x0, tex.height), new Vector2(0.5f, 0.5f), (x1 - x0) / OrbitLength, 0, SpriteMeshType.FullRect);
+        return orbitSprite;
+    }
+
+    /// <summary>포즈를 이름 순서대로 각자의 시간 (실제 시간, 슬로우와 무관) 동안 보임</summary>
+    IEnumerator PoseSequence(string[] names, float[] seconds)
+    {
+        for (int i = 0; i < names.Length; i++)
+        {
+            P.ShowPose(names[i]);
+            yield return new WaitForSecondsRealtime(seconds[i]);
+        }
+    }
+
     IEnumerator Run()
     {
         running = true;
-        P.SetInvulnerable(Duration + 0.1f);
+        WorldSlow.Begin();   // 궁극기 중 플레이어 · 연출만 정상 속도, 나머지 전부 96% 감소 (집중용)
+        P.Root(CastTotal + 0.2f);   // 궁극기 사용 중 플레이어 멈춤 (이동 불가, 사용 중 다른 스킬도 불가 — 사용자 2026-11-21). 끝나면 EndRoot 로 바로 풀음
+        P.SetInvulnerable(CastTotal + 0.1f);
         DamageInfo per = MakeDamage(BaseDamage);
-        Fx.ScreenFlash(new Color(1f, 0.45f, 0.1f, 0.45f), Duration);
-        RibbonTornadoFx.Spawn(TornadoSettings(Duration), P.transform, Vector2.zero);   // 플레이어를 따라감 (재료가 없으면 생략)
+
+        CameraFollow.SetZoomOut(FocusZoom);   // 준비 동작 ~ 기 모으기: 플레이어 확대 (토네이도가 생기기 직전에 서서히 축소로 전환)
+
+        // ① 준비 동작 (포즈당 0.25초): Atk_SlashReady → Atk_HorizontalSlashReady → UltCharge
+        yield return PoseSequence(new[] { "Atk_SlashReady", "Atk_HorizontalSlashReady", "UltCharge" }, new[] { PoseStep, PoseStep, PoseStep });
+
+        // ② 기 모으기 (UltCharge 유지): 화염 소용돌이가 플레이어를 타고 올라가며 사라짐 (재료가 없으면 생략)
+        RibbonTornadoFx.Spawn(ChargeSettings(ChargeTime + ChargeTail), P.transform, Vector2.zero);   // 줄기가 토네이도 속으로 이어지게 ChargeTail 더 길게
+        CameraFollow.Shake(ChargeTime, 0.04f);   // [임시] 아주 약한 떨림
+        StartCoroutine(RisingEmbers());
+        yield return new WaitForSecondsRealtime(Mathf.Max(0f, ChargeTime - ZoomLead));
+        CameraFollow.SetZoomOut(CastZoomOut);    // 터지기 직전부터 카메라가 서서히 물러남
+        yield return new WaitForSecondsRealtime(Mathf.Min(ZoomLead, ChargeTime));
+
+        // ③ 토네이도 생성 (밑단부터, OverheadRaise) → 밑단 확장 (Settings 의 expand*)
+        P.ShowPose("OverheadRaise");
+        Fx.ScreenFlash(new Color(1f, 0.45f, 0.1f, 0.35f), 0.6f);
+        CameraFollow.Shake(0.25f, 0.3f);   // [임시]
+        var fx1 = RibbonTornadoFx.Spawn(TornadoSettings(Tornado1Life), P.transform, new Vector2(0f, TornadoLift));   // 플레이어를 따라감, 위로 TornadoLift (재료가 없으면 생략)
+        yield return new WaitForSecondsRealtime(FallStart);
+
+        // ④ 낙하 (Atk_VerticalSlash): 점점 빨라지며 TornadoLift → GroundAnchor
+        P.ShowPose("Atk_VerticalSlash");
+        for (float tt = 0f; tt < FallTime; )
+        {
+            tt += WorldSlow.EffectDelta;
+            float k = Mathf.Clamp01(tt / FallTime);
+            if (fx1 != null) fx1.transform.localPosition = new Vector3(0f, Mathf.Lerp(TornadoLift, GroundAnchor, k * k), 0f);
+            yield return null;
+        }
+
+        // ⑤ 지면에 닿음 → 더 큰 토네이도가 지면에서 바깥으로 퍼지며 터지듯 생성 + 피해 · 기절
+        Fx.ScreenFlash(new Color(1f, 0.45f, 0.1f, 0.5f), 0.9f);
+        CameraFollow.Shake(0.4f, 0.6f);   // [임시] 지면에 닿는 순간 가장 강하게
+        RibbonTornadoFx.Spawn(BigTornadoSettings(BigLife), P.transform, Vector2.zero);
         for (int i = 0; i < Hits; i++)
         {
-            CameraFollow.Shake(0.2f, 0.25f);
             foreach (var e in SkillHits.OnScreen(targets))
             {
                 Fx.Disc(e.transform.position, 0.4f, Fx.Fire, 0.25f);   // 카메라 시야 7 복귀에 맞춰 0.6 × 2/3
                 e.Hit(per, (Vector2)(e.transform.position - P.transform.position), 0.5f);
             }
-            // 마지막 피해 직후 모든 적 기절 (연출 시간이 끝날 때까지 기다리지 않음)
             if (i == Hits - 1) foreach (var e in SkillHits.OnScreen(targets)) e.Stun(StunSeconds);
-            yield return new WaitForSeconds(Duration / Hits);
         }
+
+        // ⑥ 후속 토네이도가 끝나기 FinishZoomLead (1초) 전까지 Atk_VerticalSlash 유지 (낙하 때 바뀐 포즈 그대로) → 그때부터 플레이어 확대 → 토네이도가 끝날 때까지
+        yield return new WaitForSecondsRealtime(Mathf.Max(0f, BigLife - FinishZoomLead));
+        CameraFollow.SetZoomOut(FocusZoom);
+        yield return new WaitForSecondsRealtime(Mathf.Min(FinishZoomLead, BigLife));
+
+        // ⑦ 마무리 동작: Atk_OneHandSlash → Atk_HorizontalSlashReady → Atk_HorizontalSlash (각 0.1초) → RearReach (1초) (후속 토네이도가 끝나면 바로. Atk_VerticalSlash 는 토네이도 종료 후 더 유지하지 않음 — 사용자 2026-11-21)
+        // 휘두르는 불꽃 줄기 파티클 대신, 마지막 0.05초에 츠바메가에시 참격 그림 + 작은 불티를 흩뿌림 (OrbitSparks, 사용자 2026-11-21)
+        StartCoroutine(OrbitSparks());
+        yield return PoseSequence(new[] { "Atk_OneHandSlash", "Atk_HorizontalSlashReady", "Atk_HorizontalSlash", "RearReach" },
+                                  new[] { OutroStep, OutroStep, OutroStep, RearReachHold });
+
+        // 궁극기 종료: 포즈 · 멈춤 · 슬로우 해제, 시야 복귀
         running = false;
+        P.ReleasePose();
+        P.EndRoot();
+        WorldSlow.End();
+        CameraFollow.SetZoomOut(1f);
+    }
+
+    /// <summary>생성 총 시간의 마지막 구간 (OrbitSparkStart ~ OrbitEmitTime) 에, 훑는 경로의 남은 각도 쪽으로 (줄기와 별개로 추가) 아주 작은 불티 (폭발 파티클 그림) 를 흩뿌림</summary>
+    IEnumerator OrbitSparks()
+    {
+        var frames = SpriteEffect.LoadFrames("ErnStray_FireParticlePop", 3, 4, 256f * 0.6f / 175f);
+        if (frames == null) yield break;
+        yield return new WaitForSecondsRealtime(OrbitSparkStart);
+        float span = OrbitEmitTime - OrbitSparkStart;
+        float a0 = OrbitSweepStart + OrbitSweepDegrees * (OrbitSparkStart / OrbitEmitTime);   // 불티 시작 시점의 각도부터
+        float a1 = OrbitSweepStart + OrbitSweepDegrees;                                      // 훑기 끝 각도 (8시)
+
+        // 마지막 구간에만 츠바메가에시 참격 하나: 참격의 끝점이 8시 (훑기 끝 각도) 에 오도록, 반시계 접선 방향으로 놓음
+        var slash = SpriteEffect.LoadFrames(OrbitSlashSheet, 1, 5, 1f);
+        if (slash != null)
+        {
+            // 사용자가 Play 에서 직접 맞춘 값 (2026-11-21): 플레이어 기준 x -0.2, 회전 z -170. y 는 직전 계산값 (0.6) 유지
+            var sfx = SpriteEffect.Spawn(slash, OrbitSlashFps, null, (Vector2)P.transform.position + OrbitSlashOffset, OrbitSlashRotation, false, 11, OrbitSlashWidth);
+            if (sfx != null) sfx.ignoreWorldSlow = true;
+        }
+
+        for (int i = 0; i < OrbitSparkCount; i++)
+        {
+            if (!running) yield break;
+            float a = Random.Range(a0, a1) * Mathf.Deg2Rad;
+            float r = Random.Range(OrbitRadiusMin, OrbitRadiusMax);
+            Vector2 dir = new Vector2(Mathf.Cos(a), Mathf.Sin(a) * OrbitSquash);
+            Vector2 pos = (Vector2)P.transform.position + dir * r;
+            var fx = SpriteEffect.Spawn(frames, OrbitSparkFps, null, pos, Random.Range(0f, 360f), Random.value < 0.5f, 12,
+                                        Random.Range(OrbitSparkScaleMin, OrbitSparkScaleMax));
+            if (fx != null)
+            {
+                fx.ignoreWorldSlow = true;
+                var d = fx.gameObject.AddComponent<DriftUp>();
+                d.velocity = dir.normalized * OrbitSparkSpeed * Random.Range(0.6f, 1.4f);
+                d.life = frames.Length / OrbitSparkFps;
+            }
+            yield return new WaitForSecondsRealtime(span / OrbitSparkCount);
+        }
+    }
+
+    /// <summary>기 모으는 동안 플레이어 둘레에서 불꽃 파티클이 조금씩 피어올라 위로 떠오르며 사라짐 (뒤로 갈수록 자주)</summary>
+    IEnumerator RisingEmbers()
+    {
+        var frames = SpriteEffect.LoadFrames("ErnStray_FireParticlePop", 3, 4, 256f * 0.6f / 175f);   // 폭발 파티클과 같은 자르기 (캐시 공유, 12프레임 중 마지막은 투명)
+        if (frames == null) yield break;
+        var times = new float[EmberCount];
+        for (int i = 0; i < EmberCount; i++) times[i] = ChargeTime * Mathf.Pow(Random.value, 0.6f);   // 0.6 제곱: 뒤쪽에 몰림
+        System.Array.Sort(times);
+        float t = 0f;
+        foreach (float at in times)
+        {
+            if (at > t) { yield return new WaitForSecondsRealtime(at - t); t = at; }
+            if (!running) yield break;
+            Vector2 around = Random.insideUnitCircle * EmberRadius;
+            Vector2 pos = (Vector2)P.transform.position + new Vector2(around.x, -0.7f + around.y * 0.35f);   // 발 근처에서 시작
+            var fx = SpriteEffect.Spawn(frames, EmberFps, null, pos, Random.Range(0f, 360f), Random.value < 0.5f, 13,
+                                        Random.Range(EmberSizeMin, EmberSizeMax));
+            if (fx != null)
+            {
+                fx.ignoreWorldSlow = true;   // 느려지는 동안에도 정상 속도로 피어오름
+                var d = fx.gameObject.AddComponent<DriftUp>();
+                d.velocity = new Vector2(Random.Range(-0.15f, 0.15f), EmberRiseSpeed * Random.Range(0.8f, 1.2f));
+                d.life = frames.Length / EmberFps;
+            }
+        }
+    }
+
+    // 도중에 스킬이 꺼져도 (사망 · 씬 전환 등) 시야가 줄어든 채 남지 않게
+    void OnDisable() { CameraFollow.SetZoomOut(1f); WorldSlow.End(); if (P != null) { P.ReleasePose(); if (running) P.EndRoot(); } }
+}
+
+/// <summary>스프라이트 이펙트를 천천히 위로 띄우고 끝 무렵 서서히 투명하게 (기 모으기 불꽃 파티클용)</summary>
+public class DriftUp : MonoBehaviour
+{
+    public Vector2 velocity;
+    public float life = 1f;
+    float t;
+    SpriteRenderer sr;
+
+    void Awake() => sr = GetComponent<SpriteRenderer>();
+
+    void Update()
+    {
+        float dt = WorldSlow.EffectDelta;   // 기 모으기 파티클은 느려지는 동안에도 정상 속도
+        t += dt;
+        transform.position += (Vector3)(velocity * dt);
+        if (sr != null && life > 0f)
+        {
+            float k = t / life;
+            var c = sr.color; c.a = k < 0.55f ? 1f : Mathf.Clamp01(1f - (k - 0.55f) / 0.45f);   // 앞 55% 는 그대로, 끝까지 서서히
+            sr.color = c;
+        }
     }
 }
