@@ -20,9 +20,21 @@ public class TripleSlash : ActiveSkill
     const float DamagePerHit = 8f;
     const int BaseHits = 3;
 
-    const float FxFps = 16f;            // 신규 시트 제작 사양 (8프레임 → 0.5초, 3타 전체를 한 시트로)
-    const float FxWidth = 3.5f;         // [임시] 한 칸 가로 = 범위 x 이 값 (신규 시트 칸 대비 그림이 작아 예전 시트의 최대 크기에 맞춤)
     const float FxForward = 1.2f;       // [임시] 이펙트 중심 = 플레이어 앞 범위 x 이 값
+
+    // 기본 3타 이펙트 (2026-11-21 사용자: 기존 시트 대신 새로 만든 불꽃 참격 시트): 4열 x 3행 칸 500x500 (11프레임 + 빈 칸 1), 참격이 왼쪽 아래 → 오른쪽 위로 휜 호.
+    // 한 번 사용 (3타) 에 참격 3개를 FlameInterval 간격으로, 방향을 FlameTurns 만큼 달리해서 같은 자리에 띄움 (이펙트만, 피해 판정은 그대로).
+    // 사용 모션 (2026-11-21 사용자): 기존 베기 모션 대신 포즈 3장을 차례로. 이름 = Player.ErnPoses (파일 ErnStray_ 뺀 이름)
+    static readonly string[] UsePoses = { "Atk_SlashReady", "Atk_OneHandSlash", "Atk_HorizontalSlashReady" };
+    const float UsePoseStep = 0.1f;     // [임시] 포즈 한 장이 보이는 시간 (게임 시간). 3장 = 0.3초
+    bool poseBusy;
+
+    const string FlameSheet = "ErnStray_TripleSlashFlame";
+    const float FlameFps = 40f;         // [임시] 12칸 = 0.3초
+    const float FlameWidth = 3.0f;      // [임시] 한 칸 가로 = 범위 x 이 값 (호 길이는 칸의 약 0.74배)
+    const float FlameInterval = 0.05f;  // 참격 사이 간격 (사용자 2026-11-21)
+    static readonly float[] FlameTurns = { -40f, 40f, 0f };   // [임시] 화면 수평 기준 참격마다 돌리는 각도 (도). 사용자 2026-11-21: 수평 + ±40
+    static readonly float[] FlameSags = { 0.22f, -0.22f, 0.12f };   // [임시] 참격마다 휨 정도 (칸 가로 단위, 양수 = 위로 볼록, 음수 = 아래로 볼록). BentSlashFx 가 그림을 곡선으로 직접 휨
 
     // 일섬 전용 이펙트: 2026-11-20 신규 시트 (1행 x 5열, 칸 448x352, 20fps, 1회 재생).
     // 참격이 왼쪽 아래 → 오른쪽 위로 휜 호 (가장 큰 프레임의 양끝을 이은 각도 약 39°)라 각도 보정.
@@ -202,8 +214,8 @@ public class TripleSlash : ActiveSkill
         // [임시] 난도질로 공격이 늘어도 한 번 사용 시간은 기본(3타)과 비슷하게: 간격 = 기본 간격 × 2 / (횟수 − 1)
         float interval = hits > BaseHits ? T.tripleSlashInterval * (BaseHits - 1) / (hits - 1) : T.tripleSlashInterval;
         bool ilseom = HasSpecial(Ilseom);
-        var sheet = ilseom ? null : ErnSkillFx.TripleSlash;
         var ilseomFrames = ilseom ? SpriteEffect.LoadFrames(IlseomSheet, 1, 5, 1f) : null;
+        var flameTex = (!ilseom && !TsubameOn) ? Resources.Load<Texture2D>("Sprites/" + FlameSheet) : null;   // 기본 3타: 새 불꽃 참격 (없으면 예전 시트)
         // 특수 조합 츠바메가에시: 일섬 이펙트 대신 전용 이펙트 (시트가 없으면 일섬 이펙트로)
         var tsubameFrames = TsubameOn ? SpriteEffect.LoadFrames(TsubameSheet, 1, 5, 1f) : null;
 
@@ -212,20 +224,20 @@ public class TripleSlash : ActiveSkill
             Vector2 from = P.transform.position;
             Vector2 facing = P.Facing;
             float r = RangeOf(Hit.radius);
-            P.PlayAttack(facing, baseFx: sheet == null && ilseomFrames == null);   // 첫 타에만 모션 (재생 중이면 무시)
+            if (!poseBusy && castIndex == 0 && i == 0 && P.ShowPose(UsePoses[0])) StartCoroutine(UsePoseRest());   // 포즈 3장 (그림이 없으면 아래 기존 모션)
+            else if (!poseBusy) P.PlayAttack(facing);   // 첫 타에만 모션 (재생 중이면 무시)
 
             foreach (var dir in Directions(facing))
             {
-                // 이펙트: 일섬 = 전용 시트, 그 외 = 3타 시트를 3타마다 한 번 (시트 1장 = 3타 연출)
+                // 이펙트: 일섬 = 전용 시트, 그 외 = 불꽃 참격 3개를 3타마다 한 번
                 if (tsubameFrames != null)
                 {
                     // 츠바메가에시: 첫 발동에서 참격 3개를 0.1초 간격으로 (이후 발동 · 추가 사용은 이펙트 없음)
                     if (castIndex == 0 && i == 0) StartCoroutine(SpawnTsubameSequence(tsubameFrames, from, dir, r));
                 }
                 else if (ilseomFrames != null) SpawnIlseomFx(ilseomFrames, from, dir, r);
-                else if (sheet != null && i % BaseHits == 0)
-                    ErnSkillFx.SpawnDirected(sheet, FxFps, from + dir * (r * FxForward), dir, r * FxWidth);
-                else if (sheet == null) Fx.Arc(from, dir, r, i == hits - 1 ? Fx.FireBright : Fx.Fire, 0.15f);
+                else if (flameTex != null && i % BaseHits == 0) StartCoroutine(SpawnFlameSlashes(flameTex, from + dir * (r * FxForward), dir, r));
+                else if (flameTex == null) Fx.Arc(from, dir, r, i == hits - 1 ? Fx.FireBright : Fx.Fire, 0.15f);   // 새 시트를 못 읽을 때만 간단한 호
 
                 var dmg = MakeDamage(DamagePerHit, cast);
                 if (HasSpecial(Searing)) dmg.perTarget = SearingMul;   // 고열 절삭: 맞은 적마다 (대상 단계)
@@ -242,6 +254,33 @@ public class TripleSlash : ActiveSkill
                 use.strikes.Add(new Strike { from = from, dir = dir });
             }
             if (i < hits - 1) yield return new WaitForSeconds(interval);
+        }
+    }
+
+    /// <summary>사용 모션: 첫 포즈는 이미 보이는 중 → 나머지 포즈를 차례로 → 끝나면 풀어서 원래 모습으로</summary>
+    IEnumerator UsePoseRest()
+    {
+        poseBusy = true;
+        yield return new WaitForSeconds(UsePoseStep);
+        for (int k = 1; k < UsePoses.Length; k++)
+        {
+            P.ShowPose(UsePoses[k]);
+            yield return new WaitForSeconds(UsePoseStep);
+        }
+        P.ReleasePose();
+        poseBusy = false;
+    }
+
+    /// <summary>기본 3타: 불꽃 참격 3개를 FlameInterval 간격으로, 방향 · 휨을 달리해 같은 자리에 띄움 (BentSlashFx 로 그림을 곡선으로 휘어 그림). 위치 · 방향은 시작 때 값 고정</summary>
+    IEnumerator SpawnFlameSlashes(Texture2D tex, Vector2 at, Vector2 dir, float r)
+    {
+        float baseAngle = dir.x >= 0f ? 0f : 180f;   // 기준 = 화면 수평 (바라보는 쪽이 왼쪽이면 180도). 참격은 이 수평 기준으로 FlameTurns 만큼 돌림 (사용자 2026-11-21)
+        float width = r * FlameWidth;
+        for (int k = 0; k < FlameTurns.Length; k++)
+        {
+            if (k > 0) yield return new WaitForSeconds(FlameInterval);
+            float angle = baseAngle + FlameTurns[k];
+            BentSlashFx.Spawn(tex, 4, 3, 11, FlameFps, at, angle, width, FlameSags[k], 11);
         }
     }
 
@@ -290,7 +329,7 @@ public class TripleSlash : ActiveSkill
 
     // ---------- 피해 적용 트리거 ----------
     void OnEnable() { Enemy.Damaging += OnDamaging; Enemy.AfterDamaged += OnAfterDamaged; }
-    protected override void OnDisable() { base.OnDisable(); Enemy.Damaging -= OnDamaging; Enemy.AfterDamaged -= OnAfterDamaged; }
+    protected override void OnDisable() { base.OnDisable(); if (poseBusy) { poseBusy = false; if (P != null) P.ReleasePose(); } Enemy.Damaging -= OnDamaging; Enemy.AfterDamaged -= OnAfterDamaged; }
 
     /// <summary>
     /// 강제 발화: 이번 타격의 화상이 쌓이기 **전** 스택 기준 (Damaging = Damaged 보다 먼저, 결정 2026-11-10).
@@ -346,8 +385,10 @@ public class TripleSlash : ActiveSkill
     IEnumerator EmberRoutine(Strike s, float perTick)
     {
         float scale = RangeScale;
-        if (ErnSkillFx.TripleSlash is { } frames)
-            ErnSkillFx.SpawnDirected(frames, FxFps * 0.5f, s.from + s.dir * (RangeOf(Hit.radius) * FxForward), s.dir, RangeOf(Hit.radius) * FxWidth * 0.8f);
+        var flameTex = Resources.Load<Texture2D>("Sprites/" + FlameSheet);   // 새 불꽃 참격 (수평, 반 속도)
+        if (flameTex != null)
+            BentSlashFx.Spawn(flameTex, 4, 3, 11, FlameFps * 0.5f, s.from + s.dir * (RangeOf(Hit.radius) * FxForward),
+                              s.dir.x >= 0f ? 0f : 180f, RangeOf(Hit.radius) * FlameWidth * 0.8f, FlameSags[2], 11);
         // 피해 간격마다 지속시간 끝까지 (기본 1초 → 1·2·3초 3회, 가속 연소면 더 자주)
         float elapsed = 0f;
         while (true)

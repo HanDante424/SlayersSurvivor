@@ -364,6 +364,29 @@ public class Player : MonoBehaviour
     /// </summary>
     const float RunSidePpu = 291f;
 
+    /// <summary>
+    /// 연출용 포즈 한 장 (2026-11-21 사용자: 블레이징 스톰 연출에 쓰는 에른 포즈들). 전부 왼쪽을 보는 한 장 그림, 오른쪽은 좌우 반전 (뒷모습 · 검 뻗기는 검도 같이 뒤집힘).
+    /// 이름 = 파일 이름에서 "ErnStray_" 뺀 것. 발 위치는 그림 픽셀 측정값 (알파 > 32): footPx = 가장 낮은 발끝이 그림 아래에서 뜬 px,
+    /// footX = 맨 아래 8% 띠의 알파 무게중심 x (두 발 가운데). ShowPose("Atk_SlashReady") 처럼 이름으로 부름
+    /// </summary>
+    static readonly (string name, float footPx, float footX)[] ErnPoses =
+    {
+        ("Atk_SlashReady", 73f, 811f),
+        ("Atk_HorizontalSlashReady", 90f, 774f),
+        ("UltCharge", 18f, 1177f),
+        ("OverheadRaise", 164f, 573f),
+        ("Atk_VerticalSlash", 99f, 903f),
+        ("Atk_OneHandSlash", 90f, 818f),
+        ("Atk_HorizontalSlash", 72f, 534f),
+        ("RearReach", 24f, 704f),
+    };
+    /// <summary>
+    /// [임시] 연출 포즈 크기 (월드 1유닛당 px): 8장을 같은 배율로 맞춰 머리 크기가 거의 같게 보이는지 비교해 정함 (스탠드는 773.5, 달리기 291 은 칸이 달라 별개).
+    /// 기 모으기 포즈는 머리카락 폭 기준 734 였음. Play 로 보고 포즈별로 어긋나면 ErnPoses 에 배율을 넣을 것
+    /// </summary>
+    const float PosePpu = 750f;
+    const string PoseKeyPrefix = "Pose_";
+
     /// <summary>스탠드 그림의 화면 키 (월드 유닛) — 기존 시트 규격 (몸 200px / 칸 256px × cell 2.07)과 같은 1.62</summary>
     const float StandBodyWorld = 1.62f;
     /// <summary>transform 이 놓이는 발 위 높이 (월드 유닛) — 기존 pivotY 0.372 계산과 같은 0.64</summary>
@@ -406,48 +429,35 @@ public class Player : MonoBehaviour
     /// <summary>공격 모션 (베기 1종). 예전 수평베기 · 수직베기 · 찌르기 3종을 하나로 통합 (2026-11-11)</summary>
     public const string Slash = "Slash";
 
-    // 기본 공격 화염 이펙트: ErnStray_FireSlash 2행 x 8열 (16프레임)
-    // 치명타여도 같은 이펙트 (치명타 전용 이펙트 교체는 취소됨)
-    // 타이밍·거리·크기·속도는 설정 파일에서 조정
-    Sprite[] fxSlash;
-    float fxTimer = -1f;
-
     /// <summary>
     /// 공격 모션(베기) 재생 (애니메이션만, 판정 없음). dir 이 0이면 현재 바라보는 방향.
     /// 이전 공격 모션이 끝나기 전에는 무시되고 false 를 돌려줍니다 (연타 스킬은 첫 타에만 모션).
-    /// baseFx = true 면 기본 공격 화염 이펙트를 함께 출력 (스킬 전용 이펙트가 없을 때만 켬).
     /// </summary>
-    public bool PlayAttack(Vector2 dir = default, bool baseFx = false)
+    public bool PlayAttack(Vector2 dir = default)
     {
         if (anim == null || !anim.Play(Slash, dir)) return false;
-        if (baseFx) fxTimer = Cfg.fxDelay;
         return true;
     }
 
+    /// <summary>
+    /// 연출 포즈를 고정 표시 (ReleasePose 로 풀 때까지). 시간 대신 직접 풀게 한 이유: 궁극기 중에는 게임 시간이 느려져 Time.time 기준 유지 시간이 어긋남.
+    /// 바라보는 방향은 좌우만 (위 · 아래를 보는 중이면 마지막 좌우 방향). 그림이 없으면 false (기존 모습 그대로)
+    /// </summary>
+    public bool ShowPose(string name)
+    {
+        if (anim == null) return false;
+        if (Mathf.Abs(Facing.x) > 0.1f) lastPoseDir = new Vector2(Mathf.Sign(Facing.x), 0f);
+        return anim.HoldPose(PoseKeyPrefix + name, lastPoseDir, 600f);
+    }
+    Vector2 lastPoseDir = Vector2.left;
+
+    public void ReleasePose() => anim?.ReleasePose();
+
+    /// <summary>이동 불가를 바로 풀음 (궁극기 종료)</summary>
+    public void EndRoot() => rootLeft = 0f;
+
     /// <summary>디버그 맵: 재생 중인 공격 모션을 끊음 (같은 스킬을 연달아 눌러도 모션이 매번 나오게)</summary>
     public void DebugStopMotion() => anim?.StopOneShot();
-
-    void SpawnSlashFx()
-    {
-        var frames = fxSlash;
-        if (frames == null) return;
-
-        // 이펙트 원본은 오른쪽으로 휘두르는 모양 → 방향에 맞게 회전/반전
-        float angle = 0f; bool flip = false; Vector2 dir;
-        switch (anim.Facing)
-        {
-            case Facing4.Left:  dir = Vector2.left;  flip = true; break;
-            case Facing4.Up:    dir = Vector2.up;    angle = 90f; break;
-            case Facing4.Down:  dir = Vector2.down;  angle = -90f; break;
-            default:            dir = Vector2.right; break;
-        }
-        // fxOffset 은 오른쪽 기준 → 바라보는 방향에 맞춰 회전 (왼쪽은 좌우 반전)
-        var o = Cfg.fxOffset;
-        Vector2 offset = anim.Facing == Facing4.Left ? new Vector2(-o.x, o.y)
-                       : (Vector2)(Quaternion.Euler(0, 0, angle) * o);
-        SpriteEffect.Spawn(frames, Cfg.fxFps, transform,
-                           dir * Cfg.fxDistance + offset, angle, flip, 11, Cfg.fxSize);
-    }
 
     void Awake()
     {
@@ -458,6 +468,7 @@ public class Player : MonoBehaviour
         sr = gameObject.AddComponent<SpriteRenderer>();
         sr.sortingOrder = 10;
         anim = gameObject.AddComponent<SpriteSheetAnimator>();
+        anim.ignoreWorldSlow = true;   // 플레이어 애니메이션은 궁극기 중에도 정상 속도
         var v = Visual;
         float cell = v.cell, pivotY = v.pivotY;
         if (anim.LoadClip(SpriteSheetAnimator.Run, CharacterId + "_Run", 4, v.runCols, cell, pivotY, v.runFps, true))
@@ -488,12 +499,20 @@ public class Player : MonoBehaviour
                                   pivotX: v.standFootX / stand.width, globalSide: false);
                 }
             }
-            // 공격 모션 · 기본 공격 이펙트는 시트가 있는 캐릭터만 (없으면 LoadClip/LoadFrames 가 건너뜀)
+            // 연출용 포즈들 (에른 전용 측정값, 그림이 없으면 건너뜀)
+            if (CharacterId == "ErnStray")
+                foreach (var pose in ErnPoses)
+                {
+                    var tex = Resources.Load<Texture2D>("Sprites/" + CharacterId + "_" + pose.name);
+                    if (tex == null) continue;
+                    anim.LoadClip(PoseKeyPrefix + pose.name, CharacterId + "_" + pose.name, 1, 1, tex.width / PosePpu,
+                                  (pose.footPx + PosePpu * StandFootToTransform) / tex.height, 1f, true,
+                                  pivotX: pose.footX / tex.width, globalSide: false);
+                }
+            // 공격 모션은 시트가 있는 캐릭터만 (없으면 LoadClip/LoadFrames 가 건너뜀)
             if (v.attackCols > 0)
                 anim.LoadClip(Slash, CharacterId + "_" + Slash, 4, v.attackCols, v.attackCell, v.attackPivotY,
                              v.attackFps > 0f ? v.attackFps : Cfg.attackFps, false);
-            // 크기는 Spawn 때 설정 값으로 맞추므로 1유닛 기준으로 자름
-            fxSlash = SpriteEffect.LoadFrames(CharacterId + "_FireSlash", 2, 8, 1f);
             transform.localScale = Vector3.one;
             HealthBarOffset = cell * (pivotY - 0.06f) + 0.15f; // 발 바로 아래
         }
@@ -522,7 +541,7 @@ public class Player : MonoBehaviour
         if (anim != null)
             anim.SetClipFps(Slash, Cfg.attackFps);
 
-        float dt = Time.deltaTime;
+        float dt = WorldSlow.PlayerDelta;   // 궁극기 중 느려지는 동안에도 플레이어는 정상 속도
         Vector2 beforeMovement = transform.position;
         if (bossSlowLeft > 0f) bossSlowLeft = Mathf.Max(0f, bossSlowLeft - dt);
         if (skillInvuln > 0) skillInvuln -= dt;
@@ -592,17 +611,11 @@ public class Player : MonoBehaviour
         if (Input.GetKeyDown(T.movementKey)) FirstOfKind(SkillKind.Movement)?.TryActivate();
         if (Input.GetKeyDown(T.ultimateKey)) FirstOfKind(SkillKind.Ultimate)?.TryActivate();
 
-        if (fxTimer >= 0f)
-        {
-            fxTimer -= Time.deltaTime;
-            if (fxTimer < 0f) SpawnSlashFx();
-        }
-
-        if (regen > 0) hp = Mathf.Min(maxHp, hp + regen * Time.deltaTime);
+        if (regen > 0) hp = Mathf.Min(maxHp, hp + regen * dt);
 
         if (invuln > 0)
         {
-            invuln -= Time.deltaTime;
+            invuln -= dt;
             // 피격 시 깜빡임 (실제 스프라이트는 흰색이라 투명도로 표현)
             sr.color = Mathf.Repeat(invuln * 20f, 1f) > 0.5f ? new Color(1f, 0.55f, 0.55f, 0.45f) : baseColor;
             if (invuln <= 0) sr.color = baseColor;

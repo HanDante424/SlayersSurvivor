@@ -204,7 +204,7 @@ public class DebugMapController : MonoBehaviour
     void LateUpdate()
     {
         if (GameManager.I == null || GameManager.I.State != GameState.Playing) return;
-        if (ImpactFrame.Frozen) return;   // 임팩트 프레임 (시간 정지) 중에는 시간 배속을 덮어쓰지 않음
+        if (ImpactFrame.Frozen || WorldSlow.Active) return;   // 임팩트 프레임 (시간 정지) 중에는 시간 배속을 덮어쓰지 않음
         // 한 프레임 진행: 이번 LateUpdate 에서 1 로 올려 다음 프레임이 진행되고, 그 프레임의 LateUpdate 에서 다시 정지
         if (stepFrames > 0)
         {

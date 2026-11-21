@@ -13,6 +13,8 @@ public class SpriteEffect : MonoBehaviour
     float fps;
     float t;
     SpriteRenderer sr;
+    /// <summary>true = 궁극기 중 WorldSlow 로 전체가 느려져도 정상 속도로 재생 (궁극기 연출용)</summary>
+    public bool ignoreWorldSlow;
 
     /// <summary>시트를 잘라 프레임 배열로 (시트 이름별 캐시). 시트가 없으면 null.</summary>
     /// <param name="cellWorldWidth">한 칸의 가로 길이(월드 유닛). 같은 시트는 처음 값으로 캐시됩니다.</param>
@@ -66,7 +68,7 @@ public class SpriteEffect : MonoBehaviour
 
     void Update()
     {
-        t += Time.deltaTime;
+        t += ignoreWorldSlow ? WorldSlow.EffectDelta : Time.deltaTime;
         int i = (int)(t * fps);
         if (i >= frames.Length) { Destroy(gameObject); return; }
         sr.sprite = frames[i];

@@ -14,18 +14,15 @@ using UnityEngine;
 public static class ErnSkillFx
 {
     // 파이어 슬래시 이펙트: 2026-11-20 신규 시트로 교체 (1행 x 6열, 칸 384x192, 16fps, 1회 재생).
-    // 예전 시트 "ErnStray_SkillFireSlash" (2행 x 4열, 7프레임) 는 되돌릴 수 있게 Resources 에 그대로 둠.
+    // 예전 시트 "ErnStray_SkillFireSlash" (2행 x 4열, 7프레임) 는 Art/Incoming/Retired 로 옮김.
     public const string FireSlashSheet = "ErnStray_SkillFireSlashAnim";
     // 검기 발사 (파이어 슬래시 Lv.10): 2026-11-20 신규 시트 (1행 x 6열, 칸 320x512, 12fps 반복). 예전에는 슬래시 이펙트를 그대로 날렸음
     public const string FireBladeWaveSheet = "ErnStray_FireBladeWave";
-    // 트리플 슬래시 이펙트: 2026-11-20 신규 시트 (2행 x 4열, 8프레임, 칸 288x288, 16fps, 1회 재생 — 3타 전체를 한 시트로).
-    // 예전 시트 "ErnStray_SkillTripleSlash" (2행 x 5열) 는 되돌릴 수 있게 Resources 에 그대로 둠.
-    public const string TripleSlashSheet = "ErnStray_SkillTripleSlashAnim";
+    // 트리플 슬래시 이펙트는 2026-11-21 에 불꽃 참격 (BentSlashFx + ErnStray_TripleSlashFlame) 으로 교체, 예전 시트는 Art/Incoming/Retired 로 옮김.
     public const string SolarSlashSheet = "ErnStray_SkillSolarSlash";   // 4행 x 3열
 
     public static Sprite[] FireSlash => SpriteEffect.LoadFrames(FireSlashSheet, 1, 6, 1f);
     public static Sprite[] FireBladeWave => SpriteEffect.LoadFrames(FireBladeWaveSheet, 1, 6, 1f);
-    public static Sprite[] TripleSlash => SpriteEffect.LoadFrames(TripleSlashSheet, 2, 4, 1f);
     public static Sprite[] SolarSlash => SpriteEffect.LoadFrames(SolarSlashSheet, 4, 3, 1f);
 
     /// <summary>

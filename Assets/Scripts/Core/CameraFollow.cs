@@ -224,6 +224,17 @@ public class CameraFollow : MonoBehaviour
         inst.lastPos = inst.transform.position;
     }
 
+    /// <summary>
+    /// 임시 시야 배율 (1 = 그대로, 2 = 시야 2배로 축소, 0.6 = 확대). 다른 시야 모드 (전체 맵 · 따라가기 · 기본) 를 건드리지 않고 그 위에 곱해서 적용 → 풀면 원래 시야로 돌아감.
+    /// 블레이징 스톰 시전 연출용 (2026-11-21). 부드럽게 변함 (ZoomSpeed).
+    /// </summary>
+    public static void SetZoomOut(float multiplier)
+    {
+        if (inst == null) return;
+        inst.zoomOutMul = Mathf.Max(0.2f, multiplier);   // 1 보다 작으면 확대 (플레이어 클로즈업, 2026-11-21)
+    }
+    float zoomOutMul = 1f;
+
     /// <summary>기본 시야로 복귀</summary>
     public static void ResetZoom()
     {
@@ -237,7 +248,7 @@ public class CameraFollow : MonoBehaviour
     {
         var cam = GetComponent<Camera>();
         if (cam == null) return;
-        float target = zoomTarget > 0f ? zoomTarget : GameManager.ViewSize;
+        float target = (zoomTarget > 0f ? zoomTarget : GameManager.ViewSize) * zoomOutMul;
         float limit = float.MaxValue;
         if (limitViewportToMap && outsideMapOwner == null && Stage.Bounded)
         {
