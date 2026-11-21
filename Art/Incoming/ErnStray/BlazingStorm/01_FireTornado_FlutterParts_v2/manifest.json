@@ -1,0 +1,67 @@
+{
+  "status": "visual draft",
+  "direction": "right-facing leading edge with tail extending left",
+  "cellPx": [
+    384,
+    288
+  ],
+  "pivotPxTopLeft": [
+    330,
+    148
+  ],
+  "pivotNormalizedUnityBottomLeft": [
+    0.859375,
+    0.48611111111111116
+  ],
+  "motion": "Local tail flutter only. Drive position, tangential rotation, perspective and depth ordering externally.",
+  "staticAtlas": {
+    "file": "flame-parts.png",
+    "columns": 3,
+    "rows": 2
+  },
+  "loopSheet": {
+    "columns": 4,
+    "rows": 3,
+    "frameOrder": "left to right, top to bottom",
+    "frameCount": 12,
+    "previewFrameDurationMs": 70
+  },
+  "parts": [
+    {
+      "id": "forked-banner",
+      "sprite": "sprites/forked-banner.png",
+      "loopSheet": "loops/forked-banner.png",
+      "staticAtlasIndex": 0
+    },
+    {
+      "id": "curling-hook",
+      "sprite": "sprites/curling-hook.png",
+      "loopSheet": "loops/curling-hook.png",
+      "staticAtlasIndex": 1
+    },
+    {
+      "id": "thin-ribbon",
+      "sprite": "sprites/thin-ribbon.png",
+      "loopSheet": "loops/thin-ribbon.png",
+      "staticAtlasIndex": 2
+    },
+    {
+      "id": "broad-flame",
+      "sprite": "sprites/broad-flame.png",
+      "loopSheet": "loops/broad-flame.png",
+      "staticAtlasIndex": 3
+    },
+    {
+      "id": "split-tongues",
+      "sprite": "sprites/split-tongues.png",
+      "loopSheet": "loops/split-tongues.png",
+      "staticAtlasIndex": 4
+    },
+    {
+      "id": "ember-trails",
+      "sprite": "sprites/ember-trails.png",
+      "loopSheet": "loops/ember-trails.png",
+      "staticAtlasIndex": 5
+    }
+  ]
+}

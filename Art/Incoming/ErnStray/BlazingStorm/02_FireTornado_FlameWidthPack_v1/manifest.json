@@ -1,0 +1,91 @@
+{
+  "status": "visual draft",
+  "direction": "right-facing leading edge with tail extending left",
+  "cellPx": [
+    384,
+    288
+  ],
+  "pivotPxTopLeft": [
+    330,
+    148
+  ],
+  "pivotNormalizedUnityBottomLeft": [
+    0.859375,
+    0.48611111111111116
+  ],
+  "motion": "Local tail flutter only. Drive position, tangential rotation, perspective and depth ordering externally.",
+  "staticAtlas": {
+    "file": "flame-parts.png",
+    "columns": 3,
+    "rows": 2
+  },
+  "loopSheet": {
+    "columns": 4,
+    "rows": 3,
+    "frameOrder": "left to right, top to bottom",
+    "frameCount": 12,
+    "previewFrameDurationMs": 70
+  },
+  "parts": [
+    {
+      "id": "stream-01-filament",
+      "sprite": "sprites/stream-01-filament.png",
+      "loopSheet": "loops/stream-01-filament.png",
+      "staticAtlasIndex": 0,
+      "opaqueSilhouettePx": [
+        294,
+        15
+      ]
+    },
+    {
+      "id": "stream-02-extra-narrow",
+      "sprite": "sprites/stream-02-extra-narrow.png",
+      "loopSheet": "loops/stream-02-extra-narrow.png",
+      "staticAtlasIndex": 1,
+      "opaqueSilhouettePx": [
+        302,
+        30
+      ]
+    },
+    {
+      "id": "stream-03-narrow",
+      "sprite": "sprites/stream-03-narrow.png",
+      "loopSheet": "loops/stream-03-narrow.png",
+      "staticAtlasIndex": 2,
+      "opaqueSilhouettePx": [
+        301,
+        57
+      ]
+    },
+    {
+      "id": "stream-04-medium",
+      "sprite": "sprites/stream-04-medium.png",
+      "loopSheet": "loops/stream-04-medium.png",
+      "staticAtlasIndex": 3,
+      "opaqueSilhouettePx": [
+        306,
+        78
+      ]
+    },
+    {
+      "id": "stream-05-wide",
+      "sprite": "sprites/stream-05-wide.png",
+      "loopSheet": "loops/stream-05-wide.png",
+      "staticAtlasIndex": 4,
+      "opaqueSilhouettePx": [
+        307,
+        107
+      ]
+    },
+    {
+      "id": "stream-06-extra-wide",
+      "sprite": "sprites/stream-06-extra-wide.png",
+      "loopSheet": "loops/stream-06-extra-wide.png",
+      "staticAtlasIndex": 5,
+      "opaqueSilhouettePx": [
+        305,
+        163
+      ]
+    }
+  ]
+}
