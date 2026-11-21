@@ -485,6 +485,37 @@ public class BlazingStorm : Skill
     readonly List<Enemy> targets = new List<Enemy>();
     bool running;
 
+    // 불꽃 토네이도 (RibbonTornadoFx): 곧은 리본 그림을 원뿔 나선으로 휘어 돌림. 크기 값은 모두 [임시] (카메라 세로 반 = 7)
+    // [임시] 리본 재료 = 오버 드라이브 화염검 시트 (칼끝 = 머리). 전용 리본 그림이 오면 이 부분만 교체
+    const string TornadoRibbonSheet = "ErnStray_OverFlameBlade";
+    const int TornadoRibbonRows = 4, TornadoRibbonCols = 4;
+    const float TornadoCellW = 256f, TornadoCellH = 768f;
+    const float TornadoRibbonX = 88f, TornadoRibbonW = 74f;    // 칼 알파 범위 x 88~162
+    const float TornadoRibbonTop = 54f, TornadoRibbonH = 674f; // 칼 알파 범위 y 54~728 (위 기준)
+
+    static RibbonTornadoFx.Settings TornadoSettings(float life)
+    {
+        var tex = Resources.Load<Texture2D>("Sprites/" + TornadoRibbonSheet);
+        if (tex == null) return null;
+        int n = TornadoRibbonRows * TornadoRibbonCols;
+        var frames = new Rect[n];
+        for (int k = 0; k < n; k++)
+        {
+            int col = k % TornadoRibbonCols, row = k / TornadoRibbonCols;
+            float x = col * TornadoCellW + TornadoRibbonX;
+            float yBottom = tex.height - (row * TornadoCellH + TornadoRibbonTop + TornadoRibbonH);   // 텍스처 좌표는 아래 기준
+            frames[k] = new Rect(x / tex.width, yBottom / tex.height, TornadoRibbonW / tex.width, TornadoRibbonH / tex.height);
+        }
+        return new RibbonTornadoFx.Settings
+        {
+            texture = tex, frames = frames, lengthAlongY = true, fps = 20f,
+            ribbons = 28, baseY = -1.5f, height = 7.5f, bottomRadius = 0.4f, topRadius = 4.2f, squash = 0.28f,
+            arcMin = 60f, arcMax = 130f, thickBottom = 0.2f, thickTop = 0.7f, endThickness = 0.35f, riseJitter = 0.4f,
+            spin = 420f, spinJitter = 0.3f, segments = 20,
+            growTime = 0.3f, fadeTime = 0.35f, life = life,
+        };
+    }
+
     public override float CooldownFraction => running ? 1f : 1f - GameManager.I.UltimateGaugeFraction;
     public override string Badge => running ? null : $"{Mathf.FloorToInt(GameManager.I.UltimateGaugeFraction * 100)}%";
 
@@ -504,6 +535,7 @@ public class BlazingStorm : Skill
         P.SetInvulnerable(Duration + 0.1f);
         DamageInfo per = MakeDamage(BaseDamage);
         Fx.ScreenFlash(new Color(1f, 0.45f, 0.1f, 0.45f), Duration);
+        RibbonTornadoFx.Spawn(TornadoSettings(Duration), P.transform, Vector2.zero);   // 플레이어를 따라감 (재료가 없으면 생략)
         for (int i = 0; i < Hits; i++)
         {
             CameraFollow.Shake(0.2f, 0.25f);
