@@ -59,7 +59,7 @@ public static class SkillCatalog
         E("M02", "파이어 차지", "Fire Charge", SkillKind.Manual, typeof(FireCharge), new SkillText(
             new[] { "수동", "이동 스킬", "근거리", "직접 사용", "직접 피해", "넉백", "무적" },
             "주변 적을 밀치며 돌진합니다.\n사용 중 무적입니다.",
-            "'초기 피해량' 4", "'쿨타임' 15초")),
+            "'초기 피해량' 4", "'쿨타임' 10초")),
         E("M03", "오버 드라이브 플레임 슬래시", "Overdrive Flame Slash", SkillKind.Manual, typeof(OverFlameSlash), new SkillText(
             new[] { "수동", "군중 제어 스킬", "근거리", "직접 사용", "직접 피해", "기절" },
             "화염의 검을 내려쳐 적들을 기절시킵니다.\n이후 폭발하며 피해를 입힙니다.",
@@ -77,7 +77,7 @@ public static class SkillCatalog
         E("D01", "파이어 스트림", "Fire Stream", SkillKind.Movement, typeof(FireStream), new SkillText(
             new[] { "수동", "이동 스킬", "직접 사용", "직접 피해", "스택", "무적" },
             "빠르게 돌진합니다.\n이동 경로의 적들에게 피해를 입힙니다.\n사용 중 무적입니다.",
-            "'초기 피해량' 3", "'스택' 3", "'쿨타임' 15초")),
+            "'초기 피해량' 3", "'스택' 3", "'스택 쿨타임' 8초")),
 
         // 패시브 (전투 통합 기획서 v1.0 8~10장)
         E("P01", "화염의 검", "Flame Sword", SkillKind.Passive, typeof(FlameSword), new SkillText(
