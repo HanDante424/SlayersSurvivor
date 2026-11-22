@@ -98,7 +98,7 @@ public class FireCharge : ActiveSkill
 /// </summary>
 public class OverFlameSlash : ActiveSkill
 {
-    const float BladeDamage = 20f, StunSeconds = 2f;
+    const float BladeDamage = 20f, BaseStun = 2f;
     const float ExplosionDelay = 1f, ExplosionDamage = 50f;
     const float BaseCooldown = 20f;
     const float WidthRatio = 0.5f;      // [임시] 검 판정 폭 = 범위 좁음 × 비율
@@ -156,7 +156,113 @@ public class OverFlameSlash : ActiveSkill
     const float PopSpread = 0.4f;           // [임시] 파티클이 나타나는 시간 폭 (폭발 시작부터, 초)
     const int PopOrder = 13;                // 폭발 그림 위
 
+    // 특수 강화 id (오버 드라이브 플레임 슬래시)
+    public const string Giant = "OS5A", Bind = "OS5B", QuickPrep = "OS5C";
+    public const string Trace = "OS10A", Collapse = "OS10B", Impact = "OS10C";
+    public const string Focus = "OS15A", Triple = "OS15B", Aftermath = "OS15C";
+    public const string ComboBlazing = "OSC1";
+
+    // 특수 강화 확정 수치 (노션 2026-11-22)
+    const float GiantRange = 0.5f, GiantDamage = 0.25f;     // 거대한 검: 범위 +50% · 피해량 +25%
+    const float BindStun = 2f;                              // 옭아매는 화염: 기절 +2초
+    const float QuickPrepPerHit = 0.025f;                   // 빠른 준비: 적중 시 남은 쿨타임 감소 2.5%
+    const float TraceRatio = 0.6f, TraceTime = 3f, TraceSlow = 0.3f;   // 불타는 잔흔: 총 피해량 60% 고정 피해 · 3초 · 이동 속도 70% 감소 (×0.3)
+    const float CollapseFinal = 0.75f;                      // 붕괴의 일격: 기절 상태 적 최종 피해량 +75%
+    const float ImpactStun = 2.5f, ImpactCooldownMul = 0.8f;   // 충격 집중: 기절 +2.5초 · 쿨타임 감소 +20%
+    const float FocusFinal = 1f, FocusPerStunSec = 0.25f;   // 화염 집중: 최종 피해량 +100% · 무효화한 기절 1초당 +25%
+    const float TripleAngle = 60f;                          // 삼연발: 양쪽 60도 간격으로 1회씩 추가 사용
+    const float AftermathRange = 0.5f, AftermathFinal = 0.5f;   // 후폭풍: 범위 +50% · 최종 피해량 +50%
+    const float ComboRange = 0.25f, ComboFinal = 0.5f, ComboPerExtra = 0.25f;   // 오버 드라이브 블레이징 슬래시: 범위 +25% · 최종 +50% · 무효화한 추가 사용 1당 +25%
+    const int ExtraUses = 2;                                // 삼연발의 추가 사용 수 (조합이 무효화하는 수)
+    // [임시] 노션에 없는 수치
+    const float TraceTick = 0.5f;                           // 잔흔 지속 피해 간격
+    const float GatherTime = 0.6f;                          // 조합: 양쪽 검이 돌며 적을 모으는 시간 (이후 본 검이 내려침)
+    const float GatherStart = 270f;                         // 조합: 각 검이 도는 총 각도 (사용자 2026-11-22: 270도). 시작 = 보는 방향 기준 뒤 → 180도 돌아 앞까지 적을 모으고 → 90도 더 돌아 반대편 옆에서 끝남
+    const float GatherFadeAt = 180f;                        // 조합: 이만큼 돌았을 때 검이 급격히 투명해지기 시작 (사용자 2026-11-22: 180도)
+    const float GatherFadeTime = 0.12f;                     // [임시] 급격히 투명해지는 시간
+    const float GatherBand = 1.2f;                          // 조합: 검날이 적을 쓸어 모으는 폭 (검 중심선에서 이 거리 안)
+
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
+
+    // ---------- 특수 강화 ----------
+    public override SpecialUpgradeOption[] SpecialOptions(int lv)
+    {
+        switch (lv)
+        {
+            case 5: return new[]
+            {
+                new SpecialUpgradeOption { id = Giant, title = "거대한 검", desc = "범위 +50%, 피해량 +25%" },
+                new SpecialUpgradeOption { id = Bind, title = "옭아매는 화염", desc = "기절 +2초" },
+                new SpecialUpgradeOption { id = QuickPrep, title = "빠른 준비", desc = "적중 시 남은 쿨타임 감소 2.5%" },
+            };
+            case 10: return new[]
+            {
+                new SpecialUpgradeOption { id = Trace, title = "불타는 잔흔", keywords = new[] { "간접 사용", "지속 피해", "고정 피해" },
+                    desc = "종료 시 잔흔이 남아 지속 피해를 줍니다. 잔흔은 이동 속도 감소를 부여합니다.",
+                    specs = new[] { "'오버 드라이브 플레임 슬래시' '총 피해량'의 60% '고정 피해'", "'지속 시간' 3초", "'이동 속도 감소' 70% 부여" } },
+                new SpecialUpgradeOption { id = Collapse, title = "붕괴의 일격", desc = "화염의 검 기절 상태 적 적중 시 최종 피해량 +75%" },
+                new SpecialUpgradeOption { id = Impact, title = "충격 집중", desc = "기절 +2.5초, 쿨타임 감소 +20%" },
+            };
+            case 15: return new[]
+            {
+                new SpecialUpgradeOption { id = Focus, title = "화염 집중", desc = "폭발이 사라지고 기절 능력치가 무효화됩니다. 무효화 비율에 따라 최종 피해량이 증가합니다.",
+                    specs = new[] { "'최종 피해량' +100%", "기절 능력치 무효화 1초당 '최종 피해량' +25%" } },
+                new SpecialUpgradeOption { id = Triple, title = "삼연발", desc = "양쪽 60도 간격으로 1회씩 추가 사용합니다." },
+                new SpecialUpgradeOption { id = Aftermath, title = "후폭풍", desc = "폭발 적중 시 적들을 폭발 중심으로 모읍니다.", specs = new[] { "'범위' +50%", "'최종 피해량' +50%" } },
+            };
+        }
+        return base.SpecialOptions(lv);
+    }
+
+    public override SpecialComboOption[] SpecialCombos() => new[]
+    {
+        new SpecialComboOption
+        {
+            id = ComboBlazing, title = "오버 드라이브 블레이징 슬래시", recipe = "붕괴의 일격 + 삼연발", requires = new[] { Collapse, Triple },
+            desc = "추가 사용이 사라집니다. 두 개의 검으로 전방향의 적을 한곳으로 모은 뒤, 강화된 검을 내려칩니다.",
+            specs = new[] { "추가 사용 능력치 무효화", "'범위' +25%", "'최종 피해량' +50%", "추가 사용 능력치 무효화 1당 '최종 피해량' +25%" },
+        },
+    };
+
+    bool Blazing => HasCombo(ComboBlazing);
+    float StunSeconds => BaseStun + (HasSpecial(Bind) ? BindStun : 0f) + (HasSpecial(Impact) ? ImpactStun : 0f);
+    float ActualStun => HasSpecial(Focus) ? 0f : StunSeconds;   // 화염 집중: 기절 무효화
+
+    protected override float SpecialDamageBonus => HasSpecial(Giant) ? GiantDamage : 0f;
+    protected override float SpecialRangeBonus =>
+        (HasSpecial(Giant) ? GiantRange : 0f) + (HasSpecial(Aftermath) ? AftermathRange : 0f) + (Blazing ? ComboRange : 0f);
+    protected override float SpecialCooldownMul => HasSpecial(Impact) ? ImpactCooldownMul : 1f;
+    protected override float SpecialFinalDamageMul
+    {
+        get
+        {
+            float m = 1f;
+            if (HasSpecial(Focus)) m *= 1f + FocusFinal + FocusPerStunSec * StunSeconds;   // 무효화한 기절 시간만큼
+            if (HasSpecial(Aftermath)) m *= 1f + AftermathFinal;
+            if (Blazing) m *= 1f + ComboFinal + ComboPerExtra * ExtraUses;
+            return m;
+        }
+    }
+
+    /// <summary>붕괴의 일격: 기절 상태 적에게 최종 피해량 +75% (대상 단계, 피해가 들어가기 전 기준)</summary>
+    static float CollapseMul(Enemy e) => e.IsStunned ? 1f + CollapseFinal : 1f;
+
+    DamageInfo Dmg(float initial, CastRef cast)
+    {
+        var d = MakeDamage(initial, cast);
+        if (HasSpecial(Collapse)) d.perTarget = CollapseMul;
+        return d;
+    }
+
+    DamageInfo FixedOf(float amount, CastRef cast)
+    {
+        var d = FixedDamage(amount, DamageType.Direct, CastKind.Indirect);
+        d.castId = cast.id;
+        return d;
+    }
+
+    /// <summary>사용 1회가 모으는 값 (빠른 준비의 적중 수)</summary>
+    class UseState { public int hits; }
 
     protected override void Activate() => StartCoroutine(Run());
 
@@ -164,22 +270,121 @@ public class OverFlameSlash : ActiveSkill
     {
         Vector2 from = P.transform.position;
         Vector2 dir = P.Facing;
+        var cast = DirectCast;
+        Vector2 ndir = dir.sqrMagnitude > 0.01f ? dir.normalized : Vector2.right;
+
+        if (Blazing)
+        {
+            // 조합: 추가 사용 대신 먼저 양쪽에서 두 검이 보는 방향으로 돌며 검날로 전방향의 적을 한곳으로 모은 뒤, 본 검을 내려침
+            // 본 검은 시작부터 치켜든 채 (준비 시간 = 모으는 시간), 모으기가 끝나면 내려치는 시간은 기존과 같음 (사용자 2026-11-22)
+            StartCoroutine(Gather(from, ndir));
+            yield return Use(from, dir, cast, true, GatherTime);
+            yield break;
+        }
+        else if (HasSpecial(Triple))
+        {
+            // 삼연발: 양쪽 60도로 1회씩 추가 사용 (같은 타이밍 · 간접 사용 · 포즈 · 이동 불가는 본 사용만)
+            StartCoroutine(Use(from, Rotate(ndir, TripleAngle), cast.AsIndirect, false));
+            StartCoroutine(Use(from, Rotate(ndir, -TripleAngle), cast.AsIndirect, false));
+        }
+        yield return Use(from, dir, cast, true);
+    }
+
+    static Vector2 Rotate(Vector2 v, float deg) => (Vector2)(Quaternion.Euler(0f, 0f, deg) * v);
+
+    /// <summary>
+    /// 조합: 양쪽에서 두 검이 (거의 뒤쪽에서) 보는 방향으로 돌며 검날에 닿은 적을 내려칠 자리 중심으로 쓸어 모음.
+    /// 두 검이 앞에서 만나면 사라지고 본 검이 내려침
+    /// </summary>
+    IEnumerator Gather(Vector2 from, Vector2 dir)
+    {
+        float len = Reach(Tier.Long);
+        float face = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        Vector2 center = from + dir * len * 0.5f;
+        var blades = new Transform[2];
+        float[] side = { 1f, -1f };   // 왼쪽 검은 시계 방향 (각도 감소), 오른쪽 검은 시계 반대 방향
+        for (int i = 0; i < 2; i++)
+        {
+            blades[i] = SpawnBlade(from, dir, len, out _, out _);
+            if (blades[i] == null) continue;
+            blades[i].position = from;
+            if (blades[i].childCount > 0)   // 곧은 날이 앞장서도록: 시계 방향이면 그대로, 반대면 좌우 반전
+                blades[i].GetChild(0).localScale = new Vector3(side[i] > 0f ? 1f : -1f, 1f, 1f);
+        }
+        var list = new List<Enemy>();
+        bool fading = false;
+        for (float t = 0f; t < GatherTime; t += Time.deltaTime)
+        {
+            float k = t / GatherTime;
+            k = k * k * (3f - 2f * k);
+            if (!fading && GatherStart * k >= GatherFadeAt)   // 180도 돌았을 때 급격히 투명해짐
+            {
+                fading = true;
+                for (int i = 0; i < 2; i++)
+                {
+                    var fx = blades[i] != null ? blades[i].GetComponentInChildren<SpriteLoopEffect>() : null;
+                    if (fx != null) fx.FadeOut(GatherFadeTime);
+                }
+            }
+            SkillHits.InCircle(from, len, list);
+            for (int i = 0; i < 2; i++)
+            {
+                float angle = face + side[i] * (GatherFadeAt - GatherStart * k);   // 뒤 (180도) 에서 시작 → 앞까지 모은 뒤 90도 더 돎
+                if (blades[i] != null) blades[i].rotation = Quaternion.Euler(0f, 0f, angle - 90f);
+                Vector2 bdir = new Vector2(Mathf.Cos(angle * Mathf.Deg2Rad), Mathf.Sin(angle * Mathf.Deg2Rad));
+                foreach (var e in list)
+                {
+                    if (e == null || e.hp <= 0 || e.IsWall || e.Hidden || e.Scripted) continue;
+                    Vector2 rel = (Vector2)e.transform.position - from;
+                    float along = Vector2.Dot(rel, bdir);
+                    float lateral = Mathf.Abs(rel.x * bdir.y - rel.y * bdir.x);
+                    if (fading || along < 0f || lateral > GatherBand) continue;   // 검날에 닿은 적만 (투명해진 뒤에는 모으지 않음)
+                    Vector2 to = center - (Vector2)e.transform.position;
+                    float dist = to.magnitude;
+                    if (dist > 0.3f) e.Push(to, Enemy.KnockSpeed(dist));
+                }
+            }
+            yield return null;
+        }
+        for (int i = 0; i < 2; i++) if (blades[i] != null) Destroy(blades[i].gameObject);
+    }
+
+    /// <summary>
+    /// 사용 1회 (삼연발의 추가 사용 포함). main = 본 사용 (플레이어 포즈 · 이동 불가 · 카메라 흔들림은 본 사용만).
+    /// </summary>
+    IEnumerator Use(Vector2 from, Vector2 dir, CastRef cast, bool main, float windup = WindupTime)
+    {
         float len = Reach(Tier.Long);
         float width = Range(Tier.Short) * WidthRatio;
-        var cast = DirectCast;
+        var st = new UseState();
+        float stun = ActualStun;
+        bool focus = HasSpecial(Focus);
+        System.Action<Enemy> onSword = e => { st.hits++; if (stun > 0f) e.Stun(stun); };
+        System.Action<Enemy> onBlast = e => { st.hits++; };
+        if (HasSpecial(Aftermath))
+        {
+            Vector2 center = from + (dir.sqrMagnitude > 0.01f ? dir.normalized : Vector2.right) * len * 0.5f;
+            onBlast += e =>
+            {
+                if (e == null || e.hp <= 0) return;
+                Vector2 to = center - (Vector2)e.transform.position;
+                float dist = to.magnitude;
+                if (dist > 0.3f) e.Push(to, Enemy.KnockSpeed(dist));   // 후폭풍: 폭발에 맞은 적을 중심으로 모음
+            };
+        }
 
         // 화염검: 위로 치켜든 채 준비 → 공격 방향으로 내려침 (그림이 없으면 예전처럼 바로 판정)
-        P.Root(WindupTime + SwingTime);   // 준비 · 내려치는 동안 이동 불가 (그림이 없어도 동일, 사용자 2026-11-22)
-        bool posed = P.ShowPose("OverheadRaise");   // 화염 검 준비 동작 (사용자 2026-11-22: ErnStray_OverheadRaise). 그림이 없으면 기존 모습 그대로
+        if (main) P.Root(windup + SwingTime);   // 준비 · 내려치는 동안 이동 불가 (그림이 없어도 동일, 사용자 2026-11-22)
+        bool posed = main && P.ShowPose("OverheadRaise");   // 화염 검 준비 동작 (사용자 2026-11-22: ErnStray_OverheadRaise). 그림이 없으면 기존 모습 그대로
         Transform blade = SpawnBlade(from, dir, len, out float startAngle, out float sweep);
         if (blade != null)
         {
             Vector2 ndir = dir.sqrMagnitude > 0.01f ? dir.normalized : Vector2.right;
             Vector2 bladeEnd = from + ndir * BladeForward;      // 내려친 화염검의 최종 자리 (공격 방향으로 BladeForward 앞)
             blade.position = from + Vector2.up * WindupLift;   // 대기 동작: 화염검 시작 피봇을 WindupLift 위치로
-            yield return new WaitForSeconds(WindupTime);
+            yield return new WaitForSeconds(windup);
             if (posed) P.ShowPose("RisingSlash_02");   // 내려베기 (사용자 2026-11-22: ErnStray_RisingSlash_02)
-            else P.PlayAttack(dir);
+            else if (main) P.PlayAttack(dir);
             for (float t = 0f; t < SwingTime; t += Time.deltaTime)
             {
                 float k = t / SwingTime;
@@ -194,24 +399,54 @@ public class OverFlameSlash : ActiveSkill
         }
         else
         {
-            if (posed) { yield return new WaitForSeconds(WindupTime); P.ShowPose("RisingSlash_02"); StartCoroutine(ReleasePoseAfter(BladeLinger)); }
-            else P.PlayAttack(dir);
+            if (main)
+            {
+                if (posed) { yield return new WaitForSeconds(windup); P.ShowPose("RisingSlash_02"); StartCoroutine(ReleasePoseAfter(BladeLinger)); }
+                else P.PlayAttack(dir);
+            }
             Fx.Box(from, dir, len, width, Fx.FireBright, 0.3f);
         }
-        SkillHits.Box(from, dir, len, width, MakeDamage(BladeDamage, cast), 2f, e => e.Stun(StunSeconds));
-        CameraFollow.Shake(0.08f, 0.08f);
+        SkillHits.Box(from, dir, len, width, Dmg(BladeDamage, cast), 2f, onSword);
+        if (main) CameraFollow.Shake(0.08f, 0.08f);
 
         // [임시] 폭발 위치 = 검을 내려친 자리 (넓은 직사각형)
         // 내려친 자리에 지면 잔흔 → 폭발 때 제거. 그림이 없으면 예전 바닥 직사각형
         yield return new WaitForSeconds(TraceDelay);   // 화염검이 다 사라진 순간 잔흔이 생김
-        Transform trace = SpawnGroundTrace(from, dir, len);
-        if (trace == null) Fx.Box(from, dir, len, width * ExplosionWidthMul, Fx.FireDeep, ExplosionDelay - TraceDelay);
-        yield return new WaitForSeconds(Mathf.Max(0f, ExplosionDelay - TraceDelay));
-        if (trace != null) Destroy(trace.gameObject);
-        if (!SpawnGroundBurst(from, dir, len)) Fx.Box(from, dir, len, width * ExplosionWidthMul, Fx.FireBright, 0.3f);
-        StartCoroutine(SpawnParticlePops(from, dir, len, width * ExplosionWidthMul));
-        SkillHits.Box(from, dir, len, width * ExplosionWidthMul, MakeDamage(ExplosionDamage, cast), 3f);
-        CameraFollow.Shake(0.15f, 0.15f);
+        if (!focus)   // 화염 집중: 폭발 삭제 (잔흔 · 폭발 연출도 없음)
+        {
+            Transform trace = SpawnGroundTrace(from, dir, len);
+            if (trace == null) Fx.Box(from, dir, len, width * ExplosionWidthMul, Fx.FireDeep, ExplosionDelay - TraceDelay);
+            yield return new WaitForSeconds(Mathf.Max(0f, ExplosionDelay - TraceDelay));
+            if (trace != null) Destroy(trace.gameObject);
+            if (!SpawnGroundBurst(from, dir, len)) Fx.Box(from, dir, len, width * ExplosionWidthMul, Fx.FireBright, 0.3f);
+            StartCoroutine(SpawnParticlePops(from, dir, len, width * ExplosionWidthMul));
+            SkillHits.Box(from, dir, len, width * ExplosionWidthMul, Dmg(ExplosionDamage, cast), 3f, onBlast);
+            if (main) CameraFollow.Shake(0.15f, 0.15f);
+        }
+        else yield return new WaitForSeconds(Mathf.Max(0f, ExplosionDelay - TraceDelay));
+
+        // 빠른 준비: 이번 사용의 적중 수만큼 남은 쿨타임 감소 (적중당 2.5%, 합계 90% 상한)
+        if (HasSpecial(QuickPrep) && st.hits > 0) ReduceRemainingCooldown(Mathf.Min(0.9f, QuickPrepPerHit * st.hits));
+
+        // 불타는 잔흔: 종료 시 남아 3초 동안 지속 피해 + 이동 속도 감소
+        if (HasSpecial(Trace))
+            yield return TraceField(from, dir, len, width * ExplosionWidthMul, cast);
+    }
+
+    /// <summary>불타는 잔흔: 폭발 자리에 3초 동안 남아 0.5초마다 고정 피해 · 이동 속도 70% 감소. 합계 = 총 피해량 (화염의 검 + 폭발 최종 피해량) 의 60% [해석]</summary>
+    IEnumerator TraceField(Vector2 from, Vector2 dir, float len, float boxWidth, CastRef cast)
+    {
+        float total = FinalDamageOf(BladeDamage) + (HasSpecial(Focus) ? 0f : FinalDamageOf(ExplosionDamage));
+        int ticks = Mathf.Max(1, Mathf.RoundToInt(TraceTime / TraceTick));
+        DamageInfo per = FixedOf(total * TraceRatio / ticks, cast);
+        Transform fx = SpawnGroundTrace(from, dir, len);
+        if (fx == null) Fx.Box(from, dir, len, boxWidth, Fx.FireDeep, TraceTime);
+        for (int i = 0; i < ticks; i++)
+        {
+            SkillHits.Box(from, dir, len, boxWidth, per, Enemy.NoKnock, e => e.SustainSlow(TraceSlow, TraceTick + 0.1f));
+            yield return new WaitForSeconds(TraceTick);
+        }
+        if (fx != null) Destroy(fx.gameObject);
     }
 
     /// <summary>내려친 화염검: 내려친 직후부터 BladeFadeTime (= 잔흔이 생기기 TraceDelay 전) 동안 서서히 투명해져 사라짐</summary>
@@ -298,7 +533,7 @@ public class OverFlameSlash : ActiveSkill
         root.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
         if (dir.x < -0.01f) root.localScale = new Vector3(1f, -1f, 1f);
         SpriteLoopEffect.Spawn(frames, TraceFps, root, new Vector2(0f, TracePivotBelowCenterPx * pxWorld), Fx.GroundOrder, 1f).Wobble(0.015f, 0.25f, 0.15f, 14f).FadeIn(TraceFadeIn);   // [임시] 한 장 + 일렁임 (가는 선이라 세로로 크게)
-        Destroy(root.gameObject, ExplosionDelay + 1f);   // 안전장치
+        Destroy(root.gameObject, TraceTime + ExplosionDelay + 1f);   // 안전장치 (불타는 잔흔은 3초 남음)
         return root;
     }
 
