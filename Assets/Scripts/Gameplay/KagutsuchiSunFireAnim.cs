@@ -26,7 +26,7 @@ public sealed class KagutsuchiSunFireAnim : IDisposable
 
     public KagutsuchiSunFireAnim()
     {
-        var texture = Resources.Load<Texture2D>("Sprites/" + Sheet);
+        var texture = SpriteLib.Load(Sheet);
         if (texture == null || texture.width != Cell * Columns || texture.height != Cell * Columns)
         {
             Debug.LogError("태양 화염 반복 시트가 없거나 1280×1280 규격과 다릅니다. 정지 그림으로 대체합니다.");

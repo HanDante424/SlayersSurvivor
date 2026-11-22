@@ -215,7 +215,7 @@ public class TripleSlash : ActiveSkill
         float interval = hits > BaseHits ? T.tripleSlashInterval * (BaseHits - 1) / (hits - 1) : T.tripleSlashInterval;
         bool ilseom = HasSpecial(Ilseom);
         var ilseomFrames = ilseom ? SpriteEffect.LoadFrames(IlseomSheet, 1, 5, 1f) : null;
-        var flameTex = (!ilseom && !TsubameOn) ? Resources.Load<Texture2D>("Sprites/" + FlameSheet) : null;   // 기본 3타: 새 불꽃 참격 (없으면 예전 시트)
+        var flameTex = (!ilseom && !TsubameOn) ? SpriteLib.Load(FlameSheet) : null;   // 기본 3타: 새 불꽃 참격 (없으면 예전 시트)
         // 특수 조합 츠바메가에시: 일섬 이펙트 대신 전용 이펙트 (시트가 없으면 일섬 이펙트로)
         var tsubameFrames = TsubameOn ? SpriteEffect.LoadFrames(TsubameSheet, 1, 5, 1f) : null;
 
@@ -274,7 +274,8 @@ public class TripleSlash : ActiveSkill
     /// <summary>기본 3타: 불꽃 참격 3개를 FlameInterval 간격으로, 방향 · 휨을 달리해 같은 자리에 띄움 (BentSlashFx 로 그림을 곡선으로 휘어 그림). 위치 · 방향은 시작 때 값 고정</summary>
     IEnumerator SpawnFlameSlashes(Texture2D tex, Vector2 at, Vector2 dir, float r)
     {
-        float baseAngle = dir.x >= 0f ? 0f : 180f;   // 기준 = 화면 수평 (바라보는 쪽이 왼쪽이면 180도). 참격은 이 수평 기준으로 FlameTurns 만큼 돌림 (사용자 2026-11-21)
+        float baseAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;   // 기준 = 보는 방향 (위 · 아래도 그 방향). 참격은 이 방향 기준으로 FlameTurns 만큼 돌림 (사용자 2026-11-22: 보는 방향에 맞춰 바뀌게)
+        // 휨 부호는 뒤집지 않음: 참격 묶음 전체를 보는 방향만큼 그대로 돌린 모양이라야 모임 (왼쪽을 볼 때 부호를 뒤집었더니 한곳에 모이지 않았음, 사용자 2026-11-22)
         float width = r * FlameWidth;
         for (int k = 0; k < FlameTurns.Length; k++)
         {
@@ -385,7 +386,7 @@ public class TripleSlash : ActiveSkill
     IEnumerator EmberRoutine(Strike s, float perTick)
     {
         float scale = RangeScale;
-        var flameTex = Resources.Load<Texture2D>("Sprites/" + FlameSheet);   // 새 불꽃 참격 (수평, 반 속도)
+        var flameTex = SpriteLib.Load(FlameSheet);   // 새 불꽃 참격 (수평, 반 속도)
         if (flameTex != null)
             BentSlashFx.Spawn(flameTex, 4, 3, 11, FlameFps * 0.5f, s.from + s.dir * (RangeOf(Hit.radius) * FxForward),
                               s.dir.x >= 0f ? 0f : 180f, RangeOf(Hit.radius) * FlameWidth * 0.8f, FlameSags[2], 11);

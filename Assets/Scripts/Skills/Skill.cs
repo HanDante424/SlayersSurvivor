@@ -476,6 +476,20 @@ public abstract class AutoSkill : Skill
     /// <summary>발동 · 쿨타임 설정 직후 (예: 빠른 공격 = 남은 쿨타임 절반)</summary>
     protected virtual void AfterFire() { }
 
+    /// <summary>디버그 맵 버튼용 (사용자 2026-11-22): 쿨타임 · 시전 중을 풀어 바로 발동할 수 있게</summary>
+    public override void DebugResetForCast() { Casting = false; timer = 0f; }
+
+    /// <summary>디버그 맵 버튼용: 자동 스킬을 지금 한 번 발동 (Tick 과 같은 순서). 대상이 없어 발동하지 않으면 false (쿨타임 소모 없음)</summary>
+    public override bool TryActivate()
+    {
+        if (P == null || P.IsStunned) return false;
+        BeginCast();
+        if (!Fire()) { timer = 0f; return false; }
+        timer = CooldownSeconds + CastDuration;
+        AfterFire();
+        return true;
+    }
+
     /// <summary>발동. 대상이 없어 발동하지 않았으면 false</summary>
     protected abstract bool Fire();
 

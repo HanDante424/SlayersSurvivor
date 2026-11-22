@@ -54,8 +54,22 @@ python -I .claude/skills/sprite-intake/scripts/inspect_bundle.py "<zip 또는 �
 - **이펙트 가장자리 뿌연 띠**: 칸 중심에서 바깥으로 갈수록 알파를 줄이는 원형 페이드를 scratchpad 스크립트로 적용 (이전 폭발 이펙트 처리 방식)
 - 정렬 뒤 1단계 검사를 출력물에 **다시 돌려** 숫자가 좋아졌는지 확인
 
+## 3.5 화질 통일: 줄인 복사본 (2026-11-22 사용자 합의, 앞으로 모든 새 스프라이트에 적용)
+화면에서 몇 배 줄여 그려지는 **큰 단일 그림** (스탠드 · 연출 포즈 · 큰 캐릭터 그림 등) 은 그대로 쓰면 질감이 서로 달라 보인다:
+밉맵 없이 쓰면 선명하게 지글거리고, 밉맵을 켜면 무압축이라 그림당 약 10MB (밉맵 + 2의 거듭제곱이 아닌 크기는 압축 불가).
+그래서 **원본은 그대로 두고 1/3 로 줄인 복사본 `{이름}_s3.png` 을 만들어 쓴다** (모습은 밉맵 원본과 거의 같고 용량은 약 1/9).
+```bash
+python -I Tools/shrink_sprite.py Assets/Resources/Sprites/<이름>.png      # --factor 3 (기본) · --out <폴더>
+```
+- 코드에서는 `Player.LoadShrinkable` 처럼 "복사본이 있으면 그것, 없으면 원본" 으로 불러오고, **그림 픽셀 좌표 (발 위치 · 기준점) 와 1유닛당 px 는 줄인 배율로 나눠** 계산. 스위치 `UseShrunkSprites` 로 원본으로 즉시 복귀 가능.
+- 줄인 배율을 바꾸면 복사본 이름의 숫자와 코드의 `ShrinkFactor` 를 같이 바꾼다. `.meta` 는 Unity 가 만들므로 사용자에게 Unity 창 클릭을 부탁.
+- 원본을 `Resources` 에 두면 빌드에 같이 들어감 → 복사본 확인이 끝나면 원본을 `Art/Incoming/` 으로 옮길지 사용자에게 묻는다 (옮기면 스위치로 되돌릴 수 없음).
+- **적용 대상**: 큰 단일 그림. **제외**: 이펙트 시트 · 칸 격자 시트 (칸 크기 · 픽셀 좌표 상수를 코드가 직접 씀 → 줄이면 상수가 깨짐, 필요하면 개별로 판단해 사용자와 상의). 새로 줄이기 전에 `compare` 식으로 복사본 · 원본 모습과 용량을 숫자로 보여 주고 사용자 OK 를 받는다 (프로젝트 규칙 6).
+
 ## 4. 저장
-- 위치: `Assets/Resources/Sprites/`, 이름: `<캐릭터>_<내용>.png` (예: `Lenia_TurretDeploy`, `ErnStray_Slash`)
+- 위치: `Assets/Resources/Sprites/<분류 폴더>/` (2026-11-22 폴더 분류: `ErnStray/{Character,Pose,Fx}` · `Kagutsuchi/{Body,Fx,Map}` · `Lenia/{Character,Fx}` · `Ganiac` · `Enemy` · `Common`), 이름: `<캐릭터>_<내용>.png` (예: `Lenia_TurretDeploy`, `ErnStray_UltCharge`). **이름은 폴더가 달라도 겹치면 안 됨.**
+  - 코드는 폴더를 몰라도 되게 `SpriteLib.Load("이름")` 으로 불러온다 (`Resources.Load("Sprites/…")` 직접 쓰지 말 것). 새 그림을 어느 폴더에 넣어도 `Assets/Editor/SpriteIndexBuilder.cs` 가 이름 → 폴더 표 (`Assets/Scripts/Core/SpriteIndex.cs`, 자동 생성 · 직접 고치지 말 것) 를 갱신 (Unity 창이 활성화될 때). 메뉴 SlayersSurvivor → 스프라이트 폴더 표 다시 만들기 로 수동 갱신도 가능.
+  - 새 분류 폴더를 만들 때는 위 목록에 맞춰 기존 폴더를 우선 쓰고, 정말 새 종류일 때만 폴더를 추가
 - 캐릭터 시트 규칙 (`SpriteSheetAnimator`): **행 = 아래 · 왼쪽 · 오른쪽 · 위, 열 = 프레임**, `_Idle` (4×1) · `_Run` (4×N) · `_<동작>`
 - 이펙트 시트: 프레임 순서 = 행(위→아래) → 열(왼→오) (`SpriteEffect.LoadFrames(name, rows, cols, cellWorldWidth)`)
 - 임포트 설정은 `Assets/Editor/SpriteImportSettings.cs` 가 자동 적용 (무압축 · 밉맵 · 트라이리니어). `.meta` 는 **Unity 가 만든다**:

@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -1246,7 +1246,7 @@ public class GaniacSwing : MonoBehaviour
     static Sprite BladeSprite()
     {
         if (bladeSprite != null) return bladeSprite;
-        var tex = Resources.Load<Texture2D>("Sprites/Ganiac_DarkSword");
+        var tex = SpriteLib.Load("Ganiac_DarkSword");
         if (tex == null) return null;
         float ppu = tex.height * (1f - PivotFromTop) / BladeLength;
         bladeSprite = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), new Vector2(0.5f, 1f - PivotFromTop), ppu, 0, SpriteMeshType.FullRect);

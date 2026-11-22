@@ -17,12 +17,12 @@ public static class ErnSkillFx
     // 예전 시트 "ErnStray_SkillFireSlash" (2행 x 4열, 7프레임) 는 Art/Incoming/Retired 로 옮김.
     public const string FireSlashSheet = "ErnStray_SkillFireSlashAnim";
     // 검기 발사 (파이어 슬래시 Lv.10): 2026-11-20 신규 시트 (1행 x 6열, 칸 320x512, 12fps 반복). 예전에는 슬래시 이펙트를 그대로 날렸음
-    public const string FireBladeWaveSheet = "ErnStray_FireBladeWave";
+    public const string FireBladeWaveSheet = "ErnStray_FireBladeWave_One";   // 한 장 (프레임 6, 2026-11-22 용량 절약, 원본 6프레임 시트는 Art/Incoming/Retired/FxSheets)
     // 트리플 슬래시 이펙트는 2026-11-21 에 불꽃 참격 (BentSlashFx + ErnStray_TripleSlashFlame) 으로 교체, 예전 시트는 Art/Incoming/Retired 로 옮김.
     public const string SolarSlashSheet = "ErnStray_SkillSolarSlash";   // 4행 x 3열
 
     public static Sprite[] FireSlash => SpriteEffect.LoadFrames(FireSlashSheet, 1, 6, 1f);
-    public static Sprite[] FireBladeWave => SpriteEffect.LoadFrames(FireBladeWaveSheet, 1, 6, 1f);
+    public static Sprite[] FireBladeWave => SpriteEffect.LoadFrames(FireBladeWaveSheet, 1, 1, 1f);
     public static Sprite[] SolarSlash => SpriteEffect.LoadFrames(SolarSlashSheet, 4, 3, 1f);
 
     /// <summary>
@@ -58,7 +58,10 @@ public class FireSlash : AutoSkill
 
     const float FxFps = 16f;            // 신규 시트 제작 사양 (6프레임 → 약 0.38초)
     const float FxWidth = 3.5f;         // [임시] 이펙트 한 칸 가로 = 범위 x 이 값 (신규 시트는 가장 큰 프레임이 칸의 84% → 예전 시트의 최대 길이에 맞춤)
-    const float FxForward = 1.2f;      // [임시] 이펙트 중심 = 플레이어 앞 범위 x 이 값
+    const float FxDistance = 2f;        // 이펙트 중심 = 플레이어 앞 이 거리 (사용자 2026-11-22: 1 → 2). 처음에는 범위 x 1.2
+    const float FxUpExtra = 0.5f;       // 위를 볼 때 이펙트를 더 멀리 (사용자 2026-11-22)
+    const float FxDownExtra = 1.0f;     // 아래를 볼 때 더 멀리 + 높이 올림 없음 (사용자 2026-11-22: 아래는 좀더 내려가게)
+    const float FxHeight = 0.3f;        // 이펙트를 위로 올리는 높이 (월드, 사용자 2026-11-22: y 0.3). 판정은 그대로
 
     // 특수 강화 id
     public const string Track = "F5A", Scatter = "F5B", BothWays = "F5C";
@@ -197,7 +200,12 @@ public class FireSlash : AutoSkill
     {
         var frames = ErnSkillFx.FireSlash;
         if (frames != null)
-            ErnSkillFx.SpawnDirected(frames, FxFps, from + dir * (Radius * FxForward), dir, Radius * FxWidth);
+            {
+            // 위 · 아래를 볼 때는 더 멀리: 방향의 세로 성분만큼 보정, 아래쪽은 0.3 올림을 없앰
+            float dist = FxDistance + Mathf.Abs(dir.y) * (dir.y > 0f ? FxUpExtra : FxDownExtra);
+            float h = FxHeight * (1f - Mathf.Max(0f, -dir.y));
+            ErnSkillFx.SpawnDirected(frames, FxFps, from + dir * dist + new Vector2(0f, h), dir, Radius * FxWidth);
+        }
         else
             Fx.Arc(from, dir, Radius, Fx.Fire, 0.15f);
         SkillHits.Directed(Hit, from, dir, RangeScale, MakeDamage(BaseDamage, cast));   // 모양은 SkillTuning.fireSlash
@@ -399,7 +407,8 @@ public class SolarSlash : AutoSkill
     // 새 3분할 이펙트 (2026-11-20 사용자): 첫 베기 고리 → 중간 고리 (반복 · 회전, 타오름에도 사용) → 폭발 고리
     // 원본 Project Slayers/output/ErnStray_SolarSlash_RingFormation_v1 · RingBurn_Loop_v1 · RingBurst_v1
     const string RingFormSheet = "ErnStray_SolarSlashRing";        // 4×4, 칸 512, 16프레임 (시계 반대로 고리가 그려짐)
-    const string RingLoopSheet = "ErnStray_SolarSlashRingLoop";    // 4행×5열, 칸 512, 20프레임 반복
+    // 한 장 (프레임 1) + 코드 회전 (RingLoopSpin) — 2026-11-22 사용자, 용량 절약. 원본 4행×5열 20프레임 시트는 Art/Incoming/Retired/FxSheets (되돌리기: 시트 이름 · LoadFrames(…, 4, 5, …))
+    const string RingLoopSheet = "ErnStray_SolarSlashRingLoop_One";
     const string RingBurstSheet = "ErnStray_SolarSlashRingBurst";  // 4×4, 칸 768 (같은 픽셀 축척), 15프레임 + 빈 칸
     const float RingCellPx = 512f, RingBurstCellPx = 768f;
     // 고리 반지름(px) = 판정 반경 (2026-11-20 사용자: 고리 = 베기 반경). 측정: 안쪽 경계 152px · 바깥 불꽃 끝 약 186px 의 중간
@@ -421,7 +430,13 @@ public class SolarSlash : AutoSkill
     const float StunSeconds = 1f;           // 뇌진탕: 기절 1초
     const float SlowMul = 0.5f, SlowSeconds = 2f;   // 느린 회복 · 플레어: 2초간 이동속도 50% 감소
     const float EchoCooldown = 0.25f;       // 메아리: 쿨타임 +25%
-    const float BurnDuration = 5f, BurnTick = 1f;   // 타오름: 5초간 매초
+    // 타오름 장판 ErnStray_SolarSlashBurnField (2026-11-22 사용자 전달 단일 그림, 원본 1254px → 게임용 1024px). 시트 (2000×1600 20프레임) 대신 코드로 연출 (GroundFieldFx)
+    const string BurnFieldSheet = "ErnStray_SolarSlashBurnField";
+    const float BurnFieldSrcPx = 1254f;                  // 원본 가로 (좌표 기준)
+    const float BurnFieldRadiusPx = 470f;                // 측정: 원판의 단단한 가장자리 반지름 (알파 > 200 픽셀의 99% 가 465px 이내, 가장자리는 흐림)
+    static readonly Vector2 BurnFieldCenterNorm = new Vector2(613.5f / 1254f, 631f / 1254f);   // 측정: 원판 중심 (위 기준 623 → 아래 기준 631)
+    const float BurnDuration = 5f, BurnTick = 1f;
+    const float BurnShrinkTime = 0.5f;   // 타오름이 끝나면 장판 · 고리가 플레이어 쪽으로 줄어들며 사라지는 시간 (사용자 2026-11-22). [임시]   // 타오름: 5초간 매초
     const float BurnRange = 0.5f;           //         공격 범위 +50%
     const float BurnRangePerKnock = 1f;     //         넉백 범위 5%당 공격 범위 +5%
     const float BurnDamagePerKnock = 0.2f;  //         넉백 범위 5%당 피해 +1%
@@ -615,7 +630,15 @@ public class SolarSlash : AutoSkill
         var frames = ringFx ? null : ErnSkillFx.SolarSlash;
         if (ringFx) StartRing(ringState, r0);
         else if (frames != null) SpriteEffect.Spawn(frames, FxFps, P.transform, Vector2.zero, 0f, false, 11, r0 * FxWidth);
-        var ring = Fx.GroundCircle(P.transform.position, r0, Fx.FireDeep, BurnDuration, P.transform);   // 장판 = 바닥 레이어
+        // 장판 = 바닥 레이어: 불타는 원판 그림 한 장을 코드로 회전 · 맥동 (시트 대신, 용량 절약 · 2026-11-22 사용자). 그림이 없으면 예전 단색 원
+        GameObject ring = null;
+        var fieldTex = SpriteLib.Load(BurnFieldSheet);
+        if (fieldTex != null)
+        {
+            var field = GroundFieldFx.Spawn(fieldTex, BurnFieldCenterNorm, BurnFieldRadiusPx, BurnFieldSrcPx, P.transform, r0, BurnDuration + BurnShrinkTime, Fx.GroundOrder, BurnShrinkTime);   // 장판은 끝나면 스스로 줄어들며 사라짐
+            if (field != null) ring = field.gameObject;
+        }
+        else { var shape = Fx.GroundCircle(P.transform.position, r0, Fx.FireDeep, BurnDuration, P.transform); if (shape != null) ring = shape.gameObject; }
 
         // 0초부터 피해 간격마다 (기본 1초 → 0·1·2·3·4초 5회). 가속 연소면 간격이 줄어 더 자주
         float elapsed = 0f;
@@ -652,14 +675,14 @@ public class SolarSlash : AutoSkill
             yield return new WaitForSeconds(iv);
             elapsed += iv;
         }
-        if (ring != null) Destroy(ring.gameObject);
-        if (ringFx) EndRing(ringState);
+        if (ring != null && ring.GetComponent<GroundFieldFx>() == null) Destroy(ring);   // 단색 원 대체만 바로 지움 (그림 장판은 스스로 줄어들며 사라짐)
+        if (ringFx) ShrinkRing(ringState);   // 중간 고리도 플레이어 쪽으로 줄어들며 사라짐
         Casting = false;
     }
 
     // ---------- 새 3분할 고리 이펙트 ----------
     static Sprite[] RingForm => SpriteEffect.LoadFrames(RingFormSheet, 4, 4, 1f);
-    static Sprite[] RingLoop => SpriteEffect.LoadFrames(RingLoopSheet, 4, 5, 1f);
+    static Sprite[] RingLoop => SpriteEffect.LoadFrames(RingLoopSheet, 1, 1, 1f);
     static Sprite[] RingBurst => SpriteEffect.LoadFrames(RingBurstSheet, 4, 4, 1f, RingBurstFrames);
     /// <summary>세 장이 모두 있을 때만 새 연출 (하나라도 없으면 기존 한 장짜리 시트)</summary>
     static bool RingFramesReady => RingForm != null && RingLoop != null && RingBurst != null;
@@ -693,6 +716,14 @@ public class SolarSlash : AutoSkill
         if (s.loop != null) s.loop.Stop();
         s.loop = null;
         return angle;
+    }
+
+    /// <summary>타오름 종료: 중간 고리를 끄지 않고 플레이어 (고리 중심) 쪽으로 줄어들며 사라지게 함</summary>
+    void ShrinkRing(RingState s)
+    {
+        s.ended = true;
+        if (s.loop != null) s.loop.ShrinkOut(BurnShrinkTime);
+        s.loop = null;
     }
 
     /// <summary>폭발 고리 (1번째 프레임 = 중간 고리 1번째와 같은 그림 → 이어서 바깥으로 터짐). 크기 = 지금 베기 반경 기준</summary>
@@ -738,7 +769,8 @@ public class FireBall : AutoSkill
     const float ExplosionFxPerDiameter = 1f / 0.705f;   // 가장 큰 프레임(4번)의 그림 폭 361px / 칸 512px → 칸 가로 = 폭발 지름 ÷ 0.705 (측정값)
 
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
-    float MaxRange => Reach(Tier.Long);
+    const float RangeMul = 10f;         // 사거리 배율 (사용자 2026-11-22: 10배). 대상 인식 거리와 투사체 수명이 같이 늘어남
+    float MaxRange => Reach(Tier.Long) * RangeMul;
     float ExplosionRadius => Range(Tier.Short) * ExplosionRatio;
 
     protected override bool Fire()
@@ -752,8 +784,27 @@ public class FireBall : AutoSkill
         float size = Mathf.Max(0.3f, Range(Tier.Short) * 0.3f);
         var p = Projectile.Spawn(from, dir, Speed, MakeDamage(DirectDamage, cast), Pierce, MaxRange / Speed,
                                  "FireBall", new Color(1f, 0.55f, 0.15f), size);
+        AttachBallFx(p, dir, size);
         p.onHit = (e, at) => Explode(at, cast);
         return true;
+    }
+
+    // 투사체 이펙트 ErnStray_FireBallFx (2026-11-22 사용자): 2×2 칸 640×352, 4프레임 반복. 머리 = 오른쪽, 꼬리 = 왼쪽 (진행 방향이 머리).
+    // 머리 (밝은 구) 지름 약 215px → 투사체 지름과 같게, 머리 중심은 칸 중심에서 오른쪽 180px
+    const string BallSheet = "ErnStray_FireBallFx";
+    const float BallFps = 12f;          // [임시] 4프레임 = 약 0.33초 반복
+    const float BallCellPerHead = 640f / 215f;   // 칸 가로 = 머리 지름 x 이 값 (측정값)
+    const float BallHeadOffsetCells = 180f / 640f;   // 머리 중심이 칸 중심에서 떨어진 정도 (칸 가로 단위)
+
+    /// <summary>도형 투사체 대신 불덩이 그림을 붙임 (그림이 없으면 기존 원 그대로)</summary>
+    static void AttachBallFx(Projectile p, Vector2 dir, float size)
+    {
+        var frames = SpriteEffect.LoadFrames(BallSheet, 2, 2, 1f, 4);
+        if (frames == null || p == null) return;
+        if (p.TryGetComponent<SpriteRenderer>(out var circle)) circle.enabled = false;
+        float scale = BallCellPerHead;   // 투사체 크기 (부모 스케일 = 머리 지름) 기준
+        var fx = SpriteLoopEffect.Spawn(frames, BallFps, p.transform, new Vector2(-BallHeadOffsetCells * scale, 0f), 9, scale);
+        if (fx != null && dir.x < 0f) fx.transform.localScale = new Vector3(scale, -scale, 1f);   // 왼쪽으로 날 때 위아래가 뒤집히지 않게
     }
 
     /// <summary>
@@ -783,13 +834,14 @@ public class FireBuster : AutoSkill
     const float FxFps = 15f;            // manifest 제안 프레임 30~90ms (평균 약 0.064초) → 8프레임 약 0.53초
     const float FxPerDiameter = 1f / 0.80f;   // 최대 폭발 프레임(5번) 그림 폭 410px / 칸 512px → 칸 가로 = 판정 지름 ÷ 0.80 (측정값). 6~8번 불씨는 판정 밖으로 조금 더 퍼짐
 
+    const float RangeMul = 1.75f;       // 범위 배율 (사용자 2026-11-22: 2.5배 → 30% 감소 = 1.75배). 판정 · 이펙트 크기 모두
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
-    float Radius => Range(Tier.Mid);
+    float Radius => Range(Tier.Mid) * RangeMul;
 
     protected override bool Fire()
     {
         Vector2 from = P.transform.position;
-        if (Nearest(from, Radius) == null) return false;
+        // 인식 범위 없음: 주변에 적이 없어도 쿨타임마다 상시 발동 (사용자 2026-11-22)
         var frames = SpriteEffect.LoadFrames(FxSheet, 3, 3, 1f, FxFrames);
         // 플레이어 위치에 고정 (따라다니지 않음)
         if (frames != null) SpriteEffect.Spawn(frames, FxFps, null, from, 0f, false, 12, Radius * 2f * FxPerDiameter);
@@ -812,6 +864,7 @@ public class FireBlade : AutoSkill
     const float SlashDamage = 3f, ExplosionDamage = 20f, BaseCooldown = 15f;
     const float SlashInterval = 0.12f;  // [임시]
     const float ExplosionRatio = 0.35f; // [임시] 폭발 반경 = 범위 좁음 × 비율 (기획 미정)
+    const float FirstSlashDistance = 1.5f;   // 첫 베기 중심 = 플레이어 앞 이 거리 (사용자 2026-11-22: 2.5 → 1.5 더 가깝게). 판정 · 이펙트 · 적 인식이 같은 중심. 이전에는 플레이어 위치
 
     // 첫 베기 이펙트 ErnStray_FireBladeSlash (원본 Project Slayers/output/FireSlash_OpenRing_Animation_v1):
     // 4×4, 칸 768, 15프레임 + 빈 칸, 시계 반대로 약 300° 베고 오른쪽이 열린 고리. 열린 쪽이 바라보는 방향을 향하게 회전 (2026-11-20 사용자)
@@ -832,7 +885,7 @@ public class FireBlade : AutoSkill
     const float ComboStrokePx = 450f;         // 측정: 가장 큰 프레임(6번) 참격 길이 (43,343)→(415,90)
     const float ComboStrokeAngle = 34f;       // 측정: 같은 두 끝점을 이은 각도 (화면 기준 오른쪽 위)
     static readonly Vector2 ComboStrokeCenterPx = new Vector2(-27f, 39.5f);   // 측정: 참격 중심이 칸 중심에서 왼쪽 27 · 위 39.5px
-    const float ComboStrokeWorld = 1.2f;      // [임시] 참격 길이 (월드). 이전 도형 참격 0.67
+    const float ComboStrokeWorld = 2.4f;      // [임시] 참격 길이 (월드). 사용자 2026-11-22: 2배 (1.2 → 2.4). 처음 도형 참격 0.67
 
     // 마지막 폭발 이펙트 ErnStray_FireBladeExplosion (원본 Project Slayers/output/FireExplosion_DiagonalTear_v1):
     // 4열×3행, 칸 768, 11프레임 + 빈 칸, 불꽃 덩어리 + 왼쪽 아래 ↔ 오른쪽 위 대각선 파편. 그림 그대로 (회전 · 반전 없음)
@@ -844,38 +897,43 @@ public class FireBlade : AutoSkill
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
     float Radius => Range(Tier.Mid);
 
-    readonly List<Enemy> found = new List<Enemy>();
+    Vector2 aim = Vector2.right;       // 이번 사용의 대상 방향 (첫 베기 중심 = 플레이어 + aim x FirstSlashDistance)
 
     protected override bool Fire()
     {
-        Vector2 from = P.transform.position;
-        SkillHits.InCircle(from, Radius, found);
-        if (found.Count == 0) return false;
+        // 범위 (플레이어에서 첫 베기 중심까지 + 반경) 안에 적이 있으면 가장 가까운 적 방향으로 알아서 사용 (사용자 2026-11-22)
+        Vector2 me = P.transform.position;
+        var target = Nearest(me, FirstSlashDistance + Radius);
+        if (target == null) return false;
+        aim = ((Vector2)target.transform.position - me);
+        aim = aim.sqrMagnitude > 0.0001f ? aim.normalized : P.Facing.normalized;
         Casting = true;   // 첫 베기 → 연속 참격 → 폭발이 끝난 뒤 쿨타임
         StartCoroutine(Run());
         return true;
     }
 
-    /// <summary>첫 베기 이펙트: 열린 쪽 = 바라보는 방향, 고리 중심 = 플레이어 (그림 속 고리 중심 오프셋 보정). 플레이어를 따라감</summary>
-    void SpawnFirstSlashFx(Vector2 facing, float r)
+    /// <summary>첫 베기 이펙트: 열린 쪽 = 플레이어 쪽 (대상 방향의 반대), 고리 중심 = 대상 방향으로 플레이어에서 FirstSlashDistance (그림 속 고리 중심 오프셋 보정). 플레이어를 따라감</summary>
+    void SpawnFirstSlashFx(Vector2 aimDir, float r)
     {
         var frames = SpriteEffect.LoadFrames(FirstSlashSheet, 4, 4, 1f, FirstSlashFrames);
-        if (frames == null) { Fx.Circle(P.transform.position, r, Fx.FireBright, 0.25f, P.transform); return; }
+        Vector2 ahead = aimDir * FirstSlashDistance;
+        if (frames == null) { Fx.Circle((Vector2)P.transform.position + ahead, r, Fx.FireBright, 0.25f, P.transform); return; }
         float width = r * FirstSlashCellPx / ArcCorePx;
-        float angle = Mathf.Atan2(facing.y, facing.x) * Mathf.Rad2Deg;
+        float angle = Mathf.Atan2(-aimDir.y, -aimDir.x) * Mathf.Rad2Deg;   // 고리의 열린 쪽 = 플레이어 쪽
         Vector2 offset = (Vector2)(Quaternion.Euler(0f, 0f, angle) * (ArcCenterPx * (width / FirstSlashCellPx)));
-        SpriteEffect.Spawn(frames, FirstSlashFps, P.transform, -offset, angle, false, 11, width);
+        SpriteEffect.Spawn(frames, FirstSlashFps, P.transform, ahead - offset, angle, false, 11, width);
     }
 
     IEnumerator Run()
     {
         var cast = DirectCast;
         float r = Radius;
-        SpawnFirstSlashFx(P.Facing, r);
+        Vector2 dirNow = aim;   // 사용 시점의 대상 방향 고정
+        SpawnFirstSlashFx(dirNow, r);
         yield return new WaitForSeconds(FirstSlashHitDelay);
 
         // 1) 첫 베기: 범위 안 모든 적 (넉백 없음 — 노션 키워드에 넉백 없음). 맞은 적 = 연속 참격 대상
-        Vector2 from = P.transform.position;
+        Vector2 from = (Vector2)P.transform.position + dirNow * FirstSlashDistance;   // 첫 베기 중심 (플레이어가 움직여도 방향은 사용 시점 값)
         var hit = new List<Enemy>();
         SkillHits.Circle(from, r, MakeDamage(FirstSlashDamage, cast), 0f, e => hit.Add(e));
         HitDebug.Circle(from, r, HitDebug.SlashColor);
@@ -955,6 +1013,7 @@ public class FireStorm : AutoSkill
     const float SlowMul = 0.5f;         // [임시] 슬로우 비율 (기획 미정)
     const float DotDamage = 2f, ExplosionDamage = 15f, BaseCooldown = 14f;
     const float Knock = 9f;             // [임시]
+    const float RangeMul = 1.69f;       // 범위 배율 (사용자 2026-11-22: 30% 증가를 두 번 = 1.3 x 1.3). 소용돌이 · 폭발 모두
 
     // 소용돌이 고리 그림 ErnStray_FireStormRing (2026-11-20 사용자 전달 1장, 1254px 정사각, 원본 webp = Art/Incoming/ErnStray/FireStorm_Ring_source.webp)
     // 생성: 플레이어 위치에서 점점 커져 판정 크기에 맞춤 → 지속 중 시계 반대 회전 → 폭발: 커지면서 사라짐 (2026-11-20 사용자)
@@ -969,8 +1028,7 @@ public class FireStorm : AutoSkill
 
     protected override bool Fire()
     {
-        Vector2 from = P.transform.position;
-        if (Nearest(from, Range(Tier.Short)) == null) return false;
+        // 인식 범위 없음: 주변에 적이 없어도 쿨타임마다 상시 발동 (사용자 2026-11-22)
         StartCoroutine(Run());
         return true;
     }
@@ -980,7 +1038,7 @@ public class FireStorm : AutoSkill
         // 화염 소용돌이 = 간접 사용 · 지속 피해 (틱마다 내림), 마지막 폭발 = 직접 사용 · 직접 피해
         var cast = DirectCast;
         DamageInfo perTick = MakeDamage(DotDamage, cast.AsIndirect, DamageType.DoT);
-        float rSmall = Range(Tier.Short);
+        float rSmall = Range(Tier.Short) * RangeMul;
 
         // [임시 해석] '주변' = 플레이어를 따라다니는 범위
         var ringFrames = SpriteEffect.LoadFrames(RingSprite, 1, 1, 1f);
@@ -1000,7 +1058,7 @@ public class FireStorm : AutoSkill
         if (ring != null) Destroy(ring.gameObject);
 
         Vector2 at = P.transform.position;
-        float rBig = Range(Tier.Mid);
+        float rBig = Range(Tier.Mid) * RangeMul;
         // 폭발: 고리가 폭발 범위까지 커지며 사라짐 (그림이 없으면 도형 폭발)
         if (vortex != null) vortex.Burst(rBig * RingCanvasPx / RingMidPx, RingBurstTime);
         else Fx.Disc(at, rBig, Fx.Fire, 0.3f);

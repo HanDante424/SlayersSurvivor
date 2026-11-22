@@ -131,7 +131,7 @@ public class ImpactFrame : MonoBehaviour
 /// </summary>
 public class ImpactSlashOverlay : MonoBehaviour
 {
-    const string Sheet = "Sprites/ErnStray_SkillTripleSlashIlseom";
+    const string Sheet = "ErnStray_SkillTripleSlashIlseom";
     const int Cols = 3, Rows = 2;
     const float Fps = 20f;                  // 6프레임 → 0.3초
     const float SizeOfDiagonal = 0.9f;      // [임시] 칸 한 변 / 화면 대각선 (참격 길이가 칸 가로의 약 1.27배라 대각선보다 길어짐)
@@ -144,7 +144,7 @@ public class ImpactSlashOverlay : MonoBehaviour
     {
         var cam = Camera.main;
         if (cam == null) return;
-        var tex = Resources.Load<Texture2D>(Sheet);
+        var tex = SpriteLib.Load(Sheet);
         if (tex == null) return;
         var go = new GameObject("ImpactSlashOverlay");
         var o = go.AddComponent<ImpactSlashOverlay>();
@@ -183,7 +183,7 @@ public class ImpactSlashOverlay : MonoBehaviour
 /// </summary>
 public class ImpactScreenFlow : MonoBehaviour
 {
-    const string Sheet = "Sprites/ErnStray_ScreenImpact";
+    const string Sheet = "ErnStray_ScreenImpact";
     const int Cols = 4, Rows = 3;
     const float Fps = 30f;   // 미리보기 GIF 기준 (칸당 약 0.033초 → 전체 약 0.4초)
 
@@ -192,7 +192,7 @@ public class ImpactScreenFlow : MonoBehaviour
 
     public static void Spawn()
     {
-        var tex = Resources.Load<Texture2D>(Sheet);
+        var tex = SpriteLib.Load(Sheet);
         if (tex == null) return;
         var go = new GameObject("ImpactScreenFlow");
         var o = go.AddComponent<ImpactScreenFlow>();

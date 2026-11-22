@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using UnityEngine;
 
 /// <summary>
@@ -210,7 +210,7 @@ public sealed class KagutsuchiPhase2 : IDisposable
                                    () => airRoot != null ? airRoot.transform : body.transform,
                                    (ground, radius) => physicalStomp.Play(ground, radius),
                                    (position, facingRight) => sonicBoom.Play(position, facingRight));
-        var sheet =Resources.Load<Texture2D>("Sprites/" + RunSheet);
+        var sheet =SpriteLib.Load(RunSheet);
         if (sheet != null && stand != null && sheet.width == RunCell * RunFrameCount && sheet.height == RunCell)
         {
             // 같은 배율·같은 발 기준으로 잘라 3·7프레임의 공중 높이를 보존.

@@ -26,15 +26,15 @@ public sealed class KagutsuchiPhysicalStompFx : MonoBehaviour
     void Awake()
     {
         bodyVisual = GetComponent<SpriteRenderer>();
-        var back = Resources.Load<Texture2D>("Sprites/Kagutsuchi_P2_Fx_PhysicalStompDepth_Back");
-        var front = Resources.Load<Texture2D>("Sprites/Kagutsuchi_P2_Fx_PhysicalStompDepth_Front");
+        var back = SpriteLib.Load("Kagutsuchi_P2_Fx_PhysicalStompDepth_Back");
+        var front = SpriteLib.Load("Kagutsuchi_P2_Fx_PhysicalStompDepth_Front");
         if (back == null || front == null || back.width != Columns * CellWidth || front.width != Columns * CellWidth
             || back.height != Rows * CellHeight || front.height != Rows * CellHeight)
         {
             Debug.LogError("앞뒤 분리용 스톰프 시트가 없거나 각1536×512 규격과 다릅니다.");
             return;
         }
-        var crack = Resources.Load<Texture2D>("Sprites/" + CrackSheet);
+        var crack = SpriteLib.Load(CrackSheet);
         if (crack != null)   // 가로 1 유닛 (루트 크기 = 지름) 기준, 중심 피벗
             crackSprite = Sprite.Create(crack, new Rect(0, 0, crack.width, crack.height), new Vector2(0.5f, 0.5f), crack.width, 0, SpriteMeshType.FullRect);
         backFrames = new Sprite[FrameCount];

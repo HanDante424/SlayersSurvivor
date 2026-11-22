@@ -48,7 +48,7 @@ public sealed class KagutsuchiPillarField : IDisposable
 
     public KagutsuchiPillarField()
     {
-        var texture = Resources.Load<Texture2D>("Sprites/" + SheetName);
+        var texture = SpriteLib.Load(SheetName);
         if (texture != null && texture.width == Cell * Columns && texture.height == Cell * Columns)
         {
             frames = new Sprite[FrameCount];
@@ -324,7 +324,7 @@ public sealed class KagutsuchiKickWindFx : IDisposable
 
     public KagutsuchiKickWindFx()
     {
-        var texture = Resources.Load<Texture2D>("Sprites/" + SheetName);
+        var texture = SpriteLib.Load(SheetName);
         if (texture == null || texture.width != Columns * Cell || texture.height != Rows * Cell) return;
         frames = new Sprite[FrameCount];
         for (int i = 0; i < FrameCount; i++)

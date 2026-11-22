@@ -157,6 +157,9 @@ public class DebugMapController : MonoBehaviour
     bool panelOpen = true;                                   // 디버그 창 전체 켜기 · 끄기 (사용자 2026-11-16, 버튼 또는 ` 키)
     readonly System.Collections.Generic.Dictionary<string, bool> sectionOpen = new System.Collections.Generic.Dictionary<string, bool>();   // 태그 (구역) 별 접기 · 펴기
     Rect toggleRect;
+    // 태그 (탭) 버튼: 눌러서 디버그 항목을 종류별로 전환 (사용자 2026-11-22: 항목이 너무 많아 가독성이 떨어짐)
+    static readonly string[] TabNames = { "맵 · 소환", "대상 · 패턴", "스킬", "특수 강화", "플레이어 그림", "보기 · 시간" };
+    int tab;
     float timeScale = 1f;
     int stepFrames;               // > 0 이면 한 프레임만 진행 후 다시 정지
     GUIStyle btn, btnOn, label, head, info;
@@ -258,8 +261,18 @@ public class DebugMapController : MonoBehaviour
 
         GUILayout.Label("디버그 맵", head);
 
+        // ----- 태그 버튼 (한 줄에 3개) -----
+        for (int i = 0; i < TabNames.Length; i += 3)
+        {
+            GUILayout.BeginHorizontal();
+            for (int j = i; j < Mathf.Min(i + 3, TabNames.Length); j++)
+                if (GUILayout.Button(TabNames[j], tab == j ? btnOn : btn, GUILayout.Height(26)) && tab != j) { tab = j; scroll = Vector2.zero; }
+            GUILayout.EndHorizontal();
+        }
+        GUILayout.Space(4);
+
         // ----- 맵 -----
-        if (Section("맵"))
+        if (tab == 0 && Section("맵"))
         {
             GUILayout.Label($"맵 크기  <color=#AAAAAA>{Stage.PresetLabel(Stage.Preset)} · {Stage.HalfSize.x * 2f:0.#} × {Stage.HalfSize.y * 2f:0.#}</color>", label);
             GUILayout.BeginHorizontal();
@@ -271,13 +284,13 @@ public class DebugMapController : MonoBehaviour
 
         // ----- 소환 -----
         GUILayout.Space(6);
-        if (Section("소환 — 보스"))
+        if (tab == 0 && Section("소환 — 보스"))
         {
             if (Toggle("등장 연출 재생", DebugMap.PlayIntro)) DebugMap.PlayIntro = !DebugMap.PlayIntro;
             foreach (var en in DebugMap.Bosses)
                 if (GUILayout.Button(en.label, btn, GUILayout.Height(26))) DebugMap.Spawn(en, 1);
         }
-        if (Section("소환 — 몬스터"))
+        if (tab == 0 && Section("소환 — 몬스터"))
         {
             GUILayout.BeginHorizontal();
             GUILayout.Label($"수량 {monsterCount}", label, GUILayout.Width(70));
@@ -293,7 +306,7 @@ public class DebugMapController : MonoBehaviour
         DebugMap.Clean();
         GUILayout.Space(6);
         var t = DebugMap.Target;
-        if (Section("대상"))
+        if (tab == 1 && Section("대상"))
         {
             if (DebugMap.Spawned.Count == 0) GUILayout.Label("<color=#888888>소환된 대상 없음</color>", label);
             foreach (var e in DebugMap.Spawned)
@@ -319,7 +332,7 @@ public class DebugMapController : MonoBehaviour
         // ----- 패턴 -----
         t = DebugMap.Target;
         GUILayout.Space(6);
-        if (Section("패턴"))
+        if (tab == 1 && Section("패턴"))
         {
         IDebugBoss boss = null;
         if (t != null) t.TryGetComponent(out boss);
@@ -355,13 +368,14 @@ public class DebugMapController : MonoBehaviour
 
         }   // 패턴 구역 끝
 
-        DrawSpriteViewer(t);
-        DrawPlayerSkills();
-        DrawSpecialUpgrades();
+        if (tab == 1) DrawSpriteViewer(t);
+        if (tab == 2) DrawPlayerSkills();
+        if (tab == 3) DrawSpecialUpgrades();
+        if (tab == 4) DrawPlayerSprites();
 
         // ----- 보기 · 시간 · 플레이어 -----
         GUILayout.Space(6);
-        if (Section("보기 · 시간 · 플레이어"))
+        if (tab == 5 && Section("보기 · 시간 · 플레이어"))
         {
         if (Toggle("판정 표시 (F1)", HitboxView.Show)) HitboxView.Show = !HitboxView.Show;
         if (Toggle("스프라이트 경계 · 정보", showSpriteInfo)) showSpriteInfo = !showSpriteInfo;
@@ -394,19 +408,48 @@ public class DebugMapController : MonoBehaviour
         var p = Player.I;
         if (p == null) return;
         GUILayout.Space(6);
-        if (!Section("플레이어 스킬 (버튼 = 바로 사용)")) return;
-        GUILayout.Label("<size=12><color=#888888>쿨타임 · 시전 중이어도 바로 사용, 안 가진 스킬은 획득 후 사용. 공격 모션은 매번 처음부터</color></size>", label);
+        // 자동 스킬이 저절로 나가지 않게 (F7 치트와 같은 값). 아래 버튼으로 직접 쓰는 것은 그대로 가능 (사용자 2026-11-22)
+        if (Toggle("자동 스킬 자동 사용 비활성화 (F7)", DebugCheats.NoAutoSkills)) DebugCheats.NoAutoSkills = !DebugCheats.NoAutoSkills;
+        GUILayout.Space(4);
+        if (!Section("플레이어 스킬 (자동 · 수동 · 이동 · 궁극기, 버튼 = 바로 사용)")) return;
+        GUILayout.Label("<size=12><color=#888888>쿨타임 · 시전 중이어도 바로 사용, 안 가진 스킬은 획득 후 사용. 자동 스킬은 근처에 적이 있어야 나감 (없으면 사용 불가로 표시). 공격 모션은 매번 처음부터</color></size>", label);
         bool any = false;
         foreach (var entry in p.Catalog)
         {
-            if (entry.kind != SkillKind.Manual && entry.kind != SkillKind.Movement && entry.kind != SkillKind.Ultimate) continue;
+            if (entry.kind != SkillKind.Auto && entry.kind != SkillKind.Manual && entry.kind != SkillKind.Movement && entry.kind != SkillKind.Ultimate) continue;
             any = true;
             var owned = p.GetSkill(entry.id);
             string tag = $"<size=12>[{SkillCatalog.KindLabel(entry.kind)}{(owned == null ? " · 미보유" : "")}]</size>";
             if (GUILayout.Button($"{entry.name}  {tag}", btn, GUILayout.Height(26))) skillStatus = RunSkill(p, entry);
         }
-        if (!any) GUILayout.Label("<color=#888888>이 캐릭터에 수동 스킬이 없음</color>", label);
+        if (!any) GUILayout.Label("<color=#888888>이 캐릭터에 사용할 스킬이 없음</color>", label);
         if (skillStatus.Length > 0) GUILayout.Label($"<color=#AAAAAA>{skillStatus}</color>", label);
+    }
+
+    // ----- 플레이어 그림 바꾸기: 연출 포즈를 골라 바로 보기 (사용자 2026-11-22) -----
+    string poseShown = "", poseStatus = "";
+
+    void DrawPlayerSprites()
+    {
+        var p = Player.I;
+        if (p == null) return;
+        GUILayout.Space(6);
+        if (!Section("플레이어 그림 (누르면 그 모습으로 고정)")) return;
+        GUILayout.Label("<size=12><color=#888888>연출용 포즈 그림. 바라보는 방향은 좌우만 반영 (오른쪽은 좌우 반전). 시간이 정지된 상태에서도 바뀜. '원래대로' 를 누르면 기본 모습으로</color></size>", label);
+        if (GUILayout.Button("원래대로 (기본 모습)", poseShown.Length == 0 ? btnOn : btn, GUILayout.Height(26))) { p.ReleasePose(); poseShown = ""; poseStatus = ""; }
+        var names = new List<string>(Player.PoseNames);
+        for (int i = 0; i < names.Count; i += 2)
+        {
+            GUILayout.BeginHorizontal();
+            for (int j = i; j < Mathf.Min(i + 2, names.Count); j++)
+                if (GUILayout.Button(names[j], poseShown == names[j] ? btnOn : btn, GUILayout.Height(24)))
+                {
+                    if (p.ShowPose(names[j])) { poseShown = names[j]; poseStatus = ""; }
+                    else poseStatus = $"{names[j]}: 그림을 불러오지 못함";
+                }
+            GUILayout.EndHorizontal();
+        }
+        if (poseStatus.Length > 0) GUILayout.Label($"<color=#AAAAAA>{poseStatus}</color>", label);
     }
 
     // ----- 스킬 특수 강화 바로 적용: 스킬을 고른 뒤 Lv.5 · 10 · 15 강화를 눌러 적용 · 교체 · 해제 (사용자 2026-11-20) -----
@@ -474,7 +517,7 @@ public class DebugMapController : MonoBehaviour
         p.DebugStopMotion();
         s.DebugResetForCast();
         if (entry.kind == SkillKind.Ultimate) GameManager.I?.DebugFillUltimate();
-        return s.TryActivate() ? $"{entry.name}: 사용함" : $"{entry.name}: 사용 불가 (이동 · 기절 · 잡힘 중이거나 스킬 금지 치트)";
+        return s.TryActivate() ? $"{entry.name}: 사용함" : $"{entry.name}: 사용 불가 (이동 · 기절 · 잡힘 중이거나 스킬 금지 치트, 자동 스킬은 대상 적이 없을 때도)";
     }
 
     void SetMap(MapPreset p)

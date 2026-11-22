@@ -45,9 +45,9 @@ public static class SpriteFactory
     /// </summary>
     static Sprite LoadCustom(string name)
     {
-        var s = Resources.Load<Sprite>("Sprites/" + name);
+        var s = SpriteLib.LoadSprite(name);
         if (s != null) return s;
-        var tex = Resources.Load<Texture2D>("Sprites/" + name);
+        var tex = SpriteLib.Load(name);
         if (tex == null) return null;
         float world = name == "Ground" ? GroundTileSize : 1f;
         float ppu = Mathf.Max(tex.width, tex.height) / world;

@@ -14,7 +14,7 @@ public sealed class KagutsuchiFlameLaserFx : MonoBehaviour
 
     public static void Attach(RaidLaser laser)
     {
-        var texture = Resources.Load<Texture2D>("Sprites/Kagutsuchi_P2_Fx_FlameLaser");
+        var texture = SpriteLib.Load("Kagutsuchi_P2_Fx_FlameLaser");
         if (laser == null || texture == null || texture.width != CellWidth * FrameCount || texture.height != CellHeight) return;
         var fx = laser.gameObject.AddComponent<KagutsuchiFlameLaserFx>();
         fx.original = laser.GetComponentsInChildren<SpriteRenderer>();

@@ -83,7 +83,7 @@ public class SpriteSheetAnimator : MonoBehaviour
                          float cellWorldSize, float pivotY, float fps, bool loop,
                          float pivotX = 0.5f, bool globalSide = true)
     {
-        var tex = Resources.Load<Texture2D>("Sprites/" + sheetName);
+        var tex = SpriteLib.Load(sheetName);
         if (tex == null) return false;
 
         float cw = tex.width / (float)columns, ch = tex.height / (float)rows;

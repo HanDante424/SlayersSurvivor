@@ -17,7 +17,7 @@ public sealed class KagutsuchiBackFireFx : MonoBehaviour
 
     public static KagutsuchiBackFireFx Attach(Enemy body)
     {
-        var texture = Resources.Load<Texture2D>("Sprites/Kagutsuchi_P1_Fx_BackFire_Loop");
+        var texture = SpriteLib.Load("Kagutsuchi_P1_Fx_BackFire_Loop");
         if (body == null || texture == null || texture.width != Columns * CellWidth || texture.height != Rows * CellHeight)
         {
             Debug.LogError("카구츠치 후방 화염 시트가 없거나 1536×1024 규격과 다릅니다.");

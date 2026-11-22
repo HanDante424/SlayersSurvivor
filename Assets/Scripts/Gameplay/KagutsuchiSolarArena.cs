@@ -256,7 +256,7 @@ public sealed class KagutsuchiSolarRain : IDisposable
                                             art.pixelsPerUnit, 0, SpriteMeshType.FullRect)
                              : SpriteFactory.Get("Fx_Circle", SpriteFactory.Shape.Circle);
         ownsSprite = art != null;
-        var impactTexture = Resources.Load<Texture2D>("Sprites/" + ImpactSheet);
+        var impactTexture = SpriteLib.Load(ImpactSheet);
         if (impactTexture == null || impactTexture.width != ImpactCell * ImpactCount || impactTexture.height != ImpactCell)
         {
             Debug.LogError("일반 화염구 착지 이펙트 시트가 없거나 3072×512 규격과 다릅니다.");

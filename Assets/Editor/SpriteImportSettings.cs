@@ -23,7 +23,7 @@ public class SpriteImportSettings : AssetPostprocessor
     };
 
     // 설정을 바꾸면 숫자를 올려서 기존 이미지도 다시 임포트되게 함
-    public override uint GetVersion() => 4;
+    public override uint GetVersion() => 6;
 
     static bool IsPowerOfTwo(int v) => v > 0 && (v & (v - 1)) == 0;
 

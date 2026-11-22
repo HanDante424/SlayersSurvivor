@@ -366,25 +366,50 @@ public class Player : MonoBehaviour
 
     /// <summary>
     /// 연출용 포즈 한 장 (2026-11-21 사용자: 블레이징 스톰 연출에 쓰는 에른 포즈들). 전부 왼쪽을 보는 한 장 그림, 오른쪽은 좌우 반전 (뒷모습 · 검 뻗기는 검도 같이 뒤집힘).
-    /// 이름 = 파일 이름에서 "ErnStray_" 뺀 것. 발 위치는 그림 픽셀 측정값 (알파 > 32): footPx = 가장 낮은 발끝이 그림 아래에서 뜬 px,
+    /// 이름 = 파일 이름에서 "ErnStray_" 뺀 것. scale = 포즈별 크기 배율 (1 = 기본, 사용자 2026-11-22 조정). 발 위치는 그림 픽셀 측정값 (알파 > 32): footPx = 가장 낮은 발끝이 그림 아래에서 뜬 px,
     /// footX = 맨 아래 8% 띠의 알파 무게중심 x (두 발 가운데). ShowPose("Atk_SlashReady") 처럼 이름으로 부름
     /// </summary>
-    static readonly (string name, float footPx, float footX)[] ErnPoses =
+    static readonly (string name, float footPx, float footX, float scale)[] ErnPoses =
     {
-        ("Atk_SlashReady", 73f, 811f),
-        ("Atk_HorizontalSlashReady", 90f, 774f),
-        ("UltCharge", 18f, 1177f),
-        ("OverheadRaise", 164f, 573f),
-        ("Atk_VerticalSlash", 99f, 903f),
-        ("Atk_OneHandSlash", 90f, 818f),
-        ("Atk_HorizontalSlash", 72f, 534f),
-        ("RearReach", 24f, 704f),
+        ("Atk_SlashReady", 73f, 811f, 1.0f),
+        ("Atk_HorizontalSlashReady", 90f, 774f, 1.0f),
+        ("UltCharge", 18f, 1177f, 1.15f),
+        ("OverheadRaise", 164f, 573f, 1.5f),
+        ("Atk_VerticalSlash", 99f, 903f, 1.1f),
+        ("Atk_OneHandSlash", 90f, 818f, 1.0f),
+        ("Atk_HorizontalSlash", 72f, 534f, 1.2f),
+        ("RearReach", 24f, 704f, 1.2f),
+        ("RisingSlash_02", 136f, 510f, 1.6f),   // 2026-11-22 오버 드라이브 플레임 슬래시 내려베기. 1024 정사각 그림, 측정 (알파 > 32). 같은 날 비율 보정본으로 교체 (발 위치 · 기준점 같음 136 · 509.7, 몸 키 585 → 607px, 이후 색감 보정본 (v3) 으로 교체: 크기 · 발 위치 동일). 크기 배율 2.0 → 1.6 → 1.2 → 1.6 (2026-11-22)
     };
+    /// <summary>연출 포즈 이름 목록 (디버그 맵의 플레이어 그림 메뉴)</summary>
+    public static System.Collections.Generic.IEnumerable<string> PoseNames { get { foreach (var p in ErnPoses) yield return p.name; } }
+
     /// <summary>
     /// [임시] 연출 포즈 크기 (월드 1유닛당 px): 8장을 같은 배율로 맞춰 머리 크기가 거의 같게 보이는지 비교해 정함 (스탠드는 773.5, 달리기 291 은 칸이 달라 별개).
     /// 기 모으기 포즈는 머리카락 폭 기준 734 였음. Play 로 보고 포즈별로 어긋나면 ErnPoses 에 배율을 넣을 것
     /// </summary>
     const float PosePpu = 750f;
+
+    /// <summary>
+    /// 스탠드 · 연출 포즈를 1/3 로 줄인 복사본 ({이름}_s3.png, 알파 곱한 색으로 줄임) 사용 (2026-11-22 사용자 합의: 원본을 밉맵 + 무압축으로 두면 +60MB,
+    /// 줄인 복사본 + 밉맵이면 모습은 거의 같고 용량은 약 1/9). false 로 바꾸면 원본 그림으로 즉시 되돌아감. 복사본이 없으면 자동으로 원본 사용.
+    /// 복사본을 쓰면 그림 픽셀 좌표 (발 위치 · 발 가운데) 와 1유닛당 px 를 ShrinkFactor 로 나눠 계산
+    /// </summary>
+    const bool UseShrunkSprites = true;
+    const float ShrinkFactor = 3f;
+    const string ShrinkSuffix = "_s3";
+
+    /// <summary>줄인 복사본이 켜져 있고 존재하면 그 그림을, 아니면 원본을 불러옴. 쓴 그림 이름 · 줄인 배율 (원본 = 1) 을 함께 돌려줌</summary>
+    static Texture2D LoadShrinkable(string name, out string usedName, out float k)
+    {
+        if (UseShrunkSprites)
+        {
+            var small = SpriteLib.Load(name + ShrinkSuffix);
+            if (small != null) { usedName = name + ShrinkSuffix; k = ShrinkFactor; return small; }
+        }
+        usedName = name; k = 1f;
+        return SpriteLib.Load(name);
+    }
     const string PoseKeyPrefix = "Pose_";
 
     /// <summary>스탠드 그림의 화면 키 (월드 유닛) — 기존 시트 규격 (몸 200px / 칸 256px × cell 2.07)과 같은 1.62</summary>
@@ -471,43 +496,46 @@ public class Player : MonoBehaviour
         anim.ignoreWorldSlow = true;   // 플레이어 애니메이션은 궁극기 중에도 정상 속도
         var v = Visual;
         float cell = v.cell, pivotY = v.pivotY;
-        if (anim.LoadClip(SpriteSheetAnimator.Run, CharacterId + "_Run", 4, v.runCols, cell, pivotY, v.runFps, true))
+        // 4방향 달리기 · 정지 시트 ({id}_Run · {id}_Idle) 는 있으면 쓰는 기본값. 에른은 이 둘을 2026-11-22 에 뺐고 (측면 달리기 · 스탠드로 대체) 없어도 아래가 이어짐
+        bool loaded = anim.LoadClip(SpriteSheetAnimator.Run, CharacterId + "_Run", 4, v.runCols, cell, pivotY, v.runFps, true);
+        if (loaded) anim.LoadClip(SpriteSheetAnimator.Idle, CharacterId + "_Idle", 4, v.idleCols, cell, pivotY, v.idleFps, true);
+        // 측면 달리기 (있으면 달리기를 이것으로 교체, 오른쪽은 좌우 반전). 없으면 위 {id}_Run (4방향) 그대로
+        if (v.runSideFootPx > 0f)
         {
-            anim.LoadClip(SpriteSheetAnimator.Idle, CharacterId + "_Idle", 4, v.idleCols, cell, pivotY, v.idleFps, true);
-            // 측면 달리기 (있으면 달리기를 이것으로 교체, 오른쪽은 좌우 반전). 없으면 위 {id}_Run (4방향) 그대로
-            if (v.runSideFootPx > 0f)
+            var runSide = SpriteLib.Load(CharacterId + "_RunSide");
+            if (runSide != null)
             {
-                var runSide = Resources.Load<Texture2D>("Sprites/" + CharacterId + "_RunSide");
-                if (runSide != null)
-                {
-                    float rppu = RunSidePpu;
-                    float cellPx = runSide.height;   // 정사각 칸
-                    anim.LoadClip(SpriteSheetAnimator.Run, CharacterId + "_RunSide", 1, Mathf.RoundToInt(runSide.width / cellPx),
+                float rppu = RunSidePpu;
+                float cellPx = runSide.height;   // 정사각 칸
+                if (anim.LoadClip(SpriteSheetAnimator.Run, CharacterId + "_RunSide", 1, Mathf.RoundToInt(runSide.width / cellPx),
                                   cellPx / rppu, (v.runSideFootPx + rppu * StandFootToTransform) / cellPx, v.runFps, true,
-                                  pivotX: 0.5f, globalSide: false);
-                }
+                                  pivotX: 0.5f, globalSide: false)) loaded = true;
             }
+        }
+        if (loaded)
+        {
             // 측면 스탠드 (있으면 정지 모습만 이것으로 교체, 달리기 · 베기는 기존 4방향 시트). 없으면 위 {id}_Idle 그대로
             if (v.standBodyPx > 0f)
             {
-                var stand = Resources.Load<Texture2D>("Sprites/" + CharacterId + "_Stand");
+                var stand = LoadShrinkable(CharacterId + "_Stand", out string standName, out float sk);
                 if (stand != null)
                 {
-                    float ppu = v.standBodyPx / StandBodyWorld;
-                    anim.LoadClip(SpriteSheetAnimator.Idle, CharacterId + "_Stand", 1, 1, stand.width / ppu,
-                                  (v.standFootPx + ppu * StandFootToTransform) / stand.height, 1f, true,
-                                  pivotX: v.standFootX / stand.width, globalSide: false);
+                    float ppu = v.standBodyPx / StandBodyWorld / sk;   // 이 그림의 1유닛당 px (줄였으면 그만큼 작음)
+                    anim.LoadClip(SpriteSheetAnimator.Idle, standName, 1, 1, stand.width / ppu,
+                                  (v.standFootPx / sk + ppu * StandFootToTransform) / stand.height, 1f, true,
+                                  pivotX: v.standFootX / sk / stand.width, globalSide: false);
                 }
             }
             // 연출용 포즈들 (에른 전용 측정값, 그림이 없으면 건너뜀)
             if (CharacterId == "ErnStray")
                 foreach (var pose in ErnPoses)
                 {
-                    var tex = Resources.Load<Texture2D>("Sprites/" + CharacterId + "_" + pose.name);
+                    var tex = LoadShrinkable(CharacterId + "_" + pose.name, out string poseName, out float pk);
                     if (tex == null) continue;
-                    anim.LoadClip(PoseKeyPrefix + pose.name, CharacterId + "_" + pose.name, 1, 1, tex.width / PosePpu,
-                                  (pose.footPx + PosePpu * StandFootToTransform) / tex.height, 1f, true,
-                                  pivotX: pose.footX / tex.width, globalSide: false);
+                    float ppu = PosePpu / pose.scale / pk;   // 포즈별 크기 배율 (사용자 2026-11-22). 배율이 크면 1유닛당 px 가 줄어 크게 보임, 발은 그대로 바닥에 닿음. pk = 줄인 배율
+                    anim.LoadClip(PoseKeyPrefix + pose.name, poseName, 1, 1, tex.width / ppu,
+                                  (pose.footPx / pk + ppu * StandFootToTransform) / tex.height, 1f, true,
+                                  pivotX: pose.footX / pk / tex.width, globalSide: false);
                 }
             // 공격 모션은 시트가 있는 캐릭터만 (없으면 LoadClip/LoadFrames 가 건너뜀)
             if (v.attackCols > 0)
