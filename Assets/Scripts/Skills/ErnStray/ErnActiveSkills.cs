@@ -29,7 +29,215 @@ public class FireCharge : ActiveSkill
     const float CharCenterY = 0.17f;        // [해석] 캐릭터 몸 가운데 = 발 기준점 위 0.17 (칸 2.07 · 발 16px · 키 200px 에서 계산)
     const int MantleBackOrder = 9, MantleFrontOrder = 11;   // 플레이어 = 10
 
+    // 특수 강화 id (파이어 차지)
+    public const string Long = "FC5A", Smash = "FC5B", Trail = "FC5C";
+    public const string Aura = "FC10A", Crush = "FC10B", Continuous = "FC10C";
+    public const string Prep = "FC15A", Endless = "FC15B", Shock = "FC15C";
+    public const string ComboRush = "FCC1";
+
+    // 특수 강화 확정 수치 (노션 2026-11-22)
+    const float LongRange = 0.5f;               // 장거리 돌진: 사거리 +50%
+    const float SmashStun = 2f;                 // 강타: 적중 시 기절 +2초
+    const float FireRatio = 2f;                 // 불타는 궤적 · 불의 장막 · 충격파: 파이어 차지 총 피해량의 200% 고정 피해
+    const float BurnFinal = 1f;                 // 위 셋: 화상 상태 적에게 최종 피해량 +100%
+    const float AuraTime = 3f;                  // 불의 장막: 지속 시간 3초
+    const float CrushKnock = 0.5f, CrushStun = 1f;   // 분쇄 돌파: 넉백 +50% · 적중 시 기절 +1초
+    const int ContinuousStacks = 1;             // 연속 돌진: 스킬 사용 최대 스택 +1
+    const float ContinuousCooldownMul = 0.6f;   // 연속 돌진: 쿨타임 -40%
+    const float PrepSeconds = 2.5f;             // 돌진 준비: 적중 시 남은 쿨타임 감소 2.5초
+    const float EndlessRange = 1f, EndlessStun = 1f;   // 무진돌파: 사거리 +100% · 적중 시 기절 +1초
+    const float ComboRange = 1f, ComboPerStack = 0.5f; // 화염 질주: 사거리 +100% · 무효화한 최대 스택 1당 사거리 +50%
+    const float ComboSlow = 0.7f;              // 화염 질주: 이동 속도 -70% (사용자 2026-11-22). 같은 거리를 1/0.3 배 시간 동안 이동 [해석]
+    // [임시] 노션에 없는 수치
+    const float TrailTime = 3f;                 // 불타는 궤적: 장판 지속 시간 (불의 장막과 같게)
+    const float FieldTick = 0.5f;               // 장판 · 오오라 지속 피해 간격
+    const float AuraRadiusMul = 1f;             // 불의 장막 반경 = 범위 중간 × 이 값
+    const float ShockRadiusMul = 1f;            // 충격파 반경 = 범위 중간 × 이 값
+
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
+
+    // ---------- 특수 강화 ----------
+    public override SpecialUpgradeOption[] SpecialOptions(int lv)
+    {
+        switch (lv)
+        {
+            case 5: return new[]
+            {
+                new SpecialUpgradeOption { id = Long, title = "장거리 돌진", desc = "사거리 +50%" },
+                new SpecialUpgradeOption { id = Smash, title = "강타", desc = "적중 시 기절 +2초" },
+                new SpecialUpgradeOption { id = Trail, title = "불타는 궤적", keywords = new[] { "간접 사용", "지속 피해", "고정 피해" }, desc = "지나간 경로에 화염 장판이 생성됩니다.",
+                    specs = new[] { "'파이어 차지' '총 피해량'의 200% '고정 피해'", "화상 상태 적에게 '최종 피해량' +100%" } },
+            };
+            case 10: return new[]
+            {
+                new SpecialUpgradeOption { id = Aura, title = "불의 장막", keywords = new[] { "간접 사용", "지속 피해", "고정 피해" }, desc = "종료 시 불의 오오라가 생깁니다.",
+                    specs = new[] { "'파이어 차지' '총 피해량'의 200% '고정 피해'", "'지속 시간' 3초", "화상 상태 적에게 '최종 피해량' +100%" } },
+                new SpecialUpgradeOption { id = Crush, title = "분쇄 돌파", desc = "넉백 +50%, 적중 시 기절 +1초" },
+                new SpecialUpgradeOption { id = Continuous, title = "연속 돌진", desc = "스킬 사용 최대 스택 +1, 쿨타임 -40%" },
+            };
+            case 15: return new[]
+            {
+                new SpecialUpgradeOption { id = Prep, title = "돌진 준비", desc = "적중 시 남은 쿨타임 2.5초 감소" },
+                new SpecialUpgradeOption { id = Endless, title = "무진돌파", desc = "사거리 +100%, 적중 시 기절 +1초" },
+                new SpecialUpgradeOption { id = Shock, title = "충격파", keywords = new[] { "간접 사용", "직접 피해", "고정 피해", "넉백" }, desc = "종료 시 충격파가 발생합니다. 적중 시 넉백.",
+                    specs = new[] { "'파이어 차지' '총 피해량'의 200% '고정 피해'", "화상 상태 적에게 '최종 피해량' +100%" } },
+            };
+        }
+        return base.SpecialOptions(lv);
+    }
+
+    public override SpecialComboOption[] SpecialCombos() => new[]
+    {
+        new SpecialComboOption
+        {
+            id = ComboRush, title = "화염 질주", recipe = "연속 돌진 + 무진돌파", requires = new[] { Continuous, Endless },
+            desc = "사용 중 자유롭게 이동할 수 있습니다. 스킬 사용 최대 스택 능력치가 무효화되고, 무효화 비율에 따라 사거리가 증가합니다.",
+            specs = new[] { "'사거리' +100%", "최대 스택 능력치 무효화 1당 '사거리' +50%", "'이동 속도' -70%" },
+        },
+    };
+
+    bool Rush => HasCombo(ComboRush);
+    /// <summary>스킬 사용 최대 스택: 기본 1, 연속 돌진 +1 (화염 질주가 무효화하면 다시 1)</summary>
+    int MaxStacks => 1 + (HasSpecial(Continuous) && !Rush ? ContinuousStacks : 0);
+    float RangeBonusSum => (HasSpecial(Long) ? LongRange : 0f) + (HasSpecial(Endless) ? EndlessRange : 0f)
+                         + (Rush ? ComboRange + ComboPerStack * ContinuousStacks : 0f);
+    float StunSeconds => (HasSpecial(Smash) ? SmashStun : 0f) + (HasSpecial(Crush) ? CrushStun : 0f) + (HasSpecial(Endless) ? EndlessStun : 0f);
+
+    protected override float SpecialCooldownMul => HasSpecial(Continuous) ? ContinuousCooldownMul : 1f;
+
+    // ---------- 스택 (연속 돌진): 파이어 스트림과 같은 방식 · 최대 스택 1 이면 일반 쿨타임과 같음 ----------
+    int stacks = 1;
+    float recharge;
+    float StackCooldown => CooldownSeconds;
+
+    public override string Badge => MaxStacks > 1 ? stacks.ToString() : null;
+    public override float CooldownFraction =>
+        stacks > 0 ? 0f : Mathf.Clamp01(recharge / Mathf.Max(0.01f, StackCooldown));
+    public override float CooldownRemaining => stacks > 0 ? 0f : Mathf.Max(0f, recharge);
+
+    protected override void OnSpecialUpgrade(int lv, string id)
+    {
+        if (id == Continuous && !Rush) stacks = Mathf.Min(MaxStacks, stacks + ContinuousStacks);   // 최대 스택이 늘어난 만큼 바로 채움
+    }
+
+    public override void Tick(float dt)
+    {
+        if (DebugCheats.NoCooldown) { stacks = MaxStacks; recharge = 0f; return; }
+        if (stacks >= MaxStacks) { stacks = MaxStacks; recharge = 0f; return; }
+        if (recharge <= 0f) recharge = StackCooldown;
+        recharge -= dt;
+        if (recharge <= 0f) { stacks++; recharge = stacks < MaxStacks ? StackCooldown : 0f; }
+    }
+
+    /// <summary>남은 쿨타임 감소 (비율)</summary>
+    public override void ReduceRemainingCooldown(float ratio)
+    {
+        if (stacks < MaxStacks && recharge > 0f) recharge *= Mathf.Clamp01(1f - ratio);
+    }
+
+    /// <summary>돌진 준비: 충전 중인 스택의 남은 쿨타임을 초 단위로 감소 (다 차면 스택 +1)</summary>
+    void ReduceSeconds(float seconds)
+    {
+        while (seconds > 0f && stacks < MaxStacks)
+        {
+            if (recharge <= 0f) recharge = StackCooldown;
+            if (recharge > seconds) { recharge -= seconds; return; }
+            seconds -= recharge;
+            stacks++;
+            recharge = stacks < MaxStacks ? StackCooldown : 0f;
+        }
+    }
+
+    public override void DebugResetForCast() { if (stacks <= 0) stacks = 1; recharge = stacks >= MaxStacks ? 0f : recharge; }
+
+    public override bool TryActivate()
+    {
+        if (CheatDisabled) return false;
+        if (stacks <= 0 || P.IsBusy || P.IsStunned) return false;
+        if (stacks >= MaxStacks) recharge = StackCooldown;
+        stacks--;
+        BeginCast();
+        Activate();
+        return true;
+    }
+
+    DamageInfo FixedOf(float amount, CastRef cast)
+    {
+        var d = FixedDamage(amount, DamageType.Direct, CastKind.Indirect);
+        d.castId = cast.id;
+        return d;
+    }
+
+    /// <summary>화상 상태 적이면 고정 피해량 ×2 (노션: 최종 피해량 +100% — 고정 피해라 직접 곱함)</summary>
+    static float BurnMul(Enemy e) => FlameSword.IsBurning(e) ? 1f + BurnFinal : 1f;
+
+    /// <summary>선분 a-b 에서 halfWidth 안의 살아 있는 적</summary>
+    static List<Enemy> NearSegment(Vector2 a, Vector2 b, float halfWidth)
+    {
+        var all = Enemy.CopyAll(new List<Enemy>());
+        var res = new List<Enemy>();
+        Vector2 ab = b - a;
+        float len2 = ab.sqrMagnitude;
+        foreach (var e in all)
+        {
+            if (e == null || e.hp <= 0) continue;
+            Vector2 p = e.transform.position;
+            float t = len2 > 0.0001f ? Mathf.Clamp01(Vector2.Dot(p - a, ab) / len2) : 0f;
+            float rr = halfWidth + e.radius;
+            if ((p - (a + ab * t)).sqrMagnitude < rr * rr) res.Add(e);
+        }
+        return res;
+    }
+
+    /// <summary>불타는 궤적: 지나간 경로에 장판 · 0.5초마다 고정 피해 (합계 = 총 피해량의 200%, 화상 상태 적은 ×2)</summary>
+    IEnumerator TrailField(Vector2 a, Vector2 b, float halfWidth, float total, CastRef cast)
+    {
+        int ticks = Mathf.Max(1, Mathf.RoundToInt(TrailTime / FieldTick));
+        float per = total * FireRatio / ticks;
+        Vector2 mid = (a + b) * 0.5f, d = b - a;
+        float len = d.magnitude;
+        var shape = len > 0.01f ? Fx.Box(a, d / len, len, halfWidth * 2f, Fx.FireDeep, TrailTime) : null;
+        for (int i = 0; i < ticks; i++)
+        {
+            foreach (var e in NearSegment(a, b, halfWidth))
+                e.Hit(FixedOf(per * BurnMul(e), cast), d, Enemy.NoKnock);
+            yield return new WaitForSeconds(FieldTick);
+        }
+    }
+
+    /// <summary>불의 장막: 도착 지점에 오오라 3초 · 0.5초마다 고정 피해 (합계 = 총 피해량의 200%, 화상 상태 적은 ×2)</summary>
+    IEnumerator AuraField(Vector2 at, float r, float total, CastRef cast)
+    {
+        int ticks = Mathf.Max(1, Mathf.RoundToInt(AuraTime / FieldTick));
+        float per = total * FireRatio / ticks;
+        Fx.GroundCircle(at, r, Fx.FireDeep, AuraTime);
+        var list = new List<Enemy>();
+        for (int i = 0; i < ticks; i++)
+        {
+            SkillHits.InCircle(at, r, list);
+            foreach (var e in list) if (e != null && e.hp > 0) e.Hit(FixedOf(per * BurnMul(e), cast), (Vector2)e.transform.position - at, Enemy.NoKnock);
+            yield return new WaitForSeconds(FieldTick);
+        }
+    }
+
+    /// <summary>충격파: 도착 지점에서 한 번 · 고정 피해 (총 피해량의 200%, 화상 상태 적은 ×2) + 넉백</summary>
+    void ShockWave(Vector2 at, float r, float total, CastRef cast, float knock)
+    {
+        Fx.Disc(at, r, Fx.FireBright, 0.3f);
+        HitDebug.Circle(at, r, HitDebug.BlastColor);
+        var list = new List<Enemy>();
+        SkillHits.InCircle(at, r, list);
+        foreach (var e in list)
+        {
+            if (e == null || e.hp <= 0) continue;
+            Vector2 d = (Vector2)e.transform.position - at;
+            if (d.sqrMagnitude < 0.0001f) d = Random.insideUnitCircle;
+            e.Hit(FixedOf(total * FireRatio * BurnMul(e), cast), d, 0f);
+            e.Push(d, knock);
+        }
+        CameraFollow.Shake(0.12f, 0.12f);
+    }
+
     readonly HashSet<Enemy> hit = new HashSet<Enemy>();
     readonly List<Enemy> found = new List<Enemy>();
 
@@ -55,39 +263,74 @@ public class FireCharge : ActiveSkill
         {
             f.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
             if (mirror) f.transform.localScale = new Vector3(1f, -1f, 1f);
-            Destroy(f.gameObject, DashTime + 0.5f);   // 안전장치: 돌진이 끊겨 onEnd 가 안 와도 남지 않게
+            Destroy(f.gameObject, DashTime / (1f - ComboSlow) + 0.5f);   // 안전장치: 돌진이 끊겨 onEnd 가 안 와도 남지 않게
         }
         return fx;
+    }
+
+    /// <summary>망토를 돌진 방향 dir 에 맞춰 다시 돌림 · 옮김 (화염 질주: 방향이 실시간으로 바뀜)</summary>
+    static void OrientMantle(SpriteLoopEffect[] fx, Vector2 dir)
+    {
+        if (fx == null || dir.sqrMagnitude < 0.01f) return;
+        dir.Normalize();
+        float pxWorld = MantleHeightWorld / MantleHeightPx;
+        float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        Vector2 at = new Vector2(0f, CharCenterY) - dir * (MantlePivotOffsetPx * pxWorld);
+        foreach (var f in fx)
+        {
+            if (f == null) continue;
+            f.transform.localPosition = at;
+            f.transform.localRotation = Quaternion.Euler(0f, 0f, angle);
+            f.transform.localScale = new Vector3(1f, dir.x < 0f ? -1f : 1f, 1f);   // 왼쪽으로 갈 때 세로 반전 (윗꼬리는 계속 위)
+        }
     }
 
     protected override void Activate()
     {
         hit.Clear();
         float r = Range(Tier.Mid) * 0.5f;   // [임시] 돌진 중 판정은 범위 중간의 절반
+        var cast = DirectCast;
         DamageInfo dmg = MakeDamage(BaseDamage);
+        float total = FinalDamageOf(BaseDamage);   // [해석] 파이어 차지 총 피해량 = 돌진 1회의 최종 피해량 (적중 1회분)
+        float stun = StunSeconds;
+        float knock = Knock * (1f + (HasSpecial(Crush) ? CrushKnock : 0f));
+        float distance = Distance * (1f + RangeBonusSum);
+        int hitCount = 0;
+        bool rush = Rush;
         Vector2 dashDir = P.Facing.sqrMagnitude > 0.01f ? P.Facing.normalized : Vector2.right;
         Vector2 sideAxis = new Vector2(-dashDir.y, dashDir.x);   // 돌진 방향의 옆 (왼쪽)
+        Vector2 start = P.transform.position;
         var mantle = SpawnMantle(P.Facing);
         if (mantle == null) Fx.Circle(P.transform.position, r, Fx.Fire, DashTime + 0.1f, P.transform, 0f);   // 그림이 없을 때만
-        P.Dash(P.Facing, Distance, DashTime, true,
+        float dashTime = rush ? DashTime / (1f - ComboSlow) : DashTime;   // 화염 질주: 이동 속도 -70%
+        P.Dash(P.Facing, distance, dashTime, true,
             onStep: () =>
             {
+                if (rush) { P.SteerDash(new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"))); OrientMantle(mantle, P.Facing); }   // 화염 질주: 이동 방향에 따라 망토도 실시간으로 바뀜   // 화염 질주: 사용 중 자유 이동 [해석: 돌진 방향을 입력으로 틀 수 있음]
                 Vector2 at = P.transform.position;
                 foreach (var e in SkillHits.InCircle(at, r, found))
                 {
                     if (!hit.Add(e)) continue;
+                    hitCount++;
                     // 부딪힌 적은 돌진 방향 양옆으로 넉백: 경로의 어느 쪽에 있는지에 따라 그 쪽으로 (사용자 2026-11-22)
                     Vector2 d = (Vector2)e.transform.position - at;
                     float s = Vector2.Dot(d, sideAxis);
                     Vector2 side = sideAxis * (Mathf.Abs(s) < 0.01f ? (Random.value < 0.5f ? 1f : -1f) : Mathf.Sign(s));
                     e.Hit(dmg, side, 0f);
-                    e.Push(side, Knock);
+                    e.Push(side, knock);
+                    if (stun > 0f) e.Stun(stun);
                 }
             },
             onEnd: () =>
             {
                 // 도착 지점의 원 이펙트 · 추가 밀치기는 없음 (사용자 2026-11-22: 밀치기는 돌진 중에만)
                 if (mantle != null) foreach (var f in mantle) if (f != null) f.Stop();
+                Vector2 end = P.transform.position;
+                var ind = cast.AsIndirect;
+                if (HasSpecial(Trail)) StartCoroutine(TrailField(start, end, r, total, ind));
+                if (HasSpecial(Aura)) StartCoroutine(AuraField(end, Range(Tier.Mid) * AuraRadiusMul, total, ind));
+                if (HasSpecial(Shock)) ShockWave(end, Range(Tier.Mid) * ShockRadiusMul, total, ind, knock);
+                if (HasSpecial(Prep) && hitCount > 0) ReduceSeconds(PrepSeconds * hitCount);   // 돌진 준비: 적중마다 2.5초 (이번 사용이 끝날 때 합산)
             });
     }
 }
@@ -577,8 +820,34 @@ public class OverFlameSlash : ActiveSkill
 /// </summary>
 public class FireBreaker : ActiveSkill
 {
-    const float StunSeconds = 1f;       // 기획서 확정
-    const float RecastDelay = 2f;       // 기획서 확정 (폭발 딜레이 2초)
+    const float BaseStun = 1f;          // 기획서 확정
+    const float BaseDelay = 2f;         // 기획서 확정 (폭발 사이 간격 = 폭발 딜레이 2초)
+    const int BaseCount = 2;            // 공격 횟수 = 폭발 횟수 (최초 + 2초 뒤 추가 1회)
+
+    // 특수 강화 id (파이어 브레이커)
+    public const string Fissure = "FBK5A", Hot = "FBK5B", Fast = "FBK5C";
+    public const string Chain = "FBK10A", Release = "FBK10B", Absorb = "FBK10C";
+    public const string Stack = "FBK15A", Crust = "FBK15B", Gravity = "FBK15C";
+    public const string ComboFlame = "FBKC1";
+
+    // 특수 강화 확정 수치 (노션 2026-11-22)
+    const float FissureRange = 0.5f, FissureStun = 1f;      // 균열 확장: 폭발마다 범위 +50% · 기절 +1초
+    const float HotSlow = 0.5f;                             // 불타는 대지: 이동 속도 감소 50% (×0.5)
+    const float FastInterval = 0.5f, FastFinal = 0.5f;      // 빠른 폭발: 공격 간격 -50% · 최종 피해량 +50%
+    const int ChainBonus = 2;                               // 연쇄 분출: 공격 횟수 +2
+    const float AbsorbHeal = 0.05f;                         // 충격 흡수: 마지막 폭발 적 하나당 최대 체력 5% 회복
+    const float StackFinal = 0.2f;                          // 중첩 붕괴: 받는 최종 피해량 +20% (적중 시 부여)
+    const int StackMax = 5;                                 // 최대 스택 5
+    const int CrustBonus = 2;                               // 지각 붕괴: 공격 횟수 +2
+    const float CrustInterval = 0.5f;                       // 지각 붕괴: 공격 간격 -50%
+    const float GravityRange = 0.5f, GravityStun = 2f;      // 중력 붕괴: 공격 횟수 능력치 무효화 1당 범위 +50% · 기절 +2초
+    const float ComboFinal = 0.4f;                          // 오버 드라이브 플레임 브레이커: 최종 피해량 -60% (×0.4)
+    const int ComboBonus = 5;                               // 공격 횟수 +5
+    // [임시] 노션에 없는 수치
+    const float ReleaseKnock = 8f;                          // 방출: 적중 시 넉백 (기본 1)
+    const float HotTime = 3f, HotStep = 0.25f;              // 불타는 대지: 장판 지속 시간 · 감속 갱신 간격 (화상 스택은 매 초)
+    const float MinDelay = 0.25f;                           // 폭발 사이 간격 하한
+    const float ExtraSearch = 14f, ExtraStep = 0.03f;       // 조합: 추가 사용 대상을 찾는 범위 · 추가 사용 사이 간격
     // 재발동 표시 고리 ErnStray_FireBreakerMark (2026-11-22 사용자 전달 단일 그림, 원본 1254px → 게임용 1024px 로 줄임). 시트 (2000×2000) 대신 코드로 연출 (GroundMarkFx)
     const string MarkSheet = "ErnStray_FireBreakerMark";
     const float MarkSrcPx = 1254f;                       // 원본 가로 (좌표 기준)
@@ -589,27 +858,163 @@ public class FireBreaker : ActiveSkill
     const float RangeMul = 2f;          // 범위 배율 (사용자 2026-11-22: 2배). 판정 · 이펙트 크기 모두
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
 
+    // ---------- 특수 강화 ----------
+    public override SpecialUpgradeOption[] SpecialOptions(int lv)
+    {
+        switch (lv)
+        {
+            case 5: return new[]
+            {
+                new SpecialUpgradeOption { id = Fissure, title = "균열 확장", desc = "폭발마다 범위 +50%, 폭발마다 기절 +1초" },
+                new SpecialUpgradeOption { id = Hot, title = "불타는 대지", desc = "종료 시 장판이 생성됩니다. 매 초 장판에 닿은 적에게 적용 중인 모든 화상 스택이 1 증가하고 이동 속도 감소를 부여합니다.", specs = new[] { "'이동 속도 감소' 50%" } },
+                new SpecialUpgradeOption { id = Fast, title = "빠른 폭발", desc = "공격 간격 -50%, 최종 피해량 +50%" },
+            };
+            case 10: return new[]
+            {
+                new SpecialUpgradeOption { id = Chain, title = "연쇄 분출", desc = "공격 횟수 +2" },
+                new SpecialUpgradeOption { id = Release, title = "방출", desc = "적중 시 넉백" },
+                new SpecialUpgradeOption { id = Absorb, title = "충격 흡수", desc = "마지막 폭발 적중 시 적 하나당 최대 체력 5% 회복" },
+            };
+            case 15: return new[]
+            {
+                new SpecialUpgradeOption { id = Stack, title = "중첩 붕괴", desc = "적중 시 받는 최종 피해량 +20%를 부여합니다. 최대 스택 5" },
+                new SpecialUpgradeOption { id = Crust, title = "지각 붕괴", desc = "공격 횟수 +2, 공격 간격 -50%" },
+                new SpecialUpgradeOption { id = Gravity, title = "중력 붕괴", desc = "공격 횟수 능력치가 무효화됩니다.", specs = new[] { "공격 횟수 능력치 무효화 1당 '범위' +50%", "공격 횟수 능력치 무효화 1당 '기절' +2초" } },
+            };
+        }
+        return base.SpecialOptions(lv);
+    }
+
+    public override SpecialComboOption[] SpecialCombos() => new[]
+    {
+        new SpecialComboOption
+        {
+            id = ComboFlame, title = "오버 드라이브 플레임 브레이커", recipe = "연쇄 분출 + 지각 붕괴", requires = new[] { Chain, Crust },
+            desc = "매 공격 시 공격 횟수에 비례해 무작위 대상의 위치에 추가 사용합니다. 같은 적에게 중복 생성될 수 있습니다.",
+            specs = new[] { "'최종 피해량' -60%", "공격 횟수 +5", "공격 횟수 1당 추가 사용 +1" },
+        },
+    };
+
+    bool Combo => HasCombo(ComboFlame);
+    /// <summary>중력 붕괴로 무효화되기 전의 공격 횟수</summary>
+    int RawCount => BaseCount + (HasSpecial(Chain) ? ChainBonus : 0) + (HasSpecial(Crust) ? CrustBonus : 0) + (Combo ? ComboBonus : 0);
+    float Delay => Mathf.Max(MinDelay, BaseDelay * (HasSpecial(Fast) ? FastInterval : 1f) * (HasSpecial(Crust) ? CrustInterval : 1f));
+
+    protected override float SpecialFinalDamageMul => (HasSpecial(Fast) ? 1f + FastFinal : 1f) * (Combo ? ComboFinal : 1f);
+
+    // ---------- 중첩 붕괴: 받는 최종 피해량 증가 부여 (대상마다 스택, 사망하면 정리) ----------
+    readonly Dictionary<Enemy, int> stacks = new Dictionary<Enemy, int>();
+    StackModifier stackMod;
+
+    sealed class StackModifier : CombatModifier
+    {
+        readonly FireBreaker owner;
+        public StackModifier(FireBreaker o) { owner = o; }
+        public override float ReceivedMul(Enemy target, in DamageInfo d)
+            => owner != null && owner.stacks.TryGetValue(target, out int n) && n > 0 ? 1f + StackFinal * n : 1f;
+    }
+
+    void AddStack(Enemy e)
+    {
+        if (e == null || e.hp <= 0) return;
+        if (stackMod == null) { stackMod = new StackModifier(this); CombatMods.Add(stackMod); }
+        stacks.TryGetValue(e, out int n);
+        stacks[e] = Mathf.Min(StackMax, n + 1);
+    }
+
+    protected override void OnDisable()
+    {
+        base.OnDisable();
+        if (stackMod != null) { CombatMods.Remove(stackMod); stackMod = null; }
+        stacks.Clear();
+    }
+
     protected override void Activate() => StartCoroutine(Run());
 
     IEnumerator Run()
     {
         Vector2 at = P.transform.position;   // 같은 위치에서 재발동
-        float r = Range(Tier.Mid) * RangeMul;
         var cast = DirectCast;
+        int raw = RawCount;
+        bool gravity = HasSpecial(Gravity);
+        int count = gravity ? 1 : raw;          // 중력 붕괴: 공격 횟수 능력치 무효화 → 폭발 1회
+        int nullified = gravity ? raw - 1 : 0;  // [해석] 무효화된 횟수 = 원래 공격 횟수 - 1 (폭발 1회는 남음)
+        float delay = Delay;
         P.PlayAttack();
-        Burst(at, r, cast);
-        // 재발동 위치 표시 = 바닥 레이어. 고리 그림 한 장을 코드로 차오르게 함 (시트 대신, 용량 절약). 그림이 없으면 예전 단색 원
-        var markTex = SpriteLib.Load(MarkSheet);
-        GameObject mark = null;
-        if (markTex != null)
+        float r = ExplosionRadius(0, nullified);
+        float stun = ExplosionStun(0, nullified);
+        float rLast = r;
+        for (int i = 0; i < count; i++)
         {
-            var fx = GroundMarkFx.Spawn(markTex, MarkCenterNorm, MarkRingRadiusPx, MarkSrcPx, at, r, RecastDelay, Fx.GroundOrder);
-            if (fx != null) mark = fx.gameObject;
+            r = ExplosionRadius(i, nullified);
+            stun = ExplosionStun(i, nullified);
+            rLast = r;
+            bool last = i == count - 1;
+            if (!Combo) Burst(at, r, cast, stun, last, true);   // 특수 조합: 기본 폭발 제거 (추가 사용만 발생, 사용자 2026-11-22)
+            if (Combo) StartCoroutine(Extras(at, r, cast.AsIndirect, stun, count, last));
+            if (last) break;
+            // 다음 폭발 위치 표시 = 바닥 레이어. 고리 그림 한 장을 코드로 차오르게 함 (시트 대신, 용량 절약). 그림이 없으면 예전 단색 원
+            float rNext = ExplosionRadius(i + 1, nullified);
+            var markTex = Combo ? null : SpriteLib.Load(MarkSheet);   // 조합은 기본 폭발이 없어 표시도 없음
+            GameObject mark = null;
+            if (Combo) { }
+            else if (markTex != null)
+            {
+                var fx = GroundMarkFx.Spawn(markTex, MarkCenterNorm, MarkRingRadiusPx, MarkSrcPx, at, rNext, delay, Fx.GroundOrder);
+                if (fx != null) mark = fx.gameObject;
+            }
+            else { var shape = Fx.GroundCircle(at, rNext, Fx.FireDeep, delay); if (shape != null) mark = shape.gameObject; }
+            yield return new WaitForSeconds(delay);
+            if (mark != null) Destroy(mark);
         }
-        else { var shape = Fx.GroundCircle(at, r, Fx.FireDeep, RecastDelay); if (shape != null) mark = shape.gameObject; }
-        yield return new WaitForSeconds(RecastDelay);
-        if (mark != null) Destroy(mark);
-        Burst(at, r, cast);
+        if (HasSpecial(Hot)) yield return HotField(at, rLast);
+    }
+
+    /// <summary>i 번째 폭발 (0부터) 의 범위: 균열 확장은 폭발마다 +50%, 중력 붕괴는 무효화 1당 +50%</summary>
+    float ExplosionRadius(int i, int nullified) =>
+        Range(Tier.Mid) * RangeMul * (1f + (HasSpecial(Fissure) ? FissureRange * i : 0f) + GravityRange * nullified);
+
+    /// <summary>i 번째 폭발의 기절: 균열 확장은 폭발마다 +1초, 중력 붕괴는 무효화 1당 +2초</summary>
+    float ExplosionStun(int i, int nullified) =>
+        BaseStun + (HasSpecial(Fissure) ? FissureStun * i : 0f) + GravityStun * nullified;
+
+    /// <summary>
+    /// 조합: 폭발 한 번마다 공격 횟수만큼 무작위 적의 위치에 추가 폭발 (같은 적에게 중복 가능). 대상이 없으면 없음.
+    /// 추가 사용은 본 폭발과 같은 범위 · 기절
+    /// </summary>
+    IEnumerator Extras(Vector2 around, float r, CastRef cast, float stun, int n, bool lastRound)
+    {
+        var list = new List<Enemy>();
+        SkillHits.InCircle(around, ExtraSearch, list);
+        if (list.Count == 0) yield break;
+        for (int k = 0; k < n; k++)
+        {
+            var e = list[Random.Range(0, list.Count)];
+            if (e != null && e.hp > 0) Burst(e.transform.position, r, cast, stun, lastRound, false);   // 마지막 공격의 추가 사용이 마지막 폭발 (충격 흡수)
+            yield return new WaitForSeconds(ExtraStep);
+        }
+    }
+
+    /// <summary>불타는 대지: 종료 시 마지막 폭발 자리에 장판. 매 초 닿은 적의 화상 스택 +1 (화상 중인 적만), 이동 속도 50% 감소</summary>
+    IEnumerator HotField(Vector2 at, float r)
+    {
+        var shape = Fx.GroundCircle(at, r, Fx.FireDeep, HotTime);
+        var list = new List<Enemy>();
+        float acc = 1f;   // 첫 틱은 바로
+        for (float t = 0f; t < HotTime; t += HotStep)
+        {
+            SkillHits.InCircle(at, r, list);
+            bool stackTick = acc >= 1f;
+            if (stackTick) acc = 0f;
+            foreach (var e in list)
+            {
+                if (e == null || e.hp <= 0) continue;
+                e.SustainSlow(1f - HotSlow, HotStep + 0.1f);
+                if (stackTick && FlameSword.IsBurning(e) && FlameSword.I != null) FlameSword.I.AddStacks(e, 1);
+            }
+            acc += HotStep;
+            yield return new WaitForSeconds(HotStep);
+        }
     }
 
     // 지면 불꽃 분출 (FireEruption_GroundFan_v1 원본): 4열 × 4행 · 칸 512 · 16프레임 (마지막 = 투명) · 1회 · 옆에서 본 부채꼴
@@ -628,7 +1033,8 @@ public class FireBreaker : ActiveSkill
     const float GroundRingFps = 22f;        // [해석] 초안 프레임 30~70ms (합계 0.73초) → 16프레임 / 0.73초
     const float GroundRingRadiusPx = 215f;  // 다 퍼졌을 때 고리 반지름 (알파 가중 평균, 12~15번 프레임 약 215px)
 
-    void Burst(Vector2 at, float r, CastRef cast)
+    /// <param name="main">본 폭발 (카메라 흔들림 · 충격 흡수 · 중첩 붕괴 대상)</param>
+    void Burst(Vector2 at, float r, CastRef cast, float stun, bool lastBurst, bool main)
     {
         // 바닥 고리: 다 퍼진 고리 반지름 = 판정 반경, 바닥 레이어 (캐릭터 · 적 아래)
         var ring = SpriteEffect.LoadFrames(GroundRingSheet, EruptionRows, EruptionCols, EruptionCellPx * r / GroundRingRadiusPx);
@@ -647,8 +1053,14 @@ public class FireBreaker : ActiveSkill
             if (particles != null) SpriteEffect.Spawn(particles, EruptionFps, null, center, 0f, false, EruptionOrder + 1);
         }
         else Fx.Disc(at, r, Fx.Fire, 0.3f);   // 그림이 없을 때만
-        SkillHits.Circle(at, r, MakeDamage(BaseDamage, cast), 1f, e => e.Stun(StunSeconds));
-        CameraFollow.Shake(0.1f, 0.1f);
+        bool stack = HasSpecial(Stack), absorb = HasSpecial(Absorb) && lastBurst;
+        SkillHits.Circle(at, r, MakeDamage(BaseDamage, cast), HasSpecial(Release) ? ReleaseKnock : 1f, e =>
+        {
+            e.Stun(stun);
+            if (stack) AddStack(e);   // 중첩 붕괴: 이번 피해가 들어간 뒤부터 받는 최종 피해량 증가
+            if (absorb && P != null) P.hp = Mathf.Min(P.maxHp, P.hp + P.maxHp * AbsorbHeal);   // 충격 흡수: 마지막 폭발 적 하나당 최대 체력 5%
+        });
+        if (main) CameraFollow.Shake(0.1f, 0.1f);
     }
 }
 

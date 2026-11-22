@@ -266,6 +266,17 @@ public class Player : MonoBehaviour
         if (anim != null) anim.SetMove(dir);
     }
 
+    /// <summary>돌진 중 방향을 입력 쪽으로 틀기 (속도는 그대로). 입력이 없으면 그대로 (파이어 차지 화염 질주)</summary>
+    public void SteerDash(Vector2 input)
+    {
+        if (dashLeft <= 0f || input.sqrMagnitude < 0.01f) return;
+        float speed = dashVel.magnitude;
+        input.Normalize();
+        dashVel = input * speed;
+        Facing = input;
+        if (anim != null) anim.SetMove(input);   // 캐릭터 그림도 이동 방향으로
+    }
+
     public Skill GetSkill(string id)
     {
         foreach (var s in skills) if (s.Entry.id == id) return s;
