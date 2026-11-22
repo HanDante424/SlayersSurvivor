@@ -417,14 +417,51 @@ public class FireBreaker : ActiveSkill
     }
 }
 
-/// <summary>M05 파이어 엑스큐션: 빠른 속도로 주변을 베어냄 · 초기 피해량 5 × 공격 횟수 30 · 쿨타임 30초 · 발동 중 이동 불가</summary>
+/// <summary>
+/// M05 파이어 엑스큐션: 빠른 속도로 주변을 베어냄 · 초기 피해량 5 × 공격 횟수 30 · 쿨타임 30초 · 발동 중 이동 불가
+/// 특수 강화 9종 + 특수 조합 플레임 디멘션 블레이드 (노션 2026-11-22 기준)
+/// </summary>
 public class FireExecution : ActiveSkill
 {
-    const float Duration = 0.75f;       // [임시] 공격 지속시간 (기획 미정). 사용자 2026-11-22: 속도 2배 (1.5 → 0.75초, 30회면 0.025초 간격)
     const float RangeMul = 3f;          // 범위 배율 (사용자 2026-11-22: 50% 증가 → 거기서 다시 2배 = 3배). 판정 · 이펙트 크기 모두
     const float FadeOutTime = 0.5f;     // [임시] 끝날 때 고리 이펙트가 서서히 사라지는 시간 (사용자 2026-11-22)
-    const int Hits = 30;
+    const int BaseHits = 30;
+    const float HitInterval = 0.025f;   // 베기 1회 간격. 사용자 2026-11-22: 속도 2배 (30회 0.75초 = 0.025초 간격). 공격 횟수가 늘어도 간격은 그대로 [해석]
     const float BaseDamage = 5f, BaseCooldown = 30f;
+
+    // 특수 강화 id (파이어 엑스큐션)
+    public const string Slaughter = "FE5A", Flow = "FE5B", Focus = "FE5C";
+    public const string Quick = "FE10A", Wind = "FE10B", Scorch = "FE10C";
+    public const string Endless = "FE15A", Afterimage = "FE15B", Blazing = "FE15C";
+    public const string ComboDimension = "FEC1";
+
+    // 특수 강화 확정 수치 (노션)
+    const int SlaughterBonus = 15;          // 난도질: 공격 횟수 +15
+    const float FlowSlow = 0.5f;            // 유동 검무: 시전 중 이동 속도 -50% (이동 불가 삭제)
+    const float FocusRange = -0.5f, FocusDamage = 0.5f;   // 집중 절삭: 범위 -50% · 피해량 +50%
+    const float QuickTimeMul = 0.25f;       // 고속 절단: 공격 시간 -75%
+    const float QuickCooldownMul = 0.75f;   // 고속 절단: 쿨타임 감소 +25% (독립 곱 0.75)
+    const int WindEvery = 5, WindCount = 8; // 검풍: 베기 5회마다 검기 8개
+    const float WindRatio = 0.4f;           // 검풍: 총 피해량의 40% 고정 피해
+    const float ScorchFinal = 0.5f;         // 작열 절삭: 화상 상태 적 최종 피해량 +50%
+    const int EndlessBonus = 30;            // 무진참: 공격 횟수 +30
+    const float EndlessCooldownMul = 1.25f; // 무진참: 쿨타임 +25%
+    const int AfterimageCount = 6;          // 잔영: 종료 시 소형 연속 베기 6개
+    const float AfterimageRatio = 0.6f;     // 잔영: 총 피해량의 60% 고정 피해
+    const int BlazingEvery = 5;             // 타오르는 검: 화상 상태 적 5회 적중 시 폭발
+    const float BlazingRatio = 1f;          // 타오르는 검: 폭발 화상 총 피해량의 100% 고정 피해
+    const int ComboBonus = 30;              // 플레임 디멘션 블레이드: 공격 횟수 +30
+    const int ComboWaveEvery = 3;           // 플레임 디멘션 블레이드: 공격 횟수 3당 검기 1개
+
+    // [임시] 노션에 없는 수치
+    const float WaveSpeed = 14f, WaveRange = 10f, WaveSize = 0.55f;   // 검기 속도 · 사거리 · 크기
+    const float SeekTurn = 540f;            // 유도 검기가 방향을 트는 속도 (도/초)
+    const float SeekRange = 12f;            // 유도 검기가 적을 찾는 거리
+    const float AfterimageMin = 2.5f, AfterimageMax = 7f;   // 잔영이 생기는 거리 (플레이어 기준)
+    const float SmallComboScale = 0.35f;    // 소형 연속 베기 반경 = 본 베기 반경 × 이 값
+    const int SmallComboHits = 8;           // 소형 연속 베기 1개의 베기 횟수
+    const float SmallComboTime = 0.3f;      // 소형 연속 베기가 이어지는 시간
+    const float BlazingRadiusMul = 1f;      // 타오르는 검 폭발 반경 = 범위 좁음 × 이 값
 
     // 연속 베기 고리 이펙트 (FireSlash_OmniCombo_v2 원본): 6열 × 5행 · 칸 640px · 30프레임 · 반복 재생
     const string SlashLoopSheet = "ErnStray_FireSlashOmniCombo";
@@ -436,29 +473,242 @@ public class FireExecution : ActiveSkill
 
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
 
+    // ---------- 특수 강화 ----------
+    public override SpecialUpgradeOption[] SpecialOptions(int lv)
+    {
+        switch (lv)
+        {
+            case 5: return new[]
+            {
+                new SpecialUpgradeOption { id = Slaughter, title = "난도질", desc = "공격 횟수 +15" },
+                new SpecialUpgradeOption { id = Flow, title = "유동 검무", desc = "이동 불가가 사라집니다. 시전 중 이동 속도 -50%" },
+                new SpecialUpgradeOption { id = Focus, title = "집중 절삭", desc = "범위 -50%, 피해량 +50%" },
+            };
+            case 10: return new[]
+            {
+                new SpecialUpgradeOption { id = Quick, title = "고속 절단", desc = "공격 시간 -75%, 쿨타임 감소 +25%" },
+                new SpecialUpgradeOption { id = Wind, title = "검풍", keywords = new[] { "간접 사용", "직접 피해", "고정 피해", "투사체", "원거리" },
+                    desc = "베기 5회마다 8개의 검기를 난사합니다.", specs = new[] { "'파이어 엑스큐션' '총 피해량'의 40% '고정 피해'" } },
+                new SpecialUpgradeOption { id = Scorch, title = "작열 절삭", desc = "화상 상태 적 적중 시 최종 피해량 +50%" },
+            };
+            case 15: return new[]
+            {
+                new SpecialUpgradeOption { id = Endless, title = "무진참", desc = "공격 횟수 +30, 쿨타임 +25%" },
+                new SpecialUpgradeOption { id = Afterimage, title = "잔영", keywords = new[] { "간접 사용", "직접 피해", "고정 피해", "투사체", "원거리" },
+                    desc = "종료 시 무작위 위치에 소형 연속 베기 6개를 생성합니다.", specs = new[] { "'파이어 엑스큐션' '총 피해량'의 60% '고정 피해'" } },
+                new SpecialUpgradeOption { id = Blazing, title = "타오르는 검", desc = "화상 상태 적에게 5회 적중하면 폭발이 발생합니다.", specs = new[] { "폭발: 화상 '총 피해량'의 100% '고정 피해'" } },
+            };
+        }
+        return base.SpecialOptions(lv);
+    }
+
+    public override SpecialComboOption[] SpecialCombos() => new[]
+    {
+        new SpecialComboOption
+        {
+            id = ComboDimension, title = "플레임 디멘션 블레이드", recipe = "검풍 + 잔영", requires = new[] { Wind, Afterimage },
+            keywords = new[] { "간접 사용", "직접 피해", "고정 피해", "투사체", "원거리" },
+            desc = "연속 베기가 사라지고 공격 횟수가 늘어납니다. 공격 횟수에 비례해 유도 검기를 발사하고, 검기가 적중하면 연속 베기가 발생합니다.",
+            specs = new[] { "연속 베기 삭제", "공격 횟수 +30", "공격 횟수 3당 검기 1개 발사", "검기 유도", "검기 적중 시 연속 베기 발생" },
+        },
+    };
+
+    bool Dimension => HasCombo(ComboDimension);
+    int TotalHits => BaseHits + (HasSpecial(Slaughter) ? SlaughterBonus : 0) + (HasSpecial(Endless) ? EndlessBonus : 0) + (Dimension ? ComboBonus : 0);
+    float Interval => HitInterval * (HasSpecial(Quick) ? QuickTimeMul : 1f);
+
+    protected override float SpecialDamageBonus => HasSpecial(Focus) ? FocusDamage : 0f;
+    protected override float SpecialRangeBonus => HasSpecial(Focus) ? FocusRange : 0f;
+    protected override float SpecialCooldownMul =>
+        (HasSpecial(Quick) ? QuickCooldownMul : 1f) * (HasSpecial(Endless) ? EndlessCooldownMul : 1f);
+
+    /// <summary>작열 절삭: 화상 상태 적에게 최종 피해량 +50% (대상 단계, 피해가 들어가기 전 화상 기준)</summary>
+    static float ScorchMul(Enemy e) => FlameSword.IsBurning(e) ? 1f + ScorchFinal : 1f;
+
+    DamageInfo FixedOf(float amount, CastRef cast)
+    {
+        var d = FixedDamage(amount, DamageType.Direct, CastKind.Indirect);
+        d.castId = cast.id;
+        return d;
+    }
+
+    // ---------- 이동 속도 감소 (유동 검무) ----------
+    bool slowed;
+    void BeginSlow() { if (slowed) return; slowed = true; P.moveSpeedMul *= 1f - FlowSlow; }
+    void EndSlow() { if (!slowed) return; slowed = false; P.moveSpeedMul /= 1f - FlowSlow; }
+
+    protected override void OnDisable()
+    {
+        base.OnDisable();
+        EndSlow();
+    }
+
     protected override void Activate() => StartCoroutine(Run());
 
     IEnumerator Run()
     {
-        P.Root(Duration);
-        // [해석] 키워드 '고정' '피해' 의 의미 미확정 → 일반 직접 피해로 처리
-        DamageInfo per = MakeDamage(BaseDamage, DirectCast);
-        // [임시] 그림 반지름 = 판정 반경 (범위 중간). 발동 동안 플레이어를 따라감
-        var frames = SpriteEffect.LoadFrames(SlashLoopSheet, SlashLoopRows, SlashLoopCols, 1f);
+        int hits = TotalHits;
+        float interval = Interval;
+        float duration = hits * interval;
+        bool flow = HasSpecial(Flow);
+        bool dimension = Dimension;
+        var cast = DirectCast;
+        var indirect = cast.AsIndirect;
+
+        if (flow) BeginSlow(); else P.Root(duration);
+
+        // [해석] 노션 키워드 '고정 피해' 는 검풍 · 잔영 · 조합 쪽 → 본 베기는 일반 직접 피해
+        DamageInfo per = MakeDamage(BaseDamage, cast);
+        if (HasSpecial(Scorch)) per.perTarget = ScorchMul;
+
+        // [해석] '총 피해량' = 이번 사용의 베기 전체 최종 피해량 (최종 피해량 × 공격 횟수). 검풍 · 잔영 · 조합은 그 x% 를 개수로 나눠 줌
+        float totalDamage = FinalDamageOf(BaseDamage) * hits;
+        int waves = dimension ? hits / ComboWaveEvery : (HasSpecial(Wind) ? hits / WindEvery * WindCount : 0);
+        float waveDamage = waves > 0 ? totalDamage * WindRatio / waves : 0f;
+        float smallComboTotal = dimension
+            ? (waves > 0 ? totalDamage * AfterimageRatio / waves : 0f)
+            : totalDamage * AfterimageRatio / AfterimageCount;
+
+        // 그림 반지름 = 판정 반경 (범위 중간). 발동 동안 플레이어를 따라감. 조합은 연속 베기 삭제
+        SpriteLoopEffect loop = null;
         float r0 = Range(Tier.Mid) * RangeMul;
-        var loop = SpriteLoopEffect.Spawn(frames, SlashLoopFps, P.transform, Vector2.zero, SlashLoopOrder,
-                                          r0 * SlashLoopCellPx / SlashLoopRadiusPx);
-        for (int i = 0; i < Hits; i++)
+        if (!dimension)
         {
-            Vector2 at = P.transform.position;
-            float r = Range(Tier.Mid) * RangeMul;
-            P.PlayAttack();
-            if (loop == null) Fx.Circle(at, r, i == Hits - 1 ? Fx.FireBright : Fx.Fire, 0.25f);   // 그림이 없을 때만 예전 원
-            SkillHits.Circle(at, r, per, i == Hits - 1 ? 6f : 1f);
-            if (i == Hits - 1) CameraFollow.Shake(0.15f, 0.15f);
-            yield return new WaitForSeconds(Duration / Hits);
+            var frames = SpriteEffect.LoadFrames(SlashLoopSheet, SlashLoopRows, SlashLoopCols, 1f);
+            loop = SpriteLoopEffect.Spawn(frames, SlashLoopFps, P.transform, Vector2.zero, SlashLoopOrder,
+                                          r0 * SlashLoopCellPx / SlashLoopRadiusPx);
         }
+
+        var burnHits = new Dictionary<Enemy, int>();   // 타오르는 검: 화상 상태에서 맞은 횟수
+        bool blazing = HasSpecial(Blazing);
+        bool wind = HasSpecial(Wind) && !dimension;
+
+        float t = 0f;
+        int done = 0;
+        while (done < hits)
+        {
+            t += Time.deltaTime;
+            int due = Mathf.Min(hits, Mathf.FloorToInt(t / interval + 0.0001f) + 1);   // 첫 베기는 바로. 간격이 한 프레임보다 짧으면 한 프레임에 여러 번
+            while (done < due)
+            {
+                int i = done++;
+                bool last = i == hits - 1;
+                Vector2 at = P.transform.position;
+                float r = Range(Tier.Mid) * RangeMul;
+                P.PlayAttack();
+                if (dimension)
+                {
+                    // 연속 베기 없음: 공격 횟수 3당 유도 검기 1개
+                    if ((i + 1) % ComboWaveEvery == 0) FireWave(at, RandomDir(), waveDamage, indirect, true, smallComboTotal, r);
+                }
+                else
+                {
+                    if (loop == null) Fx.Circle(at, r, last ? Fx.FireBright : Fx.Fire, 0.25f);   // 그림이 없을 때만 예전 원
+                    SkillHits.Circle(at, r, per, last ? 6f : 1f, blazing ? (System.Action<Enemy>)(e => CountBurn(e, burnHits, indirect)) : null);
+                    if (wind && (i + 1) % WindEvery == 0)
+                    {
+                        float a0 = Random.value * 360f;
+                        for (int k = 0; k < WindCount; k++)
+                        {
+                            float a = (a0 + k * 360f / WindCount) * Mathf.Deg2Rad;
+                            FireWave(at, new Vector2(Mathf.Cos(a), Mathf.Sin(a)), waveDamage, indirect, false, 0f, r);
+                        }
+                    }
+                }
+                if (last) CameraFollow.Shake(0.15f, 0.15f);
+            }
+            yield return null;
+        }
+
         if (loop != null) loop.FadeOut(FadeOutTime);   // 갑자기 끊지 않고 서서히 사라짐 (플레이어를 따라가는 채로)
+        EndSlow();
+
+        // 잔영: 종료 시 무작위 위치에 소형 연속 베기 6개
+        if (HasSpecial(Afterimage) && !dimension)
+        {
+            Vector2 c = P.transform.position;
+            float sr = Range(Tier.Mid) * RangeMul * SmallComboScale;
+            for (int k = 0; k < AfterimageCount; k++)
+            {
+                Vector2 pos = c + RandomDir() * Random.Range(AfterimageMin, AfterimageMax);
+                StartCoroutine(SmallCombo(pos, sr, smallComboTotal, indirect));
+            }
+        }
+    }
+
+    static Vector2 RandomDir()
+    {
+        float a = Random.value * Mathf.PI * 2f;
+        return new Vector2(Mathf.Cos(a), Mathf.Sin(a));
+    }
+
+    /// <summary>타오르는 검: 화상 상태의 적을 5번 맞히면 그 자리에서 폭발 (화상 총 피해량의 100% 고정 피해)</summary>
+    void CountBurn(Enemy e, Dictionary<Enemy, int> counts, CastRef cast)
+    {
+        if (e == null || e.hp <= 0 || !FlameSword.IsBurning(e)) return;
+        counts.TryGetValue(e, out int n);
+        if (++n < BlazingEvery) { counts[e] = n; return; }
+        counts.Remove(e);
+        Vector2 at = e.transform.position;
+        float r = Range(Tier.Short) * BlazingRadiusMul;
+        float burn = FlameSword.TotalBurnDamage(e) * BlazingRatio;
+        Fx.Disc(at, r, Fx.FireBright, 0.25f);
+        HitDebug.Circle(at, r, HitDebug.BlastColor);
+        SkillHits.Circle(at, r, FixedOf(burn, cast), 1f);
+    }
+
+    /// <summary>검기 1개: 고정 피해 · 1회 적중 · 조합이면 적을 따라 휘고 적중 위치에 소형 연속 베기</summary>
+    void FireWave(Vector2 from, Vector2 dir, float damage, CastRef cast, bool seek, float comboTotal, float baseRadius)
+    {
+        var p = Projectile.Spawn(from, dir, WaveSpeed, FixedOf(damage, cast), 1, WaveRange / WaveSpeed,
+                                 "FireBall", new Color(1f, 0.5f, 0.12f), WaveSize);
+        if (seek)
+        {
+            var s = p.gameObject.AddComponent<SwordWaveSeeker>();
+            s.projectile = p; s.turn = SeekTurn; s.range = SeekRange;
+            float sr = baseRadius * SmallComboScale;
+            p.onHit = (e, pos) => StartCoroutine(SmallCombo(pos, sr, comboTotal, cast));
+        }
+    }
+
+    /// <summary>소형 연속 베기: 그 자리에서 짧게 여러 번 베기 (고정 피해, 합계 total)</summary>
+    IEnumerator SmallCombo(Vector2 at, float r, float total, CastRef cast)
+    {
+        var frames = SpriteEffect.LoadFrames(SlashLoopSheet, SlashLoopRows, SlashLoopCols, 1f);
+        var fx = SpriteLoopEffect.Spawn(frames, SlashLoopFps, null, at, SlashLoopOrder, r * SlashLoopCellPx / SlashLoopRadiusPx);
+        if (fx == null) Fx.Circle(at, r, Fx.Fire, SmallComboTime);
+        DamageInfo d = FixedOf(total / SmallComboHits, cast);
+        float step = SmallComboTime / SmallComboHits;
+        for (int i = 0; i < SmallComboHits; i++)
+        {
+            SkillHits.Circle(at, r, d, 0.5f);
+            yield return new WaitForSeconds(step);
+        }
+        if (fx != null) fx.FadeOut(0.15f);
+    }
+}
+
+/// <summary>유도 검기 (플레임 디멘션 블레이드): 가장 가까운 적 쪽으로 방향을 틀며 날아감</summary>
+public class SwordWaveSeeker : MonoBehaviour
+{
+    public Projectile projectile;
+    public float turn, range;
+
+    void Update()
+    {
+        if (projectile == null) return;
+        Vector2 me = transform.position;
+        Enemy best = null;
+        float bestSq = range * range;
+        foreach (var e in Enemy.All)
+        {
+            if (e.hp <= 0 || e.IsWall || e.Hidden || e.Scripted || projectile.HasHit(e)) continue;
+            float sq = ((Vector2)e.transform.position - me).sqrMagnitude;
+            if (sq < bestSq) { bestSq = sq; best = e; }
+        }
+        if (best == null) return;
+        Vector3 want = ((Vector2)best.transform.position - me).normalized;
+        projectile.Direction = Vector3.RotateTowards(projectile.Direction, want, turn * Mathf.Deg2Rad * Time.deltaTime, 0f);
     }
 }
 
