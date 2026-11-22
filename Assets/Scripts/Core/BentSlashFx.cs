@@ -51,9 +51,11 @@ public class BentSlashFx : MonoBehaviour
             float uu = (u - um) / hw;
             float g = sag * Mathf.Clamp01(1f - uu * uu);            // 원하는 곡선 (가운데가 가장 볼록, 양 끝은 0)
             float shift = (Center(u) - cm) + g;                      // 원래 호를 펴고 (중심선 - 가운데 높이) 새 곡선을 더함 (위가 + 인 칸 세로 단위)
-            float x = (u - 0.5f) * width;
-            v[i * 2] = new Vector3(x, (0.5f - 0f + shift) * width, 0f);        // 칸 위쪽
-            v[i * 2 + 1] = new Vector3(x, (0.5f - 1f + shift) * width, 0f);    // 칸 아래쪽
+            // 회전 · 위치의 중심 = 호 양 끝을 잇는 선의 가운데 (칸 가운데가 아님). 칸 가운데는 호 가운데에서 떨어져 있어서
+            // 방향 (특히 반대쪽) 에 따라 참격들이 한곳에 모이지 않았음 (사용자 2026-11-22: 왼쪽을 보고 쓰면 안 모임)
+            float x = (u - um) * width;
+            v[i * 2] = new Vector3(x, (cm + shift) * width, 0f);            // 칸 위쪽
+            v[i * 2 + 1] = new Vector3(x, (cm - 1f + shift) * width, 0f);   // 칸 아래쪽
         }
         for (int i = 0; i < Columns; i++)
         {

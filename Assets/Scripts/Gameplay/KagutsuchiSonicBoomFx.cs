@@ -22,7 +22,7 @@ public sealed class KagutsuchiSonicBoomFx : MonoBehaviour
     void Awake()
     {
         bodyVisual = GetComponent<SpriteRenderer>();
-        var texture = Resources.Load<Texture2D>("Sprites/Kagutsuchi_P2_Fx_SonicBoomSide_v2");
+        var texture = SpriteLib.Load("Kagutsuchi_P2_Fx_SonicBoomSide_v2");
         if (texture == null || texture.width != Columns * CellSize || texture.height != Rows * CellSize)
         {
             Debug.LogError("측면 소닉붐 v2가 없거나1536×1024 규격과 다릅니다.");

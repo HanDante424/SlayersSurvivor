@@ -31,7 +31,7 @@ public static class LeniaFx
     {
         string key = $"{name}|{worldSize}|{pivot.x}|{pivot.y}";
         if (single.TryGetValue(key, out var s) && s != null) return s;
-        var tex = Resources.Load<Texture2D>("Sprites/" + name);
+        var tex = SpriteLib.Load(name);
         if (tex == null) return null;
         s = Sprite.Create(tex, new Rect(0, 0, tex.width, tex.height), pivot, visiblePx / worldSize, 0, SpriteMeshType.FullRect);
         single[key] = s;
@@ -66,7 +66,7 @@ public static class LeniaFx
         public Sprite[,] Load(float worldHeight)
         {
             if (cache != null && cache[0, 0] != null) return cache;
-            var tex = Resources.Load<Texture2D>("Sprites/" + name);
+            var tex = SpriteLib.Load(name);
             if (tex == null) return null;
             int cols = directionsAsColumns ? 4 : frames, rows = directionsAsColumns ? 1 : 4;
             float cw = tex.width / (float)cols, ch = tex.height / (float)rows;
@@ -229,7 +229,7 @@ public static class LeniaFx
             var shader = Shader.Find("Sprites/Default");
             for (int i = 0; i < 4; i++)
             {
-                var tex = Resources.Load<Texture2D>($"Sprites/Lenia_Lightning_0{i + 1}");
+                var tex = SpriteLib.Load($"Lenia_Lightning_0{i + 1}");
                 if (tex != null) tex.wrapModeU = TextureWrapMode.Repeat;   // 가로 반복 (프로젝트 기본은 Clamp)
                 boltMats[i] = new Material(shader) { mainTexture = tex };
             }

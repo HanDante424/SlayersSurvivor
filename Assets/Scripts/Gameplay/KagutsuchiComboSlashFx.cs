@@ -30,7 +30,7 @@ public sealed class KagutsuchiComboSlashFx : MonoBehaviour
 
     void Awake()
     {
-        var texture = Resources.Load<Texture2D>("Sprites/Kagutsuchi_Fx_ComboSlash");
+        var texture = SpriteLib.Load("Kagutsuchi_Fx_ComboSlash");
         if (texture == null || texture.width != Columns * CellSize || texture.height != Rows * CellSize) return;
         frames = new Sprite[FrameCount];
         for (int i = 0; i < FrameCount; i++)

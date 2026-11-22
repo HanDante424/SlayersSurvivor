@@ -81,3 +81,24 @@
 - **에른 올려베기 `ErnStray_RisingSlash_08`** 파일만 넣어 둠 (2026-11-19, GPT 작업본 `RisingSlash_08_Polish_v1`, 1024 × 1024, 원본 이름 그대로, `Art/Incoming/ErnStray/` 에도 보관). 왼쪽 3/4, 양손으로 검을 머리 위로 들어 올린 자세 (칼끝 화면 왼쪽 위). 머리 곱슬 · 코트 붉은색이 스탠드보다 밝고 선명해 보임 (눈으로만 본 것). 코드 연결 없음, `.meta` 는 에디터에서 생성.
 - **에른 뒷모습 검 뻗기 `ErnStray_RearReach`** 파일만 넣어 둠 (2026-11-19, GPT 작업본 `RearReach_v9`, 1536 × 1024, 원본 이름 그대로, `Art/Incoming/ErnStray/` 에도 보관). 뒷모습 3/4 (등 칼집, 얼굴은 왼쪽 옆), 왼손은 화면 왼쪽으로 펼치고 오른손의 검은 화면 오른쪽 아래로 길게 뻗음 — 횡베기와 같이 검이 바라보는 쪽 **반대편**이라 좌우 반전 시 검도 뒤집힘. 위 · 아래 여백이 좁음 (12 · 25px, 잘림은 없음). 코드 연결 없음, `.meta` 는 에디터에서 생성.
 - 남은 것: 에른 공격 포즈, 레니아 전체, 캐릭터 선택 카드.
+
+## 화질 통일 규칙 (2026-11-22 사용자 합의)
+- 화면에서 몇 배 줄여 그려지는 **큰 단일 그림** (스탠드 · 연출 포즈 등) 은 원본을 그대로 쓰지 않고 **1/3 로 줄인 복사본 `{이름}_s3.png`** 을 쓴다. 원본을 밉맵 없이 쓰면 선명하게 지글거려 질감이 달라 보이고, 밉맵 + 무압축으로 쓰면 용량이 그림당 약 10MB 로 커지기 때문 (줄인 복사본 + 밉맵 = 모습은 거의 같고 용량 약 1/9).
+- 만들기: `python -I Tools/shrink_sprite.py <그림.png>` (알파를 곱해 LANCZOS 로 줄임, 원본은 건드리지 않음). 코드: `Player.LoadShrinkable` · 스위치 `UseShrunkSprites` · 배율 `ShrinkFactor` (그림 픽셀 좌표는 배율로 나눠 계산).
+- 이펙트 시트 · 칸 격자 시트는 칸 크기 · 픽셀 좌표 상수를 코드가 직접 써서 제외 (개별 판단).
+- 적용 현황: 에른 스탠드와 연출 포즈 9장 (`Atk_SlashReady` · `Atk_HorizontalSlashReady` · `Atk_OneHandSlash` · `Atk_HorizontalSlash` · `Atk_VerticalSlash` · `UltCharge` · `OverheadRaise` · `RearReach` · `RisingSlash_02`) 에 복사본 생성 (Play 미확인). 원본은 아직 `Resources` 에 있음.
+
+## 폴더 분류 (2026-11-22 사용자)
+- `Assets/Resources/Sprites/` 를 하위 폴더로 분류: `ErnStray/Character` (Idle · Run · RunSide · Stand) · `ErnStray/Pose` (Atk_* · 연출 포즈 · 가드, 줄인 `_s3` 복사본 포함) · `ErnStray/Fx` (스킬 이펙트 · 폭풍 재료) · `Kagutsuchi/Body` · `Kagutsuchi/Fx` · `Kagutsuchi/Map` · `Lenia/Character` · `Lenia/Fx` · `Ganiac` (Ganiak 포함) · `Enemy` · `Common` (Ground · Soul · Player_Run · FX_BurnFlame).
+- 파일 이름은 그대로 (폴더가 달라도 이름은 겹치면 안 됨). `.meta` 는 파일과 함께 이동했으므로 GUID · 임포트 설정 유지.
+- **불러오기**: 코드는 `SpriteLib.Load("이름")` (텍스처) / `SpriteLib.LoadSprite("이름")` 사용 — `Resources.Load("Sprites/…")` 를 직접 쓰면 하위 폴더 그림을 못 찾음. 이름 → 폴더 표 `Assets/Scripts/Core/SpriteIndex.cs` 는 `Assets/Editor/SpriteIndexBuilder.cs` 가 그림이 추가 · 이동될 때마다 자동으로 다시 만듦 (표에 없는 이름은 예전처럼 `Sprites/이름` 으로 시도).
+- 코드 호출부 약 34곳을 `SpriteLib` 로 바꿈 (컴파일만 확인, **Play 미확인** — Unity 에서 처음 열 때 폴더 `.meta` 가 새로 생기고 표가 다시 만들어짐).
+- **에른 `ErnStray_Idle` · `ErnStray_Run` 제거** (2026-11-22 사용자): 측면 스탠드 · 측면 달리기 (`ErnStray_RunSide`) 로 대체되어 `Art/Incoming/Retired/` 로 옮김 (`.meta` 포함, 되돌리려면 `Resources/Sprites/ErnStray/Character` 로). 코드: 플레이어는 4방향 달리기 · 정지 시트가 없어도 측면 달리기 · 스탠드 · 포즈가 이어서 로드되고, 캐릭터 선택 카드는 스탠드 (정지) · 측면 달리기 (선택 시) 를 사용. 컴파일만 확인, Play 미확인.
+
+## 이펙트 시트를 한 장으로 줄임 (2026-11-22 사용자: 알파 겹침 0.9 이상은 전부 변경)
+- 프레임 사이 모양이 거의 같은 (알파 겹침 IoU ≥ 0.9) 반복 시트 6장을 **대표 프레임 한 장 `{이름}_One.png`** 으로 바꾸고, 프레임 교체 대신 **코드로 크기 · 투명도를 흔들어** (`SpriteLoopEffect.Wobble`) 살아 있게 함. 원본 시트는 `Art/Incoming/Retired/FxSheets/` 로 옮김 (`.meta` 포함).
+  - `FireChargeMantleFront` (20f → 프레임 2) · `OverFlameGroundTrace` (24f → 5) · `OverFlameBlade` (16f → 13) · `SolarSlashRingLoop` (20f → 1, 회전은 기존 코드) · `FireBladeWave` (6f → 6) · `StormHook` (12f → 4).
+  - 용량 (무압축 + 밉맵 추정): 약 84 MB → 약 6.5 MB. 실제 빌드에서는 비정형 큰 시트가 압축돼 절감은 이보다 작음 (미측정).
+  - 되돌리기: 원본 시트를 `Resources/Sprites/ErnStray/Fx` 로 옮기고, 각 코드 상수 (시트 이름 · 행 · 열) 를 주석의 값으로, `.Wobble(…)` 줄 삭제.
+  - 칸 크기 · 픽셀 좌표는 그대로 (한 칸을 그대로 잘라 저장). `FireChargeMantleBack` (0.88) · `StormStream*` · `SolarSlashRing` 등 0.9 미만은 그대로 시트.
+  - 컴파일만 확인, **Play 미확인** (일렁임 정도 · 어색함).

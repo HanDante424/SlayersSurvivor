@@ -38,14 +38,23 @@ public class CharacterSelect : MonoBehaviour
         foreach (var c in CharacterRoster.All)
         {
             if (c.availability == CharacterAvailability.Locked) continue;
-            idle[c.id] = LoadSheet(c.id + "_Idle", 4, c.visual.idleCols);
-            run[c.id] = LoadSheet(c.id + "_Run", 4, c.visual.runCols);
+            // 4방향 시트가 있으면 그것 (정면 = 0행), 없으면 (에른: 2026-11-22 _Idle · _Run 을 뺌) 측면 스탠드 한 장 · 측면 달리기 가로 한 줄
+            idle[c.id] = LoadSheet(c.id + "_Idle", 4, c.visual.idleCols) ?? LoadStrip(c.id + "_Stand");
+            run[c.id] = LoadSheet(c.id + "_Run", 4, c.visual.runCols) ?? LoadStrip(c.id + "_RunSide");
         }
+    }
+
+    /// <summary>가로 한 줄 시트 (정사각 칸이 가로로 이어짐). 한 장짜리면 열 1</summary>
+    static Sheet LoadStrip(string name)
+    {
+        var tex = SpriteLib.Load(name);
+        if (tex == null) return null;
+        return new Sheet { tex = tex, rows = 1, cols = Mathf.Max(1, Mathf.RoundToInt(tex.width / (float)tex.height)) };
     }
 
     static Sheet LoadSheet(string name, int rows, int cols)
     {
-        var tex = Resources.Load<Texture2D>("Sprites/" + name);
+        var tex = SpriteLib.Load(name);
         return tex == null || cols <= 0 ? null : new Sheet { tex = tex, rows = rows, cols = cols };
     }
 

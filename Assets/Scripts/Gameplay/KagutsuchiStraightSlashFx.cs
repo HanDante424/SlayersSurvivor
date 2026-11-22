@@ -11,7 +11,7 @@ public sealed class KagutsuchiStraightSlashFx : MonoBehaviour
 
     public static void Attach(RaidLaser laser, float seconds)
     {
-        var texture = Resources.Load<Texture2D>("Sprites/Kagutsuchi_Fx_StraightSlash");
+        var texture = SpriteLib.Load("Kagutsuchi_Fx_StraightSlash");
         if (laser == null || texture == null || texture.width != CellWidth || texture.height != CellHeight * FrameCount) return;
         var fx = laser.gameObject.AddComponent<KagutsuchiStraightSlashFx>();
         fx.original = laser.GetComponentsInChildren<SpriteRenderer>();

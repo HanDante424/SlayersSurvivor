@@ -8,8 +8,8 @@ public sealed class KagutsuchiUppercutFx : MonoBehaviour
     const float VisualScale = 3f; // 사용자: 앞뒤 어퍼컷 풍압을 기존 크기의3배로 확대.
     const float GroundPixelY = 652f, PreviewBossHeight = 420f; // 사용자 승인: 제작 미리보기의 발 원점과 크기 비율.
     const int BackOrderOffset = -2, FrontOrderOffset = 1;
-    const string BackSheet = "Sprites/Kagutsuchi_P2_Fx_UppercutWindDepth_v9_Back";
-    const string FrontSheet = "Sprites/Kagutsuchi_P2_Fx_UppercutWindDepth_v9_Front";
+    const string BackSheet = "Kagutsuchi_P2_Fx_UppercutWindDepth_v9_Back";
+    const string FrontSheet = "Kagutsuchi_P2_Fx_UppercutWindDepth_v9_Front";
     Enemy owner;
     SpriteRenderer bodyVisual, backVisual, frontVisual;
     Sprite[] backFrames, frontFrames;
@@ -21,8 +21,8 @@ public sealed class KagutsuchiUppercutFx : MonoBehaviour
     {
         owner = GetComponent<Enemy>();
         bodyVisual = GetComponent<SpriteRenderer>();
-        var back = Resources.Load<Texture2D>(BackSheet);
-        var front = Resources.Load<Texture2D>(FrontSheet);
+        var back = SpriteLib.Load(BackSheet);
+        var front = SpriteLib.Load(FrontSheet);
         if (owner == null || bodyVisual == null || back == null || front == null
             || back.width != FrameCount * CellWidth || front.width != FrameCount * CellWidth
             || back.height != CellHeight || front.height != CellHeight)

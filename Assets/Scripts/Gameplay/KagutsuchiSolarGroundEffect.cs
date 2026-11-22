@@ -24,7 +24,7 @@ public sealed class KagutsuchiSolarGroundEffect : IDisposable
 
     public KagutsuchiSolarGroundEffect(SpriteRenderer sunVisual, Material sunMaterial, Vector2 center, float sunRadius)
     {
-        var texture = Resources.Load<Texture2D>("Sprites/" + Sheet);
+        var texture = SpriteLib.Load(Sheet);
         if (texture == null || texture.width != CellWidth * FrameCount || texture.height != CellHeight)
         {
             Debug.LogError("초거대 화염구 지면 이펙트 시트가 없거나 3072×256 규격과 다릅니다.");

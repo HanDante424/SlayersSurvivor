@@ -52,7 +52,7 @@ public sealed class DebugSpriteView : MonoBehaviour
 
     static void AddSingle(List<Def> list, string sheet)
     {
-        if (Resources.Load<Texture2D>("Sprites/" + sheet) == null) return;
+        if (SpriteLib.Load(sheet) == null) return;
         foreach (var d in list) if (d.Sheet == sheet) return;
         list.Add(new Def { Label = sheet.Replace("Enemy_", ""), Sheet = sheet });
     }
@@ -63,7 +63,7 @@ public sealed class DebugSpriteView : MonoBehaviour
         if (sr == null || d == null) return;
         if (shown == null) basis = sr.sprite;     // 처음 고를 때의 원래 그림 (크기 · 발 기준)
         if (basis == null) return;
-        var tex = Resources.Load<Texture2D>("Sprites/" + d.Sheet);
+        var tex = SpriteLib.Load(d.Sheet);
         if (tex == null) return;
         row = Mathf.Clamp(row, 0, d.Rows - 1); col = Mathf.Clamp(col, 0, d.Cols - 1);
         float cw = tex.width / (float)d.Cols, ch = tex.height / (float)d.Rows;

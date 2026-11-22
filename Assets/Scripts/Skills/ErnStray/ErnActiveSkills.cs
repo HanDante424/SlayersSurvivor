@@ -10,19 +10,22 @@ using UnityEngine;
 public class FireCharge : ActiveSkill
 {
     const float BaseDamage = 4f, BaseCooldown = 10f;
-    const float Distance = 2.67f;       // [임시] 돌진 거리 (기획 미정). 카메라 시야 7 복귀에 맞춰 4 × 2/3
+    const float Distance = 2.67f * 2.5f;   // [임시] 돌진 거리 (기획 미정). 카메라 시야 7 복귀에 맞춰 4 × 2/3, 사용자 2026-11-22: 2.5배
     const float DashTime = 0.25f;       // [임시]
-    const float Knock = 8f;             // [임시]
+    const float Knock = 16f;            // [임시] 사용자 2026-11-22: 넉백 거리 증가 (8 → 16)
 
     // 불꽃 망토 이펙트 (FireMantle_MoveLoop_v4 원본): 5열 × 4행 · 칸 768 × 512 · 20프레임 반복 · 오른쪽을 향함
     // 캐릭터 뒤 레이어 + 앞 레이어 (앞은 캐릭터 자리 알파 63 이하라 캐릭터가 비쳐 보임)
-    const string MantleBackSheet = "ErnStray_FireChargeMantleBack", MantleFrontSheet = "ErnStray_FireChargeMantleFront";
+    // 앞 레이어는 프레임이 거의 같아 (알파 겹침 0.97) 한 장으로 줄임 (2026-11-22 사용자, 용량 절약): 프레임 2 한 장 + 코드 일렁임. 원본 20프레임 시트는 Art/Incoming/Retired/FxSheets
+    // (되돌리려면 시트를 Resources 로 옮기고 MantleFrontSheet = "ErnStray_FireChargeMantleFront", MantleFrontRows/Cols = 4/5, 아래 Wobble 줄 삭제)
+    const string MantleBackSheet = "ErnStray_FireChargeMantleBack", MantleFrontSheet = "ErnStray_FireChargeMantleFront_One";
+    const int MantleFrontRows = 1, MantleFrontCols = 1;
     const int MantleRows = 4, MantleCols = 5;
     const float MantleFps = 20f;            // 초안 프레임 50ms
     const float MantleCellPx = 768f;
     const float MantlePivotOffsetPx = 96f;  // 캐릭터 기준점 (480, 256) = 칸 가운데에서 앞쪽(오른쪽)으로 96px
     const float MantleHeightPx = 295f;      // 그림 세로 범위 (프레임별 알파 범위 102~397px)
-    const float MantleHeightWorld = 1.85f;  // [임시] 망토 세로 = 캐릭터 키(약 1.62) × 약 1.15
+    const float MantleHeightWorld = 1.85f * 1.5f;  // [임시] 망토 세로 = 캐릭터 키(약 1.62) × 약 1.15, 사용자 2026-11-22: 크기 50% 증가
     const float CharCenterY = 0.17f;        // [해석] 캐릭터 몸 가운데 = 발 기준점 위 0.17 (칸 2.07 · 발 16px · 키 200px 에서 계산)
     const int MantleBackOrder = 9, MantleFrontOrder = 11;   // 플레이어 = 10
 
@@ -36,7 +39,7 @@ public class FireCharge : ActiveSkill
         float pxWorld = MantleHeightWorld / MantleHeightPx;
         float cellWorld = MantleCellPx * pxWorld;
         var back = SpriteEffect.LoadFrames(MantleBackSheet, MantleRows, MantleCols, cellWorld);
-        var front = SpriteEffect.LoadFrames(MantleFrontSheet, MantleRows, MantleCols, cellWorld);
+        var front = SpriteEffect.LoadFrames(MantleFrontSheet, MantleFrontRows, MantleFrontCols, cellWorld);
         if (back == null || front == null) return null;
         dir = dir.sqrMagnitude > 0.01f ? dir.normalized : Vector2.right;
         float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
@@ -46,7 +49,7 @@ public class FireCharge : ActiveSkill
         var fx = new[]
         {
             SpriteLoopEffect.Spawn(back, MantleFps, P.transform, at, MantleBackOrder, 1f),
-            SpriteLoopEffect.Spawn(front, MantleFps, P.transform, at, MantleFrontOrder, 1f),
+            SpriteLoopEffect.Spawn(front, MantleFps, P.transform, at, MantleFrontOrder, 1f)?.Wobble(0.025f, 0.035f, 0.08f, 9f),   // [임시] 한 장 + 일렁임
         };
         foreach (var f in fx)
         {
@@ -62,6 +65,8 @@ public class FireCharge : ActiveSkill
         hit.Clear();
         float r = Range(Tier.Mid) * 0.5f;   // [임시] 돌진 중 판정은 범위 중간의 절반
         DamageInfo dmg = MakeDamage(BaseDamage);
+        Vector2 dashDir = P.Facing.sqrMagnitude > 0.01f ? P.Facing.normalized : Vector2.right;
+        Vector2 sideAxis = new Vector2(-dashDir.y, dashDir.x);   // 돌진 방향의 옆 (왼쪽)
         var mantle = SpawnMantle(P.Facing);
         if (mantle == null) Fx.Circle(P.transform.position, r, Fx.Fire, DashTime + 0.1f, P.transform, 0f);   // 그림이 없을 때만
         P.Dash(P.Facing, Distance, DashTime, true,
@@ -71,19 +76,18 @@ public class FireCharge : ActiveSkill
                 foreach (var e in SkillHits.InCircle(at, r, found))
                 {
                     if (!hit.Add(e)) continue;
+                    // 부딪힌 적은 돌진 방향 양옆으로 넉백: 경로의 어느 쪽에 있는지에 따라 그 쪽으로 (사용자 2026-11-22)
                     Vector2 d = (Vector2)e.transform.position - at;
-                    e.Hit(dmg, d, 0f);
-                    e.Push(d, Knock);
+                    float s = Vector2.Dot(d, sideAxis);
+                    Vector2 side = sideAxis * (Mathf.Abs(s) < 0.01f ? (Random.value < 0.5f ? 1f : -1f) : Mathf.Sign(s));
+                    e.Hit(dmg, side, 0f);
+                    e.Push(side, Knock);
                 }
             },
             onEnd: () =>
             {
+                // 도착 지점의 원 이펙트 · 추가 밀치기는 없음 (사용자 2026-11-22: 밀치기는 돌진 중에만)
                 if (mantle != null) foreach (var f in mantle) if (f != null) f.Stop();
-                // 도착 지점에서 주변 적 밀치기
-                Vector2 at = P.transform.position;
-                Fx.Disc(at, Range(Tier.Mid), Fx.FireDeep, 0.2f);
-                foreach (var e in SkillHits.InCircle(at, Range(Tier.Mid), found))
-                    e.Push((Vector2)e.transform.position - at, Knock);
             });
     }
 }
@@ -101,8 +105,9 @@ public class OverFlameSlash : ActiveSkill
     const float ExplosionWidthMul = 2.2f;   // [임시] 폭발 판정 폭 = 검 판정 폭 × 이 값 (같은 길이)
 
     // 화염검 그림 (FlameBlade_Upright_v5 원본): 4열 × 4행 · 칸 256 × 768 · 16프레임 반복 · 칼끝 위 · 곧은 날 = 오른쪽
-    const string BladeSheet = "ErnStray_OverFlameBlade";
-    const int BladeRows = 4, BladeCols = 4;
+    // 한 장 (프레임 13, 알파 겹침 0.94) + 코드 일렁임 (2026-11-22 사용자, 용량 절약). 원본 16프레임 시트는 Art/Incoming/Retired/FxSheets (되돌리기: 시트 이름 · 4×4 로, Wobble 줄 삭제)
+    const string BladeSheet = "ErnStray_OverFlameBlade_One";
+    const int BladeRows = 1, BladeCols = 1;
     const float BladeFps = 20f;             // 초안 프레임 50ms
     const float BladeCellPx = 256f;
     const float BladeRootFromCenterPx = 340f;   // 뿌리 기준점 (128, 724) = 칸 가운데(384)에서 아래로 340px
@@ -110,11 +115,26 @@ public class OverFlameSlash : ActiveSkill
     const int BladeOrder = 12;
     const float WindupTime = 0.35f;         // [임시] 칼을 위로 치켜들고 준비하는 시간 (그동안 이동 불가 [해석])
     const float SwingTime = 0.08f;          // [임시] 내려치는 시간 → 끝나는 순간 판정
+    const float UpwardLean = 0f;            // 바로 위로 공격할 때 준비 자세를 공격 방향에서 뒤로 젖히는 각도 (도). 사용자 2026-11-22: 위로 쓸 때는 수직으로 듦 (45 → 0, 회전 없이 곧게 선 채 앞으로 내려옴). 0 보다 크면 그만큼 젖힌 자세에서 시작
+    const float TraceLengthMul = 1.5f;      // 지면 잔흔 · 폭발 그림의 길이 배율 (사용자 2026-11-22: 인스펙터 Scale 1.5). 판정 길이는 그대로
+    const float TraceCenterDist = 4f;       // 지면 잔흔 · 폭발 그림의 중심 거리 (플레이어에서 공격 방향으로, 사용자 2026-11-22: 인스펙터 X 4). 이전에는 판정 길이의 절반
+    const float WindupLift = 1.4f;          // 대기 동작 동안 화염검 시작 피봇의 세로 위치 (플레이어 기준 월드, 사용자 2026-11-22: 디버그 맵 (플레이어 y -6) 에서 피봇 y -4.6 = 플레이어 +1.4 = 손 높이). 내려치면서 원래 자리 (플레이어) 로 옮겨 옴
+    const float BladeForward = 1f;          // 내려친 화염검의 뿌리를 공격 방향으로 앞당기는 거리 (월드, 사용자 2026-11-22: 인스펙터 X 1). 그림만 옮김 — 판정 · 지면 잔흔은 그대로
+    const float TraceDelay = 0.25f;         // 내려친 뒤 지면 잔흔이 생기기까지 (사용자 2026-11-22: 잔흔이 생기기 0.25초 전부터 화염검이 사라짐). 폭발 시각 (내려친 뒤 ExplosionDelay) 은 그대로라 잔흔은 그만큼 짧게 남음
+    const float TraceFadeIn = 0.25f;        // 잔흔이 나타나는 시간 (사용자 2026-11-22: 천천히 → 0.25초)
+    // 화염검이 사라질 때 흩어지는 불꽃 파티클 (FireParticlePop 시트 재사용, 사용자 2026-11-22). 모두 [임시]
+    const int BladeSparkCount = 22;         // 사라지는 동안 터뜨리는 개수
+    const float BladeSparkSize = 0.5f;      // 파티클 1개 크기 (월드, 기본 0.6 기준)
+    const float BladeSparkRise = 1.6f;      // 위로 떠오르는 속도 (월드/초)
+    const float BladeSparkSide = 0.8f;      // 옆으로 퍼지는 속도 (±)
+    const float BladeFadeDelay = 0f;        // 내려친 직후부터 사라지기 시작 (= 잔흔이 생기기 TraceDelay 전)
+    const float BladeFadeTime = TraceDelay; // 화염검이 사라지는 시간 = 0.25초 (잔흔이 생기는 순간 다 사라짐). 이전 0.7 → 0.35 → 0.15
     const float BladeLinger = 0.15f;        // [임시] 내려친 뒤 칼이 남는 시간
 
     // 지면 잔흔 (FlameBlade_GroundTrace_Sustain_v1 원본): 4열 × 6행 · 칸 768 × 192 · 24프레임 반복 · 가로선 + 위로 오르는 불씨
-    const string TraceSheet = "ErnStray_OverFlameGroundTrace";
-    const int TraceRows = 6, TraceCols = 4;
+    // 한 장 (프레임 5, 알파 겹침 0.99) + 코드 일렁임 (2026-11-22 사용자, 용량 절약). 원본 24프레임 시트는 Art/Incoming/Retired/FxSheets (되돌리기: 시트 이름 · 6×4 로, Wobble 줄 삭제)
+    const string TraceSheet = "ErnStray_OverFlameGroundTrace_One";
+    const int TraceRows = 1, TraceCols = 1;
     const float TraceFps = 20f;             // 초안 프레임 50ms
     const float TraceCellPx = 768f;
     const float TraceLengthPx = 660f;       // 선 길이 (알파 범위 54~714px)
@@ -150,24 +170,33 @@ public class OverFlameSlash : ActiveSkill
         var cast = DirectCast;
 
         // 화염검: 위로 치켜든 채 준비 → 공격 방향으로 내려침 (그림이 없으면 예전처럼 바로 판정)
-        Transform blade = SpawnBlade(from, dir, len, out float startAngle, out float endAngle);
+        P.Root(WindupTime + SwingTime);   // 준비 · 내려치는 동안 이동 불가 (그림이 없어도 동일, 사용자 2026-11-22)
+        bool posed = P.ShowPose("OverheadRaise");   // 화염 검 준비 동작 (사용자 2026-11-22: ErnStray_OverheadRaise). 그림이 없으면 기존 모습 그대로
+        Transform blade = SpawnBlade(from, dir, len, out float startAngle, out float sweep);
         if (blade != null)
         {
-            P.Root(WindupTime + SwingTime);
+            Vector2 ndir = dir.sqrMagnitude > 0.01f ? dir.normalized : Vector2.right;
+            Vector2 bladeEnd = from + ndir * BladeForward;      // 내려친 화염검의 최종 자리 (공격 방향으로 BladeForward 앞)
+            blade.position = from + Vector2.up * WindupLift;   // 대기 동작: 화염검 시작 피봇을 WindupLift 위치로
             yield return new WaitForSeconds(WindupTime);
-            P.PlayAttack(dir);
+            if (posed) P.ShowPose("RisingSlash_02");   // 내려베기 (사용자 2026-11-22: ErnStray_RisingSlash_02)
+            else P.PlayAttack(dir);
             for (float t = 0f; t < SwingTime; t += Time.deltaTime)
             {
                 float k = t / SwingTime;
-                blade.rotation = Quaternion.Euler(0f, 0f, Mathf.LerpAngle(startAngle, endAngle, k * k) - 90f);   // 가속하며 내려침
+                blade.rotation = Quaternion.Euler(0f, 0f, startAngle + sweep * k * k - 90f);   // 가속하며 내려침
+                blade.position = Vector2.Lerp(from + Vector2.up * WindupLift, bladeEnd, k * k);    // 대기 위치의 화염검이 같이 원래 자리로 옴
                 yield return null;
             }
-            blade.rotation = Quaternion.Euler(0f, 0f, endAngle - 90f);
-            Destroy(blade.gameObject, BladeLinger);
+            blade.rotation = Quaternion.Euler(0f, 0f, startAngle + sweep - 90f);
+            blade.position = bladeEnd;
+            StartCoroutine(FadeBlade(blade, len));   // 내려친 직후부터 서서히 사라지며 불꽃 파티클이 흩어짐
+            if (posed) StartCoroutine(ReleasePoseAfter(BladeLinger));   // 검이 남는 동안 내려벤 자세 유지 → 원래 모습
         }
         else
         {
-            P.PlayAttack(dir);
+            if (posed) { yield return new WaitForSeconds(WindupTime); P.ShowPose("RisingSlash_02"); StartCoroutine(ReleasePoseAfter(BladeLinger)); }
+            else P.PlayAttack(dir);
             Fx.Box(from, dir, len, width, Fx.FireBright, 0.3f);
         }
         SkillHits.Box(from, dir, len, width, MakeDamage(BladeDamage, cast), 2f, e => e.Stun(StunSeconds));
@@ -175,9 +204,10 @@ public class OverFlameSlash : ActiveSkill
 
         // [임시] 폭발 위치 = 검을 내려친 자리 (넓은 직사각형)
         // 내려친 자리에 지면 잔흔 → 폭발 때 제거. 그림이 없으면 예전 바닥 직사각형
+        yield return new WaitForSeconds(TraceDelay);   // 화염검이 다 사라진 순간 잔흔이 생김
         Transform trace = SpawnGroundTrace(from, dir, len);
-        if (trace == null) Fx.Box(from, dir, len, width * ExplosionWidthMul, Fx.FireDeep, ExplosionDelay);
-        yield return new WaitForSeconds(ExplosionDelay);
+        if (trace == null) Fx.Box(from, dir, len, width * ExplosionWidthMul, Fx.FireDeep, ExplosionDelay - TraceDelay);
+        yield return new WaitForSeconds(Mathf.Max(0f, ExplosionDelay - TraceDelay));
         if (trace != null) Destroy(trace.gameObject);
         if (!SpawnGroundBurst(from, dir, len)) Fx.Box(from, dir, len, width * ExplosionWidthMul, Fx.FireBright, 0.3f);
         StartCoroutine(SpawnParticlePops(from, dir, len, width * ExplosionWidthMul));
@@ -185,16 +215,62 @@ public class OverFlameSlash : ActiveSkill
         CameraFollow.Shake(0.15f, 0.15f);
     }
 
+    /// <summary>내려친 화염검: BladeFadeDelay 뒤부터 BladeFadeTime 동안 서서히 투명해져 사라짐</summary>
+    IEnumerator FadeBlade(Transform blade, float len)
+    {
+        if (BladeFadeDelay > 0f) yield return new WaitForSeconds(BladeFadeDelay);
+        if (blade == null) yield break;
+        var fx = blade.GetComponentInChildren<SpriteLoopEffect>();
+        if (fx != null) fx.FadeOut(BladeFadeTime);
+        Destroy(blade.gameObject, BladeFadeTime + 0.1f);
+
+        // 사라지는 칼날 위 무작위 자리에서 불꽃 파티클이 시간차로 터져 위로 흩어짐 (칼날 방향 = 회전축의 위쪽)
+        Vector2 root = blade.position, bdir = blade.up, side = new Vector2(-bdir.y, bdir.x);
+        var frames = SpriteEffect.LoadFrames(PopSheet, PopRows, PopCols, PopCellPx * BladeSparkSize / PopSpanPx);
+        if (frames == null) yield break;
+        float t = 0f;
+        for (int i = 0; i < BladeSparkCount; i++)
+        {
+            float at = BladeFadeTime * (i + Random.value) / BladeSparkCount;   // 사라지는 시간 안에 고르게
+            if (at > t) { yield return new WaitForSeconds(at - t); t = at; }
+            Vector2 pos = root + bdir * Random.Range(0.05f, 1f) * len + side * Random.Range(-0.15f, 0.15f);
+            var spark = SpriteEffect.Spawn(frames, PopFps * 0.7f, null, pos, Random.Range(0f, 360f), Random.value < 0.5f, PopOrder,
+                                           Random.Range(0.6f, 1.2f));
+            if (spark != null)
+            {
+                var d = spark.gameObject.AddComponent<DriftUp>();
+                d.velocity = new Vector2(Random.Range(-BladeSparkSide, BladeSparkSide), BladeSparkRise * Random.Range(0.7f, 1.3f));
+                d.life = frames.Length / (PopFps * 0.7f);
+            }
+        }
+    }
+
+    IEnumerator ReleasePoseAfter(float seconds)
+    {
+        yield return new WaitForSeconds(seconds);
+        P.ReleasePose();
+    }
+
     /// <summary>
     /// 화염검을 뿌리 = from 에 세움. 반환 = 회전축(뿌리) Transform, 그림이 없으면 null.
-    /// 칼 길이 = 판정 길이. 시작 각도 = 공격 방향에서 90° 뒤 (오른쪽 공격이면 위, 왼쪽 공격이면 위 + 좌우 반전 → 곧은 날이 앞장섬)
+    /// 칼 길이 = 판정 길이. 시작 각도 = 항상 위 (90°, 사용자 2026-11-22: 준비는 무조건 위에서). 거기서 공격 방향으로 내려침:
+    /// 오른쪽 · 아래 공격은 시계 방향, 왼쪽 공격은 시계 반대 방향 (+ 좌우 반전 → 곧은 날이 앞장섬). sweep = 내려치는 회전량 (도, 부호 = 방향).
+    /// 바로 위로 공격하면 회전량이 0 이라 위쪽으로 조금 기울인 자세에서 시작 (UpwardLean)
     /// </summary>
-    Transform SpawnBlade(Vector2 from, Vector2 dir, float len, out float startAngle, out float endAngle)
+    Transform SpawnBlade(Vector2 from, Vector2 dir, float len, out float startAngle, out float sweep)
     {
         dir = dir.sqrMagnitude > 0.01f ? dir.normalized : Vector2.right;
-        endAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+        float endAngle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
         bool left = dir.x < -0.01f;
-        startAngle = endAngle + (left ? -90f : 90f);
+        startAngle = 90f;
+        sweep = endAngle - startAngle;
+        if (!left) { while (sweep > 0f) sweep -= 360f; while (sweep <= -360f) sweep += 360f; }   // 시계 방향 (−)
+        else { while (sweep < 0f) sweep += 360f; while (sweep >= 360f) sweep -= 360f; }         // 시계 반대 방향 (+)
+        if (Mathf.Abs(sweep) < UpwardLean)   // 위쪽 공격: 위에서 시작하면 내려칠 거리가 없음 → 뒤로 젖힌 자세에서 시작
+        {
+            startAngle = endAngle + (left ? -UpwardLean : UpwardLean);
+            sweep = endAngle - startAngle;
+        }
         float pxWorld = len / BladeLengthPx;
         var frames = SpriteEffect.LoadFrames(BladeSheet, BladeRows, BladeCols, BladeCellPx * pxWorld);
         if (frames == null) return null;
@@ -202,9 +278,9 @@ public class OverFlameSlash : ActiveSkill
         var pivot = new GameObject("FX_OverFlameBladePivot").transform;
         pivot.position = from;
         pivot.rotation = Quaternion.Euler(0f, 0f, startAngle - 90f);   // 그림은 칼끝이 위(90°)
-        var loop = SpriteLoopEffect.Spawn(frames, BladeFps, pivot, new Vector2(0f, BladeRootFromCenterPx * pxWorld), BladeOrder, 1f);
+        var loop = SpriteLoopEffect.Spawn(frames, BladeFps, pivot, new Vector2(0f, BladeRootFromCenterPx * pxWorld), BladeOrder, 1f).Wobble(0.03f, 0.012f, 0.1f, 11f);   // [임시] 한 장 + 일렁임
         if (left) loop.transform.localScale = new Vector3(-1f, 1f, 1f);   // [해석] 왼쪽으로 내려칠 땐 곧은 날이 앞(왼쪽)
-        Destroy(pivot.gameObject, WindupTime + SwingTime + BladeLinger + 1f);   // 안전장치
+        Destroy(pivot.gameObject, WindupTime + SwingTime + BladeLinger + BladeFadeTime + 1f);   // 안전장치
         return pivot;
     }
 
@@ -215,15 +291,15 @@ public class OverFlameSlash : ActiveSkill
     Transform SpawnGroundTrace(Vector2 from, Vector2 dir, float len)
     {
         dir = dir.sqrMagnitude > 0.01f ? dir.normalized : Vector2.right;
-        float pxWorld = len / TraceLengthPx;
+        float pxWorld = len * TraceLengthMul / TraceLengthPx;
         var frames = SpriteEffect.LoadFrames(TraceSheet, TraceRows, TraceCols, TraceCellPx * pxWorld);
         if (frames == null) return null;
 
         var root = new GameObject("FX_OverFlameGroundTrace").transform;
-        root.position = from + dir * (len * 0.5f);
+        root.position = from + dir * TraceCenterDist;
         root.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
         if (dir.x < -0.01f) root.localScale = new Vector3(1f, -1f, 1f);
-        SpriteLoopEffect.Spawn(frames, TraceFps, root, new Vector2(0f, TracePivotBelowCenterPx * pxWorld), Fx.GroundOrder, 1f);
+        SpriteLoopEffect.Spawn(frames, TraceFps, root, new Vector2(0f, TracePivotBelowCenterPx * pxWorld), Fx.GroundOrder, 1f).Wobble(0.015f, 0.25f, 0.15f, 14f).FadeIn(TraceFadeIn);   // [임시] 한 장 + 일렁임 (가는 선이라 세로로 크게)
         Destroy(root.gameObject, ExplosionDelay + 1f);   // 안전장치
         return root;
     }
@@ -232,10 +308,10 @@ public class OverFlameSlash : ActiveSkill
     bool SpawnGroundBurst(Vector2 from, Vector2 dir, float len)
     {
         dir = dir.sqrMagnitude > 0.01f ? dir.normalized : Vector2.right;
-        float pxWorld = len / TraceLengthPx;
+        float pxWorld = len * TraceLengthMul / TraceLengthPx;
         var frames = SpriteEffect.LoadFrames(BurstSheet, BurstRows, BurstCols, TraceCellPx * pxWorld);
         if (frames == null) return false;
-        var fx = SpriteEffect.Spawn(frames, BurstFps, null, from + dir * (len * 0.5f),
+        var fx = SpriteEffect.Spawn(frames, BurstFps, null, from + dir * TraceCenterDist,
                                     Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg, false, BurstOrder);
         if (dir.x < -0.01f) fx.transform.localScale = new Vector3(1f, -1f, 1f);   // [해석] 잔흔과 같이 세로 반전
         return true;
@@ -270,8 +346,14 @@ public class FireBreaker : ActiveSkill
 {
     const float StunSeconds = 1f;       // 기획서 확정
     const float RecastDelay = 2f;       // 기획서 확정 (폭발 딜레이 2초)
+    // 재발동 표시 고리 ErnStray_FireBreakerMark (2026-11-22 사용자 전달 단일 그림, 원본 1254px → 게임용 1024px 로 줄임). 시트 (2000×2000) 대신 코드로 연출 (GroundMarkFx)
+    const string MarkSheet = "ErnStray_FireBreakerMark";
+    const float MarkSrcPx = 1254f;                       // 원본 가로 (좌표 기준)
+    const float MarkRingRadiusPx = 500f;                 // 측정: 얇은 고리의 반지름 (원본 px, 불투명 픽셀 반지름 중앙값 474 · 90% 506)
+    static readonly Vector2 MarkCenterNorm = new Vector2(622f / 1254f, 629f / 1254f);   // 측정: 고리 중심 (그림 가운데에서 왼쪽 5px · 아래 2px, 아래쪽 기준)
     const float BaseDamage = 10f, BaseCooldown = 10f;   // [해석] 두 번째 폭발도 초기 피해량 10
 
+    const float RangeMul = 2f;          // 범위 배율 (사용자 2026-11-22: 2배). 판정 · 이펙트 크기 모두
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
 
     protected override void Activate() => StartCoroutine(Run());
@@ -279,13 +361,21 @@ public class FireBreaker : ActiveSkill
     IEnumerator Run()
     {
         Vector2 at = P.transform.position;   // 같은 위치에서 재발동
-        float r = Range(Tier.Mid);
+        float r = Range(Tier.Mid) * RangeMul;
         var cast = DirectCast;
         P.PlayAttack();
         Burst(at, r, cast);
-        var mark = Fx.GroundCircle(at, r, Fx.FireDeep, RecastDelay);   // 재발동 위치 표시 = 바닥 레이어
+        // 재발동 위치 표시 = 바닥 레이어. 고리 그림 한 장을 코드로 차오르게 함 (시트 대신, 용량 절약). 그림이 없으면 예전 단색 원
+        var markTex = SpriteLib.Load(MarkSheet);
+        GameObject mark = null;
+        if (markTex != null)
+        {
+            var fx = GroundMarkFx.Spawn(markTex, MarkCenterNorm, MarkRingRadiusPx, MarkSrcPx, at, r, RecastDelay, Fx.GroundOrder);
+            if (fx != null) mark = fx.gameObject;
+        }
+        else { var shape = Fx.GroundCircle(at, r, Fx.FireDeep, RecastDelay); if (shape != null) mark = shape.gameObject; }
         yield return new WaitForSeconds(RecastDelay);
-        if (mark != null) Destroy(mark.gameObject);
+        if (mark != null) Destroy(mark);
         Burst(at, r, cast);
     }
 
@@ -332,14 +422,16 @@ public class FireBreaker : ActiveSkill
 /// <summary>M05 파이어 엑스큐션: 빠른 속도로 주변을 베어냄 · 초기 피해량 5 × 공격 횟수 30 · 쿨타임 30초 · 발동 중 이동 불가</summary>
 public class FireExecution : ActiveSkill
 {
-    const float Duration = 1.5f;        // [임시] 공격 지속시간 (기획 미정) → 30회면 0.05초 간격
+    const float Duration = 0.75f;       // [임시] 공격 지속시간 (기획 미정). 사용자 2026-11-22: 속도 2배 (1.5 → 0.75초, 30회면 0.025초 간격)
+    const float RangeMul = 3f;          // 범위 배율 (사용자 2026-11-22: 50% 증가 → 거기서 다시 2배 = 3배). 판정 · 이펙트 크기 모두
+    const float FadeOutTime = 0.5f;     // [임시] 끝날 때 고리 이펙트가 서서히 사라지는 시간 (사용자 2026-11-22)
     const int Hits = 30;
     const float BaseDamage = 5f, BaseCooldown = 30f;
 
     // 연속 베기 고리 이펙트 (FireSlash_OmniCombo_v2 원본): 6열 × 5행 · 칸 640px · 30프레임 · 반복 재생
     const string SlashLoopSheet = "ErnStray_FireSlashOmniCombo";
     const int SlashLoopRows = 5, SlashLoopCols = 6;
-    const float SlashLoopFps = 25f;       // 초안 프레임 40ms (한 바퀴 1.2초)
+    const float SlashLoopFps = 50f;       // 초안 프레임 40ms (한 바퀴 1.2초). 사용자 2026-11-22: 속도 2배 (25 → 50)
     const float SlashLoopCellPx = 640f;
     const float SlashLoopRadiusPx = 290f; // 그림 범위 반지름 (프레임별 알파 범위 34~623px 에서 잰 값)
     const int SlashLoopOrder = 11;
@@ -355,20 +447,20 @@ public class FireExecution : ActiveSkill
         DamageInfo per = MakeDamage(BaseDamage, DirectCast);
         // [임시] 그림 반지름 = 판정 반경 (범위 중간). 발동 동안 플레이어를 따라감
         var frames = SpriteEffect.LoadFrames(SlashLoopSheet, SlashLoopRows, SlashLoopCols, 1f);
-        float r0 = Range(Tier.Mid);
+        float r0 = Range(Tier.Mid) * RangeMul;
         var loop = SpriteLoopEffect.Spawn(frames, SlashLoopFps, P.transform, Vector2.zero, SlashLoopOrder,
                                           r0 * SlashLoopCellPx / SlashLoopRadiusPx);
         for (int i = 0; i < Hits; i++)
         {
             Vector2 at = P.transform.position;
-            float r = Range(Tier.Mid);
+            float r = Range(Tier.Mid) * RangeMul;
             P.PlayAttack();
             if (loop == null) Fx.Circle(at, r, i == Hits - 1 ? Fx.FireBright : Fx.Fire, 0.25f);   // 그림이 없을 때만 예전 원
             SkillHits.Circle(at, r, per, i == Hits - 1 ? 6f : 1f);
             if (i == Hits - 1) CameraFollow.Shake(0.15f, 0.15f);
             yield return new WaitForSeconds(Duration / Hits);
         }
-        if (loop != null) loop.Stop();
+        if (loop != null) loop.FadeOut(FadeOutTime);   // 갑자기 끊지 않고 서서히 사라짐 (플레이어를 따라가는 채로)
     }
 }
 
@@ -392,12 +484,16 @@ public class FireStream : Skill
     // 오른쪽으로 곧게 자라는 나선 불꽃 (월드에 고정, 캐릭터를 따라가지 않음) · 뒤 레이어 + 앞 레이어
     const string StreamRearSheet = "ErnStray_FireStreamRear", StreamFrontSheet = "ErnStray_FireStreamFront";
     const int StreamRows = 6, StreamCols = 4;
-    const float StreamFps = 25f;            // 초안 프레임 40ms (1초)
+    const float StreamFps = 50f;            // 초안 프레임 40ms (1초). 사용자 2026-11-22: 재생 시간 절반 (25 → 50fps = 0.5초)
     const float StreamCellPx = 768f;
     const float StreamStartPx = 118f;       // 출발점 = 1번 프레임 점화 자리 가운데 (알파 범위 86~151px)
     const float StreamEndPx = 733f;         // 도착점 = 다 자랐을 때 오른쪽 끝 (알파 범위 최대 733px)
     const float StreamGroundBelowCenterPx = 55f;   // 지면선 (기준점 y 311) = 칸 가운데(256)에서 아래로 55px
     const int StreamRearOrder = 9, StreamFrontOrder = 11;   // 플레이어 = 10
+    const float StreamDrop = 1.5f;          // 좌우 돌진 때 이펙트를 월드 아래로 내리는 거리 (사용자 2026-11-22: 2 → 0.5 더 높여 1.5)
+    const float StreamMidAboveGroundPx = 87.5f;   // 측정: 불꽃 그림 세로 범위 110~337px, 지면선 311px → 가운데가 지면선 위 87.5px
+    const float DistanceMul = 2.5f;         // 돌진 거리 배율 (사용자 2026-11-22: 2.5배)
+    const float StreamThickness = 3f;       // 불꽃 굵기 배율 (사용자 2026-11-22: 3배)
 
     /// <summary>
     /// 돌진 경로에 불꽃 줄기: 출발점 → 도착점 길이 = 돌진 거리, 돌진 방향으로 회전 (왼쪽이면 세로 반전 [해석]).
@@ -412,17 +508,24 @@ public class FireStream : Skill
         if (rear == null || front == null) return false;
 
         var root = new GameObject("FX_FireStream").transform;
-        root.position = from;
-        root.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg);
-        if (dir.x < -0.01f) root.localScale = new Vector3(1f, -1f, 1f);
-        Vector2 local = new Vector2((StreamCellPx * 0.5f - StreamStartPx) * pxWorld, StreamGroundBelowCenterPx * pxWorld);
+        // 앞에서부터 뒤로 나옴 (사용자 2026-11-22): 그림은 점화 자리에서 오른쪽으로 자라므로, 점화 자리를 돌진 도착점에 두고 돌진 반대 방향으로 자라게 함
+        Vector2 grow = -dir;
+        // 높이 보정은 좌우로 돌진할 때만 (위 · 아래로 돌진할 때 아래로 내리면 경로에서 벗어나 멀리 떨어져 보임, 사용자 2026-11-22)
+        float horiz = Mathf.Abs(grow.x), vert = Mathf.Abs(grow.y);
+        root.position = from + dir * distance + Vector2.down * (StreamDrop * horiz);
+        root.rotation = Quaternion.Euler(0f, 0f, Mathf.Atan2(grow.y, grow.x) * Mathf.Rad2Deg);
+        // 크기 3배 (사용자 2026-11-22): 길이 = 돌진 거리 그대로, 굵기 (불꽃 높이) 만 3배. 지면선이 루트 원점이라 땅에 붙은 채 위로 커짐
+        float side = grow.x < -0.01f ? -1f : 1f;   // 자라는 방향이 왼쪽이면 세로 반전 (불꽃이 계속 위로)
+        root.localScale = new Vector3(1f, side * StreamThickness, 1f);
+        // 위 · 아래로 돌진하면 불꽃이 옆으로 서서 경로 한쪽에 치우침 → 그림의 가운데 (지면선 위 StreamMidAboveGroundPx) 가 경로에 오도록 보정
+        Vector2 local = new Vector2((StreamCellPx * 0.5f - StreamStartPx) * pxWorld, (StreamGroundBelowCenterPx - StreamMidAboveGroundPx * vert) * pxWorld);
         SpriteEffect.Spawn(rear, StreamFps, root, local, 0f, false, StreamRearOrder);
         SpriteEffect.Spawn(front, StreamFps, root, local, 0f, false, StreamFrontOrder);
         Destroy(root.gameObject, StreamRows * StreamCols / StreamFps + 0.2f);   // 두 장이 끝난 뒤 빈 루트 정리
         return true;
     }
     float StackCooldown => CooldownOf(BaseCooldown);
-    float Distance => Reach(Tier.Short);
+    float Distance => Reach(Tier.Short) * DistanceMul;
 
     public override string Badge => stacks.ToString();
     public override float CooldownFraction =>
@@ -563,17 +666,17 @@ public class BlazingStorm : Skill
     const float StillH = 192f;
 
     // [임시] 예전 시험판 재료 = 오버 드라이브 화염검 시트 (칼끝 = 머리). 새 재료가 없을 때만
-    const string TornadoRibbonSheet = "ErnStray_OverFlameBlade";
-    const int TornadoRibbonRows = 4, TornadoRibbonCols = 4;
+    const string TornadoRibbonSheet = "ErnStray_OverFlameBlade_One";   // 2026-11-22: 화염검 시트를 한 장 (_One) 으로 줄여서 이 시험판도 그 한 장을 씀
+    const int TornadoRibbonRows = 1, TornadoRibbonCols = 1;
     const float TornadoCellW = 256f, TornadoCellH = 768f;
     const float TornadoRibbonX = 88f, TornadoRibbonW = 74f;    // 칼 알파 범위 x 88~162
     const float TornadoRibbonTop = 54f, TornadoRibbonH = 674f; // 칼 알파 범위 y 54~728 (위 기준)
 
-    static RibbonTornadoFx.Source LoopSource(string sheet, float weight)
+    static RibbonTornadoFx.Source LoopSource(string sheet, float weight, bool single = false)
     {
-        var tex = Resources.Load<Texture2D>("Sprites/" + sheet);
+        var tex = SpriteLib.Load(sheet);
         if (tex == null) return null;
-        const int cols = 4, rows = 3;
+        int cols = single ? 1 : 4, rows = single ? 1 : 3;   // single = 칸 한 장짜리 그림
         var frames = new Rect[cols * rows];
         for (int k = 0; k < frames.Length; k++)
         {
@@ -588,7 +691,7 @@ public class BlazingStorm : Skill
     /// <summary>낱장 줄기: 불꽃이 있는 가로 구간 x0~x1 만 잘라 꼬리 → 머리로 씀</summary>
     static RibbonTornadoFx.Source StillSource(string sheet, float x0, float x1, float weight)
     {
-        var tex = Resources.Load<Texture2D>("Sprites/" + sheet);
+        var tex = SpriteLib.Load(sheet);
         if (tex == null) return null;
         var frames = new[] { new Rect(x0 / tex.width, 0f, (x1 - x0) / tex.width, 1f) };
         // 칸 세로가 288 이 아니라 192 라서 같은 굵기로 보이게 두께를 맞춤
@@ -597,7 +700,7 @@ public class BlazingStorm : Skill
 
     static RibbonTornadoFx.Source SwordSource()
     {
-        var tex = Resources.Load<Texture2D>("Sprites/" + TornadoRibbonSheet);
+        var tex = SpriteLib.Load(TornadoRibbonSheet);
         if (tex == null) return null;
         int n = TornadoRibbonRows * TornadoRibbonCols;
         var frames = new Rect[n];
@@ -620,7 +723,7 @@ public class BlazingStorm : Skill
         Add(LoopSource("ErnStray_StormStreamNarrow", 3f));
         Add(LoopSource("ErnStray_StormStreamMedium", 3f));
         Add(LoopSource("ErnStray_StormStreamWide", 2f));
-        Add(LoopSource("ErnStray_StormHook", 1f));
+        Add(LoopSource("ErnStray_StormHook_One", 1f, true));   // 한 장 (프레임 4, 2026-11-22 용량 절약, 원본 12프레임은 Art/Incoming/Retired/FxSheets)
         Add(LoopSource("ErnStray_StormEmbers", 1f));
         // 낱장 줄기: 불꽃이 있는 가로 구간 (원본 알파 범위 ±2px)
         Add(StillSource("ErnStray_StormStillThin", 39f, 926f, 1f));
@@ -742,7 +845,7 @@ public class BlazingStorm : Skill
     static Sprite OrbitSprite()
     {
         if (orbitSprite != null) return orbitSprite;
-        var tex = Resources.Load<Texture2D>("Sprites/ErnStray_StormStillCurl");
+        var tex = SpriteLib.Load("ErnStray_StormStillCurl");
         if (tex == null) return null;
         const float x0 = 32f, x1 = 304f;
         orbitSprite = Sprite.Create(tex, new Rect(x0, 0f, x1 - x0, tex.height), new Vector2(0.5f, 0.5f), (x1 - x0) / OrbitLength, 0, SpriteMeshType.FullRect);
