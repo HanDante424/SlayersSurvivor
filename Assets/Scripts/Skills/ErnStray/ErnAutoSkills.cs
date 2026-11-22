@@ -755,11 +755,15 @@ public class SolarSlash : AutoSkill
 /// <summary>
 /// A03 파이어 볼 (2026-11-20 노션 기준): 가까운 적에게 화염구 발사 · 직격 초기 피해량 3 · 적중 시 폭발 (범위 피해) 초기 피해량 4 · 쿨타임 3초.
 /// 폭발은 직격당한 적도 포함. 적중 없이 사거리 끝에 닿으면 폭발하지 않음 (노션 "적중 시").
+/// 특수 강화 9종 (2026-11-22 구현, 노션 기준. 노션에 없는 세부는 [해석] · [임시] 표시):
+///   5레벨 산탄 (양쪽 30° 추가 사용 2) · 관통 (+2) · 도탄 (+2)
+///   10레벨 집속탄 (적중 시 120° 3발, 총 피해량 60% 고정) · 연속 폭발 (종료 시 0.5초 간격 2회, 범위 +50%씩) · 화염강타 (화상 적 적중 시 기절 +1초 · 기절 적 최종 피해량 +25%)
+///   15레벨 홍염 (적중 시 120° 3발, 모든 대상 관통 후 발사 지점으로 복귀) · 폭죽놀이 (도탄 · 관통 · 공격 횟수 무효화 → 종료 시 12발) · 초거대 (최종 피해량 +50% · 범위 +50%)
 /// </summary>
 public class FireBall : AutoSkill
 {
     const float Speed = 10f;            // [임시] 투사체 속도
-    const int Pierce = 1;               // [임시] 관통 수 (기획 미정 → 1)
+    const int Pierce = 1;               // [임시] 기본 관통 수 (기획 미정 → 1: 한 명 맞으면 종료)
     const float DirectDamage = 3f, ExplosionDamage = 4f, BaseCooldown = 3f;   // 노션 확정 (직격 3 · 폭발 4)
     const float ExplosionRatio = 0.5f;  // [임시] 폭발 반경 = 범위 좁음 × 비율 (기획에 반경 없음) → 기본 0.8
     // 폭발 이펙트 ErnStray_FireExplosion: 3×3, 칸 512, 8프레임 (9번째 칸은 빈 칸), 1회 재생
@@ -768,11 +772,105 @@ public class FireBall : AutoSkill
     const float ExplosionFps = 15f;     // manifest 제안 프레임 40~75ms (평균 약 0.067초) → 8프레임 약 0.53초
     const float ExplosionFxPerDiameter = 1f / 0.705f;   // 가장 큰 프레임(4번)의 그림 폭 361px / 칸 512px → 칸 가로 = 폭발 지름 ÷ 0.705 (측정값)
 
+    // 특수 강화 id (파이어 볼)
+    public const string Spread = "FB5A", PierceUp = "FB5B", Ricochet = "FB5C";
+    public const string Cluster = "FB10A", ChainBlast = "FB10B", FlameStrike = "FB10C";
+    public const string Crimson = "FB15A", Fireworks = "FB15B", Colossal = "FB15C";
+
+    // 특수 강화 확정 수치 (노션)
+    const float SpreadAngle = 30f;                  // 산탄: 양쪽 각 30°
+    const int SpreadUses = 2;                       // 산탄: 추가 사용 +2 (양쪽 1회씩)
+    const int PierceBonus = 2, RicochetBonus = 2;   // 관통 +2 · 도탄 +2
+    const float ShardPct = 0.6f;                    // 집속탄 · 홍염: 파이어 볼 총 피해량의 60% 고정 피해 (직격 총 피해량 기준 [해석])
+    const float ChainDelay = 0.5f;                  // 연속 폭발 간격
+    const float Chain1Pct = 0.6f, Chain2Pct = 0.9f; // 연속 폭발: 1회 60% · 2회 90% 고정 피해 (폭발 총 피해량 기준 [해석])
+    const float ChainRangeStep = 0.5f;              // 폭발마다 범위 +50% ([해석] 1회 ×1.5 · 2회 ×2.0)
+    const float StrikeStun = 1f, StrikeStunnedBonus = 0.25f;   // 화염강타: 기절 +1초 · 기절 적 최종 피해량 +25%
+    const int FireworksCount = 12;                  // 폭죽놀이: 종료 시 화염구 12개
+    const float FireworksPct = 0.2f;                // 폭죽놀이: 총 피해량의 20% 고정 피해
+    const float FireworksNullBonus = 0.5f;          // 폭죽놀이: 능력치 무효화 1당 최종 피해량 +50%
+    const float ColossalFinal = 0.5f, ColossalRange = 0.5f;   // 초거대: 최종 피해량 +50% · 범위 +50%
+    // [임시] 노션에 없는 수치
+    const float RicochetRadius = 6f;                // 도탄 대상 탐색 반경
+    const float ShardSpeed = 9f, ShardRange = 3.5f, ShardSizeMul = 0.55f;   // 집속탄 화염구
+    const float CrimsonOut = 4f, CrimsonSpeed = 9f, CrimsonSizeMul = 0.6f;  // 홍염: 나가는 거리 · 속도 · 크기
+    const float FireworksSpeed = 7f, FireworksRange = 3f, FireworksSizeMul = 0.5f;   // 폭죽놀이 화염구
+
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
     const float RangeMul = 10f;         // 사거리 배율 (사용자 2026-11-22: 10배). 대상 인식 거리와 투사체 수명이 같이 늘어남
     float MaxRange => Reach(Tier.Long) * RangeMul;
     float ExplosionRadius => Range(Tier.Short) * ExplosionRatio;
 
+    // ---------- 특수 강화 ----------
+    public override SpecialUpgradeOption[] SpecialOptions(int lv)
+    {
+        switch (lv)
+        {
+            case 5: return new[]
+            {
+                new SpecialUpgradeOption { id = Spread, title = "산탄", desc = "양쪽 각 30도 방향으로 1회씩 추가 사용합니다." },
+                new SpecialUpgradeOption { id = PierceUp, title = "관통", desc = "관통 +2" },
+                new SpecialUpgradeOption { id = Ricochet, title = "도탄", desc = "도탄 +2" },
+            };
+            case 10: return new[]
+            {
+                new SpecialUpgradeOption { id = Cluster, title = "집속탄", keywords = new[] { "간접 사용", "직접 피해", "고정 피해", "원거리", "투사체" }, desc = "적중 시 화염구 3개를 120도 간격으로 발사합니다. 파이어 볼 총 피해량의 60% 고정 피해." },
+                new SpecialUpgradeOption { id = ChainBlast, title = "연속 폭발", keywords = new[] { "간접 사용", "직접 피해", "고정 피해" }, desc = "종료 시 0.5초 간격으로 폭발이 2회 추가됩니다. 폭발마다 범위 +50%. 1회 총 피해량 60%, 2회 90% 고정 피해." },
+                new SpecialUpgradeOption { id = FlameStrike, title = "화염강타", keywords = new[] { "기절" }, desc = "화상 상태 적 적중 시 기절 +1초, 기절 상태 적 적중 시 최종 피해량 +25%." },
+            };
+            case 15: return new[]
+            {
+                new SpecialUpgradeOption { id = Crimson, title = "홍염", keywords = new[] { "간접 사용", "직접 사용", "고정 피해", "원거리", "투사체" }, desc = "적중 시 화염구 3개를 120도 간격으로 생성합니다. 모든 대상을 관통한 뒤 발사 지점으로 복귀합니다. 총 피해량의 60% 고정 피해." },
+                new SpecialUpgradeOption
+                {
+                    id = Fireworks, title = "폭죽놀이", keywords = new[] { "간접 사용", "직접 사용", "고정 피해", "원거리", "투사체" },
+                    specs = new[] { "'도탄' '능력치 무효화'", "'관통' '능력치 무효화'", "'공격 횟수' '능력치 무효화'", "'종료 시' 화염구 12개 생성", "각 화염구 '종료 시' 1회 추가 발동", "'능력치 무효화' 1 당 '최종 피해량' +50%", "총 피해량의 20% 고정 피해" },
+                },
+                new SpecialUpgradeOption { id = Colossal, title = "초거대", desc = "최종 피해량 +50%, 범위 +50%" },
+            };
+        }
+        return base.SpecialOptions(lv);
+    }
+
+    bool Nullified => HasSpecial(Fireworks);                                  // 폭죽놀이: 도탄 · 관통 · 공격 횟수 능력치 무효화
+    int PierceCount => Pierce + (HasSpecial(PierceUp) && !Nullified ? PierceBonus : 0);
+    int Bounces => HasSpecial(Ricochet) && !Nullified ? RicochetBonus : 0;
+    bool UseSpread => HasSpecial(Spread) && !Nullified;
+    /// <summary>폭죽놀이가 무효화한 능력치 수 ([해석] 도탄 +2 · 관통 +2 · 공격 횟수 +2 를 각각 2로 셈, 고른 것만)</summary>
+    int NullifiedUnits => (HasSpecial(PierceUp) ? PierceBonus : 0) + (HasSpecial(Ricochet) ? RicochetBonus : 0) + (HasSpecial(Spread) ? SpreadUses : 0);
+    protected override float SpecialFinalDamageMul =>
+        (HasSpecial(Colossal) ? 1f + ColossalFinal : 1f) * (Nullified ? 1f + FireworksNullBonus * NullifiedUnits : 1f);
+    protected override float SpecialRangeBonus => HasSpecial(Colossal) ? ColossalRange : 0f;
+
+    /// <summary>화염강타: 기절 상태 적에게 최종 피해량 +25% (대상 단계 배율)</summary>
+    static float StrikeMul(Enemy e) => e != null && e.IsStunned ? 1f + StrikeStunnedBonus : 1f;
+
+    /// <summary>
+    /// 화염강타: 화상 상태 적이 이 스킬에 적중하면 기절 +1초. 직격 · 폭발 · 파생 화염구 (집속탄 · 홍염 · 폭죽놀이) 의 모든 적중에 적용 ([해석] 노션 "적중 시").
+    /// 화염의 검 (화상) 이 없거나 기절 면역 (보스 연출 중 등) 인 대상에는 걸리지 않음
+    /// </summary>
+    void StrikeOn(Enemy e)
+    {
+        if (!HasSpecial(FlameStrike) || e == null || e.hp <= 0 || !FlameSword.IsBurning(e)) return;
+        e.Stun(StrikeStun);
+        if (!e.IsStunned) Debug.Log($"화염강타: {e.DisplayName} 에게 기절이 걸리지 않음 (기절 면역 · 연출 중 · 숨김 상태)");   // 진단용
+    }
+
+    static Vector2 Rot(Vector2 v, float deg)
+    {
+        float r = deg * Mathf.Deg2Rad, c = Mathf.Cos(r), s = Mathf.Sin(r);
+        return new Vector2(v.x * c - v.y * s, v.x * s + v.y * c);
+    }
+
+    /// <summary>같은 사용에서 나온 간접 사용 고정 피해 (모든 증감 무효)</summary>
+    DamageInfo FixedOf(float amount, CastRef cast)
+    {
+        var d = FixedDamage(amount, DamageType.Direct, CastKind.Indirect);
+        d.castId = cast.id;
+        return d;
+    }
+
+    // ---------- 발사 ----------
     protected override bool Fire()
     {
         Vector2 from = P.transform.position;
@@ -780,13 +878,120 @@ public class FireBall : AutoSkill
         if (target == null) return false;
         Vector2 dir = ((Vector2)target.transform.position - from).normalized;
         var cast = DirectCast;   // 발사 시점 번호 (폭발이 나중에 일어나도 같은 사용)
+        Launch(from, dir, cast);
+        if (UseSpread)   // 산탄: 양쪽 각 30도로 추가 사용 (간접 사용, 같은 사용 번호)
+        {
+            Launch(from, Rot(dir, SpreadAngle), cast.AsIndirect);
+            Launch(from, Rot(dir, -SpreadAngle), cast.AsIndirect);
+        }
+        return true;
+    }
+
+    /// <summary>화염구 1발 (도탄 · 관통 · 적중 시 · 종료 시 효과 포함)</summary>
+    void Launch(Vector2 from, Vector2 dir, CastRef cast)
+    {
         // 크기 = 범위 좁음의 일부, 수명 = 사거리 / 속도
         float size = Mathf.Max(0.3f, Range(Tier.Short) * 0.3f);
-        var p = Projectile.Spawn(from, dir, Speed, MakeDamage(DirectDamage, cast), Pierce, MaxRange / Speed,
+        var dmg = MakeDamage(DirectDamage, cast);
+        if (HasSpecial(FlameStrike)) dmg.perTarget = StrikeMul;
+        var p = Projectile.Spawn(from, dir, Speed, dmg, PierceCount, MaxRange / Speed,
                                  "FireBall", new Color(1f, 0.55f, 0.15f), size);
         AttachBallFx(p, dir, size);
-        p.onHit = (e, at) => Explode(at, cast);
+        int bounces = Bounces;
+        Vector2 origin = from;
+        p.onHit = (e, at) =>
+        {
+            // 화염강타: 화상 상태 적 적중 시 기절 +1초 (이후 폭발 · 피해는 기절 상태로 계산)
+            StrikeOn(e);
+            Explode(at, cast);
+            if (HasSpecial(Cluster)) ShootShards(at, p.Direction, cast);
+            if (HasSpecial(Crimson)) ShootCrimson(at, p.Direction, origin, cast);
+            if (bounces > 0 && Redirect(p, at)) bounces--;   // 도탄: 지금 맞은 적을 뺀 가까운 적으로 방향 전환
+        };
+        p.onEnd = pos => OnBallEnd(pos, cast);
+    }
+
+    static readonly List<Enemy> ricochetBuf = new List<Enemy>();
+
+    /// <summary>도탄: 이 화염구가 아직 맞지 않은 가장 가까운 적 (RicochetRadius 안) 쪽으로 방향을 바꾸고 관통 1 추가 (적중 직후 감소분 상쇄). 대상이 없으면 false</summary>
+    bool Redirect(Projectile p, Vector2 at)
+    {
+        Enemy best = null; float bestD = RicochetRadius * RicochetRadius;
+        foreach (var x in Enemy.CopyAll(ricochetBuf))
+        {
+            if (x == null || x.hp <= 0 || p.HasHit(x)) continue;
+            float d = ((Vector2)x.transform.position - at).sqrMagnitude;
+            if (d < bestD) { bestD = d; best = x; }
+        }
+        if (best == null) return false;
+        p.Direction = ((Vector2)best.transform.position - at).normalized;
+        p.Pierce += 1;
+        p.Life = Mathf.Max(p.Life, RicochetRadius * 1.5f / Speed + 0.2f);
+        FlipFx(p, p.Direction);
         return true;
+    }
+
+    /// <summary>종료 시 효과: 연속 폭발 (0.5초 간격 2회) · 폭죽놀이 (화염구 12개)</summary>
+    void OnBallEnd(Vector2 pos, CastRef cast)
+    {
+        if (CheatDisabled) return;
+        if (HasSpecial(ChainBlast)) StartCoroutine(ChainRoutine(pos, cast));
+        if (HasSpecial(Fireworks)) Fireworks12(pos, cast);
+    }
+
+    IEnumerator ChainRoutine(Vector2 at, CastRef cast)
+    {
+        yield return new WaitForSeconds(ChainDelay);
+        Explode(at, cast, 1f + ChainRangeStep, Chain1Pct);
+        yield return new WaitForSeconds(ChainDelay);
+        Explode(at, cast, 1f + ChainRangeStep * 2f, Chain2Pct);
+    }
+
+    /// <summary>집속탄: 적중 위치에서 화염구 3개를 120도 간격으로 (60도 비껴서 직진 방향과 겹치지 않게). 총 피해량 60% 고정 피해</summary>
+    void ShootShards(Vector2 at, Vector2 dir, CastRef cast)
+    {
+        float size = Mathf.Max(0.3f, Range(Tier.Short) * 0.3f) * ShardSizeMul;
+        float dmg = FinalDamageOf(DirectDamage) * ShardPct;
+        for (int k = 0; k < 3; k++)
+        {
+            Vector2 d = Rot(dir, 60f + 120f * k);
+            var sp = Projectile.Spawn(at, d, ShardSpeed, FixedOf(dmg, cast), 1, ShardRange / ShardSpeed, "FireBall", new Color(1f, 0.55f, 0.15f), size);
+            AttachBallFx(sp, d, size);
+            sp.onHit = (e, hitAt) => StrikeOn(e);
+        }
+    }
+
+    /// <summary>홍염: 적중 위치에서 화염구 3개를 120도 간격으로 → 모든 대상을 관통하며 나갔다가 발사 지점으로 복귀. 총 피해량 60% 고정 피해</summary>
+    void ShootCrimson(Vector2 at, Vector2 dir, Vector2 origin, CastRef cast)
+    {
+        float size = Mathf.Max(0.3f, Range(Tier.Short) * 0.3f) * CrimsonSizeMul;
+        float dmg = FinalDamageOf(DirectDamage) * ShardPct;
+        for (int k = 0; k < 3; k++)
+            FireBallReturner.Spawn(at, Rot(dir, 60f + 120f * k), origin, CrimsonSpeed, CrimsonOut, FixedOf(dmg, cast), size, () => this == null || CheatDisabled, StrikeOn);
+    }
+
+    /// <summary>
+    /// 폭죽놀이: 종료 위치에서 화염구 12개 (30도 간격). 각 화염구는 종료 시 폭발하고, 1세대 화염구의 폭발은 한 번 더 12개로 퍼져나감 (2세대는 폭발만, 사용자 2026-11-22).
+    /// 총 피해량 20% 고정 피해. generation = 1 (처음 퍼짐) · 2 (폭발에서 다시 퍼짐)
+    /// </summary>
+    void Fireworks12(Vector2 at, CastRef cast, int generation = 1)
+    {
+        float size = Mathf.Max(0.3f, Range(Tier.Short) * 0.3f) * FireworksSizeMul;
+        float dmg = FinalDamageOf(DirectDamage) * FireworksPct;
+        float baseAngle = Random.Range(0f, 360f / FireworksCount);
+        for (int k = 0; k < FireworksCount; k++)
+        {
+            Vector2 d = Rot(Vector2.right, baseAngle + 360f / FireworksCount * k);
+            var sp = Projectile.Spawn(at, d, FireworksSpeed, FixedOf(dmg, cast), 1, FireworksRange / FireworksSpeed, "FireBall", new Color(1f, 0.55f, 0.15f), size);
+            AttachBallFx(sp, d, size);
+            sp.onHit = (e, hitAt) => StrikeOn(e);
+            sp.onEnd = pos =>   // 종료 시 1회 추가 발동: 폭발 + (1세대면) 한 번 더 퍼져나감
+            {
+                if (CheatDisabled) return;
+                Explode(pos, cast, 1f, FireworksPct);
+                if (generation < 2) Fireworks12(pos, cast, generation + 1);
+            };
+        }
     }
 
     // 투사체 이펙트 ErnStray_FireBallFx (2026-11-22 사용자): 2×2 칸 640×352, 4프레임 반복. 머리 = 오른쪽, 꼬리 = 왼쪽 (진행 방향이 머리).
@@ -797,29 +1002,108 @@ public class FireBall : AutoSkill
     const float BallHeadOffsetCells = 180f / 640f;   // 머리 중심이 칸 중심에서 떨어진 정도 (칸 가로 단위)
 
     /// <summary>도형 투사체 대신 불덩이 그림을 붙임 (그림이 없으면 기존 원 그대로)</summary>
-    static void AttachBallFx(Projectile p, Vector2 dir, float size)
+    public static void AttachBallFx(Component host, Vector2 dir, float size)
     {
         var frames = SpriteEffect.LoadFrames(BallSheet, 2, 2, 1f, 4);
-        if (frames == null || p == null) return;
-        if (p.TryGetComponent<SpriteRenderer>(out var circle)) circle.enabled = false;
+        if (frames == null || host == null) return;
+        if (host.TryGetComponent<SpriteRenderer>(out var circle)) circle.enabled = false;
         float scale = BallCellPerHead;   // 투사체 크기 (부모 스케일 = 머리 지름) 기준
-        var fx = SpriteLoopEffect.Spawn(frames, BallFps, p.transform, new Vector2(-BallHeadOffsetCells * scale, 0f), 9, scale);
+        var fx = SpriteLoopEffect.Spawn(frames, BallFps, host.transform, new Vector2(-BallHeadOffsetCells * scale, 0f), 9, scale);
         if (fx != null && dir.x < 0f) fx.transform.localScale = new Vector3(scale, -scale, 1f);   // 왼쪽으로 날 때 위아래가 뒤집히지 않게
+    }
+
+    /// <summary>방향이 바뀌었을 때 (도탄 · 복귀) 그림이 뒤집히지 않게 세로 부호를 맞춤</summary>
+    public static void FlipFx(Component host, Vector2 dir)
+    {
+        var fx = host != null ? host.GetComponentInChildren<SpriteLoopEffect>() : null;
+        if (fx == null) return;
+        var sc = fx.transform.localScale;
+        fx.transform.localScale = new Vector3(sc.x, Mathf.Abs(sc.y) * (dir.x < 0f ? -1f : 1f), sc.z);
     }
 
     /// <summary>
     /// 적중 위치 폭발: 반경 안 모든 적에게 폭발 피해 (직격당한 적 포함).
-    /// [해석] 폭발 = '직접 피해' · '간접 사용' (같은 사용 번호) — 직격에서 파생된 공격이라 간접 사용으로 판정
+    /// [해석] 폭발 = '직접 피해' · '간접 사용' (같은 사용 번호) — 직격에서 파생된 공격이라 간접 사용으로 판정.
+    /// radiusMul = 범위 배율 (연속 폭발), fixedPct > 0 이면 폭발 총 피해량의 그 비율을 고정 피해로 (연속 폭발 · 폭죽놀이)
     /// </summary>
-    void Explode(Vector2 at, CastRef cast)
+    void Explode(Vector2 at, CastRef cast, float radiusMul = 1f, float fixedPct = 0f)
     {
         if (CheatDisabled) return;
-        float r = ExplosionRadius;
+        float r = ExplosionRadius * radiusMul;
         var frames = SpriteEffect.LoadFrames(ExplosionSheet, 3, 3, 1f, ExplosionFrames);
         if (frames != null) SpriteEffect.Spawn(frames, ExplosionFps, null, at, 0f, false, 12, r * 2f * ExplosionFxPerDiameter);
         else Fx.Disc(at, r, Fx.Fire, 0.2f);   // 그림이 없으면 도형 대체
         HitDebug.Circle(at, r, HitDebug.BlastColor);
-        SkillHits.Circle(at, r, MakeDamage(ExplosionDamage, cast.AsIndirect), Enemy.NoKnock);
+        DamageInfo dmg;
+        if (fixedPct > 0f) dmg = FixedOf(FinalDamageOf(ExplosionDamage) * fixedPct, cast);
+        else
+        {
+            dmg = MakeDamage(ExplosionDamage, cast.AsIndirect);
+            if (HasSpecial(FlameStrike)) dmg.perTarget = StrikeMul;
+        }
+        SkillHits.Circle(at, r, dmg, Enemy.NoKnock, StrikeOn);
+    }
+}
+
+/// <summary>
+/// 홍염 화염구: 모든 대상을 관통 (대상마다 1번 피해) 하며 outDist 만큼 나갔다가 발사 지점 (origin) 으로 복귀해 사라짐.
+/// 고정 피해 · 간접 사용 (홍염 규칙). 그림은 파이어 볼 불덩이 그림 재사용.
+/// </summary>
+public class FireBallReturner : MonoBehaviour
+{
+    static readonly List<Enemy> buf = new List<Enemy>();
+    readonly HashSet<Enemy> hit = new HashSet<Enemy>();
+    Vector2 dir, origin;
+    float speed, outLeft, radius;
+    bool returning;
+    DamageInfo dmg;
+    System.Func<bool> cancelled;
+
+    System.Action<Enemy> onHit;
+
+    public static FireBallReturner Spawn(Vector2 at, Vector2 dir, Vector2 origin, float speed, float outDist, DamageInfo dmg, float size, System.Func<bool> cancelled, System.Action<Enemy> onHit = null)
+    {
+        var go = new GameObject("FireBallReturner");
+        go.transform.position = at;
+        go.transform.localScale = Vector3.one * size;
+        go.transform.right = dir;
+        var r = go.AddComponent<FireBallReturner>();
+        r.dir = dir.normalized; r.origin = origin; r.speed = speed; r.outLeft = outDist; r.dmg = dmg; r.radius = size * 0.5f; r.cancelled = cancelled; r.onHit = onHit;
+        SpriteFactory.AddRenderer(go, "FireBall", SpriteFactory.Shape.Circle, new Color(1f, 0.55f, 0.15f), 8);
+        FireBall.AttachBallFx(r, r.dir, size);
+        return r;
+    }
+
+    void Update()
+    {
+        if (GameManager.I != null && GameManager.I.State != GameState.Playing) return;
+        if (cancelled != null && cancelled()) { Destroy(gameObject); return; }
+        float step = speed * Time.deltaTime;
+        if (!returning)
+        {
+            transform.position += (Vector3)(dir * step);
+            outLeft -= step;
+            if (outLeft <= 0f) returning = true;
+        }
+        else
+        {
+            Vector2 to = origin - (Vector2)transform.position;
+            if (to.magnitude <= step + 0.1f) { Destroy(gameObject); return; }
+            dir = to.normalized;
+            transform.right = dir;
+            FireBall.FlipFx(this, dir);
+            transform.position += (Vector3)(dir * step);
+        }
+        Vector2 pos = transform.position;
+        foreach (var e in Enemy.CopyAll(buf))
+        {
+            if (e == null || e.hp <= 0 || hit.Contains(e)) continue;
+            float rr = radius + e.radius;
+            if (((Vector2)e.transform.position - pos).sqrMagnitude > rr * rr) continue;
+            hit.Add(e);
+            e.Hit(dmg, dir);
+            onHit?.Invoke(e);
+        }
     }
 }
 
