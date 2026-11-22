@@ -127,7 +127,6 @@ public class OverFlameSlash : ActiveSkill
     const float BladeSparkSize = 0.5f;      // 파티클 1개 크기 (월드, 기본 0.6 기준)
     const float BladeSparkRise = 1.6f;      // 위로 떠오르는 속도 (월드/초)
     const float BladeSparkSide = 0.8f;      // 옆으로 퍼지는 속도 (±)
-    const float BladeFadeDelay = 0f;        // 내려친 직후부터 사라지기 시작 (= 잔흔이 생기기 TraceDelay 전)
     const float BladeFadeTime = TraceDelay; // 화염검이 사라지는 시간 = 0.25초 (잔흔이 생기는 순간 다 사라짐). 이전 0.7 → 0.35 → 0.15
     const float BladeLinger = 0.15f;        // [임시] 내려친 뒤 칼이 남는 시간
 
@@ -215,10 +214,9 @@ public class OverFlameSlash : ActiveSkill
         CameraFollow.Shake(0.15f, 0.15f);
     }
 
-    /// <summary>내려친 화염검: BladeFadeDelay 뒤부터 BladeFadeTime 동안 서서히 투명해져 사라짐</summary>
+    /// <summary>내려친 화염검: 내려친 직후부터 BladeFadeTime (= 잔흔이 생기기 TraceDelay 전) 동안 서서히 투명해져 사라짐</summary>
     IEnumerator FadeBlade(Transform blade, float len)
     {
-        if (BladeFadeDelay > 0f) yield return new WaitForSeconds(BladeFadeDelay);
         if (blade == null) yield break;
         var fx = blade.GetComponentInChildren<SpriteLoopEffect>();
         if (fx != null) fx.FadeOut(BladeFadeTime);

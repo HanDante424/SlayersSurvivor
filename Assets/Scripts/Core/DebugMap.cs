@@ -325,6 +325,16 @@ public class DebugMapController : MonoBehaviour
                 if (GUILayout.Button("체력 50% 감소", btn, GUILayout.Height(24))) t.hp = Mathf.Max(1f, t.hp * 0.5f);
                 if (GUILayout.Button("제거", btn, GUILayout.Height(24))) DebugMap.Destroy(t);
                 GUILayout.EndHorizontal();
+                // 상태 시험 (사용자 2026-11-22: 디버그 맵에서 화염강타 등 화상 · 기절 조건 스킬을 확인하기 어려움)
+                GUILayout.BeginHorizontal();
+                if (GUILayout.Button("화상 3스택", btn, GUILayout.Height(24))) statusNote = BurnTarget(t);
+                if (GUILayout.Button("기절 3초", btn, GUILayout.Height(24)))
+                {
+                    t.Stun(3f);
+                    statusNote = t.IsStunned ? $"{t.DisplayName}: 기절 적용" : $"{t.DisplayName}: 기절 안 걸림 (기절 면역 · 연출 중 · 숨김 상태)";
+                }
+                GUILayout.EndHorizontal();
+                if (statusNote.Length > 0) GUILayout.Label($"<color=#AAAAAA>{statusNote}</color>", label);
                 if (t != null && showSpriteInfo) GUILayout.Label(SpriteInfoText(t), info);
             }
         }
@@ -508,6 +518,24 @@ public class DebugMapController : MonoBehaviour
             string t = on && !active ? $"{c.title}  <size=11>(조건 강화 없음 → 효과 없음)</size>" : c.title;
             if (GUILayout.Button(t, on ? btnOn : btn, GUILayout.Height(24))) s.DebugSetCombo(c.id, !on);
         }
+    }
+
+    string statusNote = "";
+
+    /// <summary>대상에게 화염의 검 화상 3스택. 화염의 검이 없으면 획득 (화상 상태 조건 스킬 시험용)</summary>
+    static string BurnTarget(Enemy t)
+    {
+        var p = Player.I;
+        if (p == null || t == null) return "";
+        if (FlameSword.I == null)
+        {
+            SkillEntry entry = null;
+            foreach (var e in p.Catalog) if (e.type == typeof(FlameSword)) entry = e;
+            if (entry != null) p.AddOrLevelSkill(entry);
+        }
+        if (FlameSword.I == null) return "화염의 검을 획득하지 못함";
+        FlameSword.I.AddStacks(t, 3);
+        return $"{t.DisplayName}: 화상 {FlameSword.StacksOn(t)}스택";
     }
 
     static string RunSkill(Player p, SkillEntry entry)
