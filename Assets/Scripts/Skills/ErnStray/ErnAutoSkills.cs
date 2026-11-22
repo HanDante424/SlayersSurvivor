@@ -1107,7 +1107,13 @@ public class FireBallReturner : MonoBehaviour
     }
 }
 
-/// <summary>A04 파이어 버스터: 거대한 폭발로 주변 적 밀치기 · 초기 피해량 20 · 쿨타임 10초</summary>
+/// <summary>
+/// A04 파이어 버스터: 거대한 폭발로 주변 적 밀치기 · 초기 피해량 20 · 쿨타임 10초.
+/// 특수 강화 (2026-11-22 구현, 노션 기준. 노션에 없는 세부는 [해석] · [임시] 표시):
+///   5레벨 열파 (범위 +30% · 넉백 +50%) · 점화 (적중 시 화상 +2) · 고농축 (범위 -25% · 피해량 +75%)
+///   10레벨 이중 폭발 (종료 시 0.5초 뒤 폭발 1회, 총 피해량 100% 고정) · 뇌진탕 (노션 미입력 → 선택 불가) · 과열 반응 (화상 적 적중 시 최종 피해량 +50%)
+///   15레벨 초신성 (범위 +100% · 최종 피해량 +150% · 쿨타임 +100%) · 연쇄 폭발 (화상 적 적중 시 폭발, 대상 화상 총 피해량 100% 고정) · 연속 폭발 (종료 시 0.25초 간격 3회, 총 피해량 40% 고정)
+/// </summary>
 public class FireBuster : AutoSkill
 {
     const float Knock = 9f;             // [임시] 밀치기 세기
@@ -1118,27 +1124,154 @@ public class FireBuster : AutoSkill
     const float FxFps = 15f;            // manifest 제안 프레임 30~90ms (평균 약 0.064초) → 8프레임 약 0.53초
     const float FxPerDiameter = 1f / 0.80f;   // 최대 폭발 프레임(5번) 그림 폭 410px / 칸 512px → 칸 가로 = 판정 지름 ÷ 0.80 (측정값). 6~8번 불씨는 판정 밖으로 조금 더 퍼짐
 
+    // 특수 강화 id (파이어 버스터)
+    public const string Wave = "FU5A", Ignite = "FU5B", Dense = "FU5C";
+    public const string Double = "FU10A", Concuss = "FU10B", Overheat = "FU10C";
+    public const string Nova = "FU15A", ChainBlast = "FU15B", Barrage = "FU15C";
+
+    // 특수 강화 확정 수치 (노션)
+    const float WaveRange = 0.3f, WaveKnock = 0.5f;          // 열파: 범위 +30% · 넉백 +50%
+    const int IgniteStacks = 2;                              // 점화: 화상 +2
+    const float DenseRange = -0.25f, DenseDamage = 0.75f;    // 고농축: 범위 -25% · 피해량 +75%
+    const float DoubleDelay = 0.5f, DoublePct = 1f;          // 이중 폭발: 0.5초 뒤 1회, 총 피해량 100% 고정
+    const float OverheatFinal = 0.5f;                        // 과열 반응: 화상 적 최종 피해량 +50%
+    const float NovaRange = 1f, NovaFinal = 1.5f, NovaCooldown = 1f;   // 초신성: 범위 +100% · 최종 피해량 +150% · 쿨타임 +100%
+    const float ChainBlastPct = 1f;                          // 연쇄 폭발: 대상 화상 총 피해량의 100% 고정
+    const float BarrageInterval = 0.25f, BarragePct = 0.4f;  // 연속 폭발: 0.25초 간격 3회, 총 피해량 40% 고정
+    const int BarrageCount = 3;
+    // [임시]
+    const float ChainBlastRatio = 0.5f; // 연쇄 폭발 반경 = 범위 좁음 × 비율 (노션에 반경 없음, 파이어 볼 폭발과 같은 비율)
+
     const float RangeMul = 1.75f;       // 범위 배율 (사용자 2026-11-22: 2.5배 → 30% 감소 = 1.75배). 판정 · 이펙트 크기 모두
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
     float Radius => Range(Tier.Mid) * RangeMul;
+    float KnockSpeed => Knock * (HasSpecial(Wave) ? 1f + WaveKnock : 1f);
+
+    // ---------- 특수 강화 ----------
+    public override SpecialUpgradeOption[] SpecialOptions(int lv)
+    {
+        switch (lv)
+        {
+            case 5: return new[]
+            {
+                new SpecialUpgradeOption { id = Wave, title = "열파", desc = "범위 +30%, 넉백 +50%" },
+                new SpecialUpgradeOption { id = Ignite, title = "점화", desc = "적중 시 적용된 모든 화상 +2" },
+                new SpecialUpgradeOption { id = Dense, title = "고농축", desc = "범위 -25%, 피해량 +75%" },
+            };
+            case 10: return new[]
+            {
+                new SpecialUpgradeOption { id = Double, title = "이중 폭발", keywords = new[] { "근거리", "간접 사용", "직접 피해", "넉백" }, desc = "종료 시 0.5초 뒤 폭발이 1회 추가 발동합니다. 파이어 버스터 총 피해량의 100% 고정 피해." },
+                new SpecialUpgradeOption { id = Concuss, title = "뇌진탕", desc = "(노션 미입력 — 아직 설계되지 않았습니다)", locked = true },
+                new SpecialUpgradeOption { id = Overheat, title = "과열 반응", desc = "화상 상태의 적 적중 시 최종 피해량 +50%" },
+            };
+            case 15: return new[]
+            {
+                new SpecialUpgradeOption { id = Nova, title = "초신성", desc = "범위 +100%, 최종 피해량 +150%, 쿨타임 +100%" },
+                new SpecialUpgradeOption { id = ChainBlast, title = "연쇄 폭발", keywords = new[] { "간접 사용", "지속 피해", "고정 피해", "근거리" }, desc = "화상 상태의 적 적중 시 폭발이 발생합니다. 폭발은 대상의 모든 화상 총 피해량의 100% 고정 피해." },
+                new SpecialUpgradeOption { id = Barrage, title = "연속 폭발", keywords = new[] { "간접 사용", "직접 피해", "고정 피해", "근거리" }, desc = "종료 시 0.25초 간격으로 폭발이 3회 추가 발생합니다. 파이어 버스터 총 피해량의 40% 고정 피해." },
+            };
+        }
+        return base.SpecialOptions(lv);
+    }
+
+    protected override float SpecialRangeBonus => (HasSpecial(Wave) ? WaveRange : 0f) + (HasSpecial(Dense) ? DenseRange : 0f) + (HasSpecial(Nova) ? NovaRange : 0f);
+    protected override float SpecialDamageBonus => HasSpecial(Dense) ? DenseDamage : 0f;
+    protected override float SpecialFinalDamageMul => HasSpecial(Nova) ? 1f + NovaFinal : 1f;
+    protected override float SpecialCooldownMul => HasSpecial(Nova) ? 1f + NovaCooldown : 1f;
+
+    /// <summary>과열 반응: 화상 상태 적에게 최종 피해량 +50% (대상 단계 배율 — 피해가 들어가기 전의 화상 상태 기준)</summary>
+    static float OverheatMul(Enemy e) => FlameSword.IsBurning(e) ? 1f + OverheatFinal : 1f;
+
+    /// <summary>같은 사용에서 나온 간접 사용 고정 피해 (모든 증감 무효)</summary>
+    DamageInfo FixedOf(float amount, CastRef cast, DamageType type = DamageType.Direct)
+    {
+        var d = FixedDamage(amount, type, CastKind.Indirect);
+        d.castId = cast.id;
+        return d;
+    }
+
+    // ---------- 발동 ----------
+    static readonly List<Enemy> scan = new List<Enemy>();
 
     protected override bool Fire()
     {
         Vector2 from = P.transform.position;
         // 인식 범위 없음: 주변에 적이 없어도 쿨타임마다 상시 발동 (사용자 2026-11-22)
-        var frames = SpriteEffect.LoadFrames(FxSheet, 3, 3, 1f, FxFrames);
-        // 플레이어 위치에 고정 (따라다니지 않음)
-        if (frames != null) SpriteEffect.Spawn(frames, FxFps, null, from, 0f, false, 12, Radius * 2f * FxPerDiameter);
-        else Fx.Disc(from, Radius, Fx.FireDeep, 0.25f);   // 그림이 없으면 도형 대체
-        SkillHits.Circle(from, Radius, MakeDamage(BaseDamage), Knock);
+        var cast = DirectCast;
+        Burst(from, cast, 0f, KnockSpeed);
         CameraFollow.Shake(0.08f, 0.08f);
+        // 종료 시 추가 발동 (같은 자리, 플레이어 위치에 고정)
+        if (HasSpecial(Double)) StartCoroutine(EchoRoutine(from, cast, 1, DoubleDelay, DoublePct, KnockSpeed));   // 이중 폭발: 넉백 유지
+        if (HasSpecial(Barrage)) StartCoroutine(EchoRoutine(from, cast, BarrageCount, BarrageInterval, BarragePct, 0f));   // 연속 폭발: 넉백 없음 (노션 키워드에 넉백 없음)
         return true;
+    }
+
+    /// <summary>count 회, interval 초 간격으로 같은 자리에서 폭발 (총 피해량의 pct 고정 피해, 간접 사용)</summary>
+    IEnumerator EchoRoutine(Vector2 at, CastRef cast, int count, float interval, float pct, float knock)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            yield return new WaitForSeconds(interval);
+            if (CheatDisabled) yield break;
+            Burst(at, cast.AsIndirect, pct, knock);
+        }
+    }
+
+    /// <summary>
+    /// 폭발 1회 (이펙트 + 판정). fixedPct = 0 이면 기본 피해 (직접 피해), > 0 이면 총 피해량의 그 비율을 고정 피해로 (추가 폭발).
+    /// 점화 · 연쇄 폭발은 이 스킬의 모든 폭발 적중에 적용 (연쇄 폭발의 폭발 자체는 제외)
+    /// </summary>
+    void Burst(Vector2 at, CastRef cast, float fixedPct, float knock)
+    {
+        float r = Radius;
+        var frames = SpriteEffect.LoadFrames(FxSheet, 3, 3, 1f, FxFrames);
+        if (frames != null) SpriteEffect.Spawn(frames, FxFps, null, at, 0f, false, 12, r * 2f * FxPerDiameter);
+        else Fx.Disc(at, r, Fx.FireDeep, 0.25f);   // 그림이 없으면 도형 대체
+
+        DamageInfo dmg;
+        if (fixedPct > 0f) dmg = FixedOf(FinalDamageOf(BaseDamage) * fixedPct, cast);
+        else
+        {
+            dmg = MakeDamage(BaseDamage, cast);
+            if (HasSpecial(Overheat)) dmg.perTarget = OverheatMul;
+        }
+
+        // 연쇄 폭발: "화상 상태의 적" = 맞기 전에 이미 화상인 적 (이번 피해가 화상을 새로 거는 경우는 제외)
+        Dictionary<Enemy, float> burning = null;
+        if (HasSpecial(ChainBlast))
+        {
+            burning = new Dictionary<Enemy, float>();
+            foreach (var e in SkillHits.InCircle(at, r, scan))
+                if (FlameSword.IsBurning(e)) burning[e] = FlameSword.TotalBurnDamage(e);
+        }
+
+        SkillHits.Circle(at, r, dmg, knock, e =>
+        {
+            if (HasSpecial(Ignite) && FlameSword.I != null) FlameSword.I.AddStacks(e, IgniteStacks);   // 점화: 적용된 화상 +2 (이번 적중이 건 화상 포함 [해석])
+            if (burning != null && burning.TryGetValue(e, out float total)) ChainExplode(e.transform.position, total, cast);
+        });
+    }
+
+    /// <summary>연쇄 폭발: 화상 상태 적이 맞은 자리에서 폭발. 그 적의 화상 총 피해량의 100% 를 범위 안에 고정 · 지속 피해로</summary>
+    void ChainExplode(Vector2 at, float burnTotal, CastRef cast)
+    {
+        if (burnTotal <= 0f) return;
+        float r = Range(Tier.Short) * ChainBlastRatio;
+        var frames = SpriteEffect.LoadFrames(FxSheet, 3, 3, 1f, FxFrames);
+        if (frames != null) SpriteEffect.Spawn(frames, FxFps, null, at, 0f, false, 12, r * 2f * FxPerDiameter);
+        else Fx.Disc(at, r, Fx.Fire, 0.2f);
+        HitDebug.Circle(at, r, HitDebug.BlastColor);
+        SkillHits.Circle(at, r, FixedOf(burnTotal * ChainBlastPct, cast.AsIndirect, DamageType.DoT), Enemy.NoKnock);
     }
 }
 
 /// <summary>
 /// A05 파이어 블레이드 (2026-11-20 노션 기준): 일정 범위를 베어냄 (첫 베기 초기 피해량 5)
-/// → 첫 베기에 맞은 적들에게서 연속 참격 (초기 피해량 3 × 5회) → 끝나면 각 대상 위치 폭발 범위 피해 (초기 피해량 20) · 쿨타임 15초
+/// → 첫 베기에 맞은 적들에게서 연속 참격 (초기 피해량 3 × 5회) → 끝나면 각 대상 위치 폭발 범위 피해 (초기 피해량 20) · 쿨타임 15초.
+/// 특수 강화 (2026-11-22 구현, 노션 기준. 노션에 없는 세부는 [해석] · [임시] 표시):
+///   5레벨 난무 (연속 참격 횟수 +5) · 회전 베기 (첫 베기를 플레이어 둘레 회전 베기로, 범위 +50%) · 확산 (종료 시 폭발에 맞은 적마다 연속 베기 + 폭발, 1회만, 고정 피해)
+///   10레벨 참격 집중 (연속 베기 삭제, 횟수 1당 폭발 피해량 +75%) · 흉터 새기기 (연속 베기 적중 시 받는 최종 피해량 +5% 부여, 최대 10스택) · 절삭 가속 (적중 시 남은 쿨타임 감소 +2.5%)
+///   15레벨 삼연발 (120° 각도로 2회 추가 사용) · 연쇄 폭발 (폭발 종료 시 대상에게 폭발 추가 발동) · 타오르는 참격 (화상 상태 적 적중 시 최종 피해량 +100%)
 /// </summary>
 public class FireBlade : AutoSkill
 {
@@ -1149,6 +1282,25 @@ public class FireBlade : AutoSkill
     const float SlashInterval = 0.12f;  // [임시]
     const float ExplosionRatio = 0.35f; // [임시] 폭발 반경 = 범위 좁음 × 비율 (기획 미정)
     const float FirstSlashDistance = 1.5f;   // 첫 베기 중심 = 플레이어 앞 이 거리 (사용자 2026-11-22: 2.5 → 1.5 더 가깝게). 판정 · 이펙트 · 적 인식이 같은 중심. 이전에는 플레이어 위치
+
+    // 특수 강화 id (파이어 블레이드)
+    public const string Frenzy = "FBL5A", Spin = "FBL5B", Spread = "FBL5C";
+    public const string Focus = "FBL10A", Scar = "FBL10B", Accel = "FBL10C";
+    public const string Triple = "FBL15A", ChainBlast = "FBL15B", Blazing = "FBL15C";
+
+    // 특수 강화 확정 수치 (노션)
+    const int FrenzyBonus = 5;                  // 난무: 연속 참격 공격 횟수 +5
+    const float SpinRange = 0.5f;               // 회전 베기: 범위 +50%
+    const float FocusPerSlash = 0.75f;          // 참격 집중: 연속 베기 공격 횟수 1당 폭발 피해량 +75%
+    const float ScarPerStack = 0.05f;           // 흉터 새기기: 받는 최종 피해량 +5% 부여
+    const int ScarMaxStacks = 10;               // 최대 스택 10
+    const float AccelPerHit = 0.025f;           // 절삭 가속: 적중 시 남은 쿨타임 감소 +2.5%
+    const float TripleAngle = 120f;             // 삼연발: 120도 각도로 2회 추가 사용
+    const float BlazingFinal = 1f;              // 타오르는 참격: 화상 상태 적 최종 피해량 +100%
+    // [임시] 노션에 없는 수치
+    const int SpreadMaxTargets = 12;            // 확산: 폭발에 맞은 적 중 추가 발생을 일으킬 최대 수
+    const float ChainBlastDelay = 0.4f;         // 연쇄 폭발: 폭발이 끝난 뒤 추가 폭발까지 (폭발 연출 길이 정도)
+    const float AccelReductionCap = 0.9f;       // 절삭 가속 누적 감소 상한 (스킬 쿨타임 최종 감소 90% 상한과 같게)
 
     // 첫 베기 이펙트 ErnStray_FireBladeSlash (원본 Project Slayers/output/FireSlash_OpenRing_Animation_v1):
     // 4×4, 칸 768, 15프레임 + 빈 칸, 시계 반대로 약 300° 베고 오른쪽이 열린 고리. 열린 쪽이 바라보는 방향을 향하게 회전 (2026-11-20 사용자)
@@ -1181,7 +1333,95 @@ public class FireBlade : AutoSkill
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
     float Radius => Range(Tier.Mid);
 
-    Vector2 aim = Vector2.right;       // 이번 사용의 대상 방향 (첫 베기 중심 = 플레이어 + aim x FirstSlashDistance)
+    // ---------- 특수 강화 ----------
+    public override SpecialUpgradeOption[] SpecialOptions(int lv)
+    {
+        switch (lv)
+        {
+            case 5: return new[]
+            {
+                new SpecialUpgradeOption { id = Frenzy, title = "난무", desc = "연속 참격의 공격 횟수 +5" },
+                new SpecialUpgradeOption { id = Spin, title = "회전 베기", desc = "첫 베기를 회전 베기로 변경합니다. 범위 +50%" },
+                new SpecialUpgradeOption { id = Spread, title = "확산", keywords = new[] { "간접 사용", "직접 피해", "고정 피해", "근거리" }, desc = "종료 시 폭발에 맞은 적들에게 연속 베기와 폭발이 발생합니다. 각 피해량은 원본과 동일, 추가 연속 베기는 1회만 발생." },
+            };
+            case 10: return new[]
+            {
+                new SpecialUpgradeOption { id = Focus, title = "참격 집중", desc = "연속 베기를 삭제합니다. 연속 베기 공격 횟수 1당 마지막 폭발 피해량 +75%" },
+                new SpecialUpgradeOption { id = Scar, title = "흉터 새기기", desc = "연속 베기 적중 시 받는 최종 피해량 +5%를 부여합니다. 최대 스택 10" },
+                new SpecialUpgradeOption { id = Accel, title = "절삭 가속", desc = "적중 시 남은 쿨타임 감소 +2.5%" },
+            };
+            case 15: return new[]
+            {
+                new SpecialUpgradeOption { id = Triple, title = "삼연발", desc = "120도 각도로 2회 추가 사용합니다." },
+                new SpecialUpgradeOption { id = ChainBlast, title = "연쇄 폭발", desc = "폭발 종료 시 대상에게 폭발이 추가 발동합니다." },
+                new SpecialUpgradeOption { id = Blazing, title = "타오르는 참격", desc = "화상 상태 적 적중 시 최종 피해량 +100%" },
+            };
+        }
+        return base.SpecialOptions(lv);
+    }
+
+    int ChainSlashCount => HasSpecial(Focus) ? 0 : SlashCount + (HasSpecial(Frenzy) ? FrenzyBonus : 0);
+    /// <summary>참격 집중이 삭제한 연속 베기 횟수 (폭발 피해량 증가의 기준)</summary>
+    int FocusSlashCount => SlashCount + (HasSpecial(Frenzy) ? FrenzyBonus : 0);
+    protected override float SpecialRangeBonus => HasSpecial(Spin) ? SpinRange : 0f;
+
+    /// <summary>타오르는 참격: 화상 상태 적에게 최종 피해량 +100% (대상 단계, 피해가 들어가기 전 화상 기준)</summary>
+    static float BlazingMul(Enemy e) => FlameSword.IsBurning(e) ? 1f + BlazingFinal : 1f;
+
+    DamageInfo Dmg(float initial, CastRef cast, float extraPct = 0f)
+    {
+        var d = MakeDamage(initial, cast, extraPct, 1f);
+        if (HasSpecial(Blazing)) d.perTarget = BlazingMul;
+        return d;
+    }
+
+    DamageInfo FixedOf(float amount, CastRef cast)
+    {
+        var d = FixedDamage(amount, DamageType.Direct, CastKind.Indirect);
+        d.castId = cast.id;
+        return d;
+    }
+
+    // ---------- 흉터 새기기: 받는 최종 피해량 증가 부여 (대상마다 스택, 사망하면 정리) ----------
+    readonly Dictionary<Enemy, int> scars = new Dictionary<Enemy, int>();
+    ScarModifier scarMod;
+
+    sealed class ScarModifier : CombatModifier
+    {
+        readonly FireBlade owner;
+        public ScarModifier(FireBlade o) { owner = o; }
+        public override float ReceivedMul(Enemy target, in DamageInfo d)
+            => owner != null && owner.scars.TryGetValue(target, out int n) && n > 0 ? 1f + ScarPerStack * n : 1f;
+    }
+
+    void AddScar(Enemy e)
+    {
+        if (e == null || e.hp <= 0) return;
+        if (scarMod == null) { scarMod = new ScarModifier(this); CombatMods.Add(scarMod); }
+        scars.TryGetValue(e, out int n);
+        scars[e] = Mathf.Min(ScarMaxStacks, n + 1);
+    }
+
+    protected override void OnDisable()
+    {
+        base.OnDisable();
+        if (scarMod != null) { CombatMods.Remove(scarMod); scarMod = null; }
+        scars.Clear();
+        running = 0;   // 코루틴이 끊겨도 영구 정지하지 않게 (Casting 은 base 가 해제)
+    }
+
+    // ---------- 발동 ----------
+    /// <summary>한 번의 사용 (삼연발의 추가 사용 포함) 이 진행 중에 모으는 값</summary>
+    class Use
+    {
+        public Vector2 aim;
+        public CastRef cast;
+        public int hits;        // 절삭 가속: 적중 횟수 (사용이 모두 끝난 뒤 쿨타임 감소로 환산)
+        public bool extra;      // 삼연발의 추가 사용
+    }
+
+    int running;                // 진행 중인 사용 수 (0 이 되면 쿨타임 시작)
+    int accelHits;              // 이번 발동의 적중 횟수 합계 (모든 사용)
 
     protected override bool Fire()
     {
@@ -1189,18 +1429,43 @@ public class FireBlade : AutoSkill
         Vector2 me = P.transform.position;
         var target = Nearest(me, FirstSlashDistance + Radius);
         if (target == null) return false;
-        aim = ((Vector2)target.transform.position - me);
+        Vector2 aim = ((Vector2)target.transform.position - me);
         aim = aim.sqrMagnitude > 0.0001f ? aim.normalized : P.Facing.normalized;
         Casting = true;   // 첫 베기 → 연속 참격 → 폭발이 끝난 뒤 쿨타임
-        StartCoroutine(Run());
+        accelHits = 0;
+        var cast = DirectCast;
+        StartUse(new Use { aim = aim, cast = cast });
+        if (HasSpecial(Triple))   // 삼연발: 120도 각도로 2회 추가 사용 (간접 사용, 같은 사용 번호)
+        {
+            StartUse(new Use { aim = Rot(aim, TripleAngle), cast = cast.AsIndirect, extra = true });
+            StartUse(new Use { aim = Rot(aim, -TripleAngle), cast = cast.AsIndirect, extra = true });
+        }
         return true;
     }
 
-    /// <summary>첫 베기 이펙트: 열린 쪽 = 플레이어 쪽 (대상 방향의 반대), 고리 중심 = 대상 방향으로 플레이어에서 FirstSlashDistance (그림 속 고리 중심 오프셋 보정). 플레이어를 따라감</summary>
-    void SpawnFirstSlashFx(Vector2 aimDir, float r)
+    void StartUse(Use u) { running++; StartCoroutine(RunUse(u)); }
+
+    static Vector2 Rot(Vector2 v, float deg)
+    {
+        float r = deg * Mathf.Deg2Rad, c = Mathf.Cos(r), s = Mathf.Sin(r);
+        return new Vector2(v.x * c - v.y * s, v.x * s + v.y * c);
+    }
+
+    void EndUse(Use u)
+    {
+        accelHits += u.hits;
+        if (--running > 0) return;
+        Casting = false;
+        // 절삭 가속: 적중마다 남은 쿨타임 -2.5% (곱연산 누적), 쿨타임이 시작된 뒤 한 번에 적용 (진행 중에는 쿨타임이 돌지 않아 감소가 무시되므로)
+        if (HasSpecial(Accel) && accelHits > 0)
+            ReduceRemainingCooldown(Mathf.Min(AccelReductionCap, 1f - Mathf.Pow(1f - AccelPerHit, accelHits)));
+    }
+
+    /// <summary>첫 베기 이펙트: 열린 쪽 = 플레이어 쪽 (대상 방향의 반대), 고리 중심 = 대상 방향으로 플레이어에서 center 만큼 (그림 속 고리 중심 오프셋 보정). 플레이어를 따라감</summary>
+    void SpawnFirstSlashFx(Vector2 aimDir, float r, float centerDist)
     {
         var frames = SpriteEffect.LoadFrames(FirstSlashSheet, 4, 4, 1f, FirstSlashFrames);
-        Vector2 ahead = aimDir * FirstSlashDistance;
+        Vector2 ahead = aimDir * centerDist;
         if (frames == null) { Fx.Circle((Vector2)P.transform.position + ahead, r, Fx.FireBright, 0.25f, P.transform); return; }
         float width = r * FirstSlashCellPx / ArcCorePx;
         float angle = Mathf.Atan2(-aimDir.y, -aimDir.x) * Mathf.Rad2Deg;   // 고리의 열린 쪽 = 플레이어 쪽
@@ -1208,18 +1473,20 @@ public class FireBlade : AutoSkill
         SpriteEffect.Spawn(frames, FirstSlashFps, P.transform, ahead - offset, angle, false, 11, width);
     }
 
-    IEnumerator Run()
+    IEnumerator RunUse(Use u)
     {
-        var cast = DirectCast;
+        var cast = u.cast;
         float r = Radius;
-        Vector2 dirNow = aim;   // 사용 시점의 대상 방향 고정
-        SpawnFirstSlashFx(dirNow, r);
+        Vector2 dirNow = u.aim;   // 사용 시점의 대상 방향 고정
+        float centerDist = HasSpecial(Spin) ? 0f : FirstSlashDistance;   // 회전 베기: 플레이어 자신이 중심 (둘레 전체)
+        SpawnFirstSlashFx(dirNow, r, centerDist);
         yield return new WaitForSeconds(FirstSlashHitDelay);
+        if (CheatDisabled) { EndUse(u); yield break; }
 
         // 1) 첫 베기: 범위 안 모든 적 (넉백 없음 — 노션 키워드에 넉백 없음). 맞은 적 = 연속 참격 대상
-        Vector2 from = (Vector2)P.transform.position + dirNow * FirstSlashDistance;   // 첫 베기 중심 (플레이어가 움직여도 방향은 사용 시점 값)
+        Vector2 from = (Vector2)P.transform.position + dirNow * centerDist;   // 첫 베기 중심 (플레이어가 움직여도 방향은 사용 시점 값)
         var hit = new List<Enemy>();
-        SkillHits.Circle(from, r, MakeDamage(FirstSlashDamage, cast), 0f, e => hit.Add(e));
+        SkillHits.Circle(from, r, Dmg(FirstSlashDamage, cast), 0f, e => { hit.Add(e); u.hits++; });
         HitDebug.Circle(from, r, HitDebug.SlashColor);
 
         // 가까운 순으로 제한 (살아 있는 적만)
@@ -1227,8 +1494,8 @@ public class FireBlade : AutoSkill
         hit.Sort((a, b) => ((Vector2)a.transform.position - from).sqrMagnitude
                        .CompareTo(((Vector2)b.transform.position - from).sqrMagnitude));
         var targets = hit.GetRange(0, Mathf.Min(MaxTargets, hit.Count));
-        if (targets.Count > 0) yield return ChainSlashes(targets, cast);
-        Casting = false;
+        if (targets.Count > 0) yield return ChainSlashes(u, targets);
+        EndUse(u);
     }
 
     /// <summary>
@@ -1250,15 +1517,27 @@ public class FireBlade : AutoSkill
         return true;
     }
 
-    IEnumerator ChainSlashes(List<Enemy> targets, CastRef cast)
+    /// <summary>폭발 이펙트 (그림이 없으면 도형)</summary>
+    void ExplosionFx(Vector2 at, float expR)
     {
-        // 베기 초기 피해량 3 × 5회, 폭발 초기 피해량 20 (각각 피해 이벤트마다 내림)
-        DamageInfo perSlash = MakeDamage(SlashDamage, cast);
-        DamageInfo explosion = MakeDamage(ExplosionDamage, cast);
+        var fxFrames = SpriteEffect.LoadFrames(ExplosionSheet, 3, 4, 1f, ExplosionFrames);
+        if (fxFrames != null) SpriteEffect.Spawn(fxFrames, ExplosionFps, null, at, 0f, false, 12, expR * 2f * ExplosionFxPerDiameter);
+        else Fx.Disc(at, expR, Fx.Fire, 0.25f);   // 그림이 없으면 도형 대체
+        HitDebug.Circle(at, expR, HitDebug.BlastColor);
+    }
+
+    IEnumerator ChainSlashes(Use u, List<Enemy> targets)
+    {
+        var cast = u.cast;
+        // 베기 초기 피해량 3 × 5회, 폭발 초기 피해량 20 (각각 피해 이벤트마다 내림). 참격 집중: 연속 베기 삭제, 횟수 1당 폭발 피해량 +75%
+        DamageInfo perSlash = Dmg(SlashDamage, cast);
+        DamageInfo explosion = Dmg(ExplosionDamage, cast, HasSpecial(Focus) ? FocusPerSlash * FocusSlashCount : 0f);
         float expR = Range(Tier.Short) * ExplosionRatio;
 
         var lastPos = new Vector2[targets.Count];
-        for (int s = 0; s < SlashCount; s++)
+        for (int i = 0; i < targets.Count; i++) lastPos[i] = targets[i].transform.position;
+        int slashes = ChainSlashCount;
+        for (int s = 0; s < slashes; s++)
         {
             for (int i = 0; i < targets.Count; i++)
             {
@@ -1269,26 +1548,90 @@ public class FireBlade : AutoSkill
                 if (!SpawnComboSlashFx(lastPos[i], d))
                     Fx.Box(lastPos[i] - d * 0.33f, d, 0.67f, 0.08f, Fx.FireBright, 0.12f);   // 그림이 없을 때 도형 (카메라 시야 7 기준 × 2/3)
                 e.Hit(perSlash, d, 0.5f);
+                u.hits++;
+                if (HasSpecial(Scar)) AddScar(e);   // 흉터 새기기: 연속 베기 적중 시 받는 최종 피해량 +5% 부여
             }
             yield return new WaitForSeconds(SlashInterval);
         }
 
+        // 폭발: 각 대상 위치. 확산 · 연쇄 폭발은 폭발이 끝난 뒤 이어서
+        var hitByExplosion = new HashSet<Enemy>();
+        var positions = new List<Vector2>();
         for (int i = 0; i < targets.Count; i++)
         {
             var e = targets[i];
             Vector2 at = e != null ? (Vector2)e.transform.position : lastPos[i];
             if (at == Vector2.zero && e == null) continue;
-            var fxFrames = SpriteEffect.LoadFrames(ExplosionSheet, 3, 4, 1f, ExplosionFrames);
-            if (fxFrames != null) SpriteEffect.Spawn(fxFrames, ExplosionFps, null, at, 0f, false, 12, expR * 2f * ExplosionFxPerDiameter);
-            else Fx.Disc(at, expR, Fx.Fire, 0.25f);   // 그림이 없으면 도형 대체
-            HitDebug.Circle(at, expR, HitDebug.BlastColor);
-            SkillHits.Circle(at, expR, explosion, 2f);
+            positions.Add(at);
+            ExplosionFx(at, expR);
+            SkillHits.Circle(at, expR, explosion, 2f, x => { hitByExplosion.Add(x); u.hits++; });
+        }
+
+        if (CheatDisabled) yield break;
+        // 확산 (5레벨): 폭발에 맞은 적마다 연속 베기와 폭발이 1회 더 (고정 피해, 각 피해량은 원본과 동일, 확산 자체는 다시 퍼지지 않음)
+        if (HasSpecial(Spread) && hitByExplosion.Count > 0)
+            yield return SpreadRoutine(u, hitByExplosion, expR);
+
+        // 연쇄 폭발 (15레벨): 폭발 종료 시 대상에게 폭발 추가 발동 (피해량은 원본 폭발과 동일 [해석], 한 번만)
+        if (HasSpecial(ChainBlast))
+        {
+            yield return new WaitForSeconds(ChainBlastDelay);
+            if (CheatDisabled) yield break;
+            DamageInfo again = Dmg(ExplosionDamage, cast.AsIndirect, HasSpecial(Focus) ? FocusPerSlash * FocusSlashCount : 0f);
+            foreach (var at in positions)
+            {
+                ExplosionFx(at, expR);
+                SkillHits.Circle(at, expR, again, 2f, x => u.hits++);
+            }
+        }
+    }
+
+    /// <summary>
+    /// 확산: 폭발에 맞은 적 (최대 SpreadMaxTargets) 마다 원본과 같은 피해량의 연속 베기 (공격 횟수만큼) 와 폭발을 고정 피해로 1회씩.
+    /// 참격 집중이면 연속 베기가 없으므로 폭발만 (집중으로 늘어난 폭발 피해량도 원본과 동일하게)
+    /// </summary>
+    IEnumerator SpreadRoutine(Use u, HashSet<Enemy> victims, float expR)
+    {
+        var cast = u.cast.AsIndirect;
+        var list = new List<Enemy>(victims);
+        if (list.Count > SpreadMaxTargets) list.RemoveRange(SpreadMaxTargets, list.Count - SpreadMaxTargets);
+        float slashFixed = FinalDamageOf(SlashDamage);
+        float blastFixed = FinalDamageOf(ExplosionDamage) * (1f + (HasSpecial(Focus) ? FocusPerSlash * FocusSlashCount : 0f));
+        int slashes = ChainSlashCount;
+        var pos = new Vector2[list.Count];
+        for (int i = 0; i < list.Count; i++) pos[i] = list[i] != null ? (Vector2)list[i].transform.position : Vector2.zero;
+
+        for (int s = 0; s < slashes; s++)
+        {
+            for (int i = 0; i < list.Count; i++)
+            {
+                var e = list[i];
+                if (e == null || e.hp <= 0) continue;
+                pos[i] = e.transform.position;
+                var d = Random.insideUnitCircle.normalized;
+                if (!SpawnComboSlashFx(pos[i], d)) Fx.Box(pos[i] - d * 0.33f, d, 0.67f, 0.08f, Fx.FireBright, 0.12f);
+                e.Hit(FixedOf(slashFixed, cast), d, 0.5f);
+                u.hits++;
+            }
+            yield return new WaitForSeconds(SlashInterval);
+        }
+        for (int i = 0; i < list.Count; i++)
+        {
+            Vector2 at = list[i] != null ? (Vector2)list[i].transform.position : pos[i];
+            if (at == Vector2.zero) continue;
+            ExplosionFx(at, expR);
+            SkillHits.Circle(at, expR, FixedOf(blastFixed, cast), 2f, x => u.hits++);
         }
     }
 }
 
 /// <summary>
-/// A06 파이어 스톰: 플레이어 중심 화염 소용돌이 (간접 사용 · 지속 피해 2, 3초, 적 느려짐) → 폭발 (직접 피해 15) 하며 밀치기 · 쿨타임 14초
+/// A06 파이어 스톰: 플레이어 중심 화염 소용돌이 (간접 사용 · 지속 피해 2, 3초, 적 느려짐) → 폭발 (직접 피해 15) 하며 밀치기 · 쿨타임 14초.
+/// 특수 강화 (2026-11-22 구현, 노션 기준. 노션에 없는 세부는 [해석] · [임시] 표시):
+///   5레벨 거대한 폭풍 (범위 +30% · 지속 시간 +1초) · 가속 회전 (피해 간격 -50%) · 폭풍전야 (소용돌이 최종 피해량 -75% · 폭발 +100%)
+///   10레벨 고정 폭풍 (플레이어를 따라오지 않음 · 범위 +50% · 지속 시간 +100%) · 추적 폭풍 (적을 추적 · 유도, 쿨타임 감소 +25%) · 타오르는 불씨 (화상 상태 적 적중 시 받는 최종 피해량 +5% 부여, 최대 10스택)
+///   15레벨 폭심 붕괴 (지속 시간 -75% · 최종 피해량 +200%) · 쌍둥이 태풍 (주위 무작위 장소에 추가 소용돌이) · 초가속 (공격 간격 -75%)
+///   특수 조합 천염폭풍 (고정 폭풍 또는 추적 폭풍 + 쌍둥이 태풍): 폭발 삭제 · 무작위 장소에 추가 소용돌이 10개 · 범위 -50% · 최종 피해량 +50% · 쿨타임 +25%
 /// </summary>
 public class FireStorm : AutoSkill
 {
@@ -1299,6 +1642,31 @@ public class FireStorm : AutoSkill
     const float Knock = 9f;             // [임시]
     const float RangeMul = 1.69f;       // 범위 배율 (사용자 2026-11-22: 30% 증가를 두 번 = 1.3 x 1.3). 소용돌이 · 폭발 모두
 
+    // 특수 강화 id (파이어 스톰)
+    public const string Giant = "FS5A", Accel = "FS5B", Eve = "FS5C";
+    public const string FixedStorm = "FS10A", Chase = "FS10B", Ember = "FS10C";
+    public const string Collapse = "FS15A", Twin = "FS15B", Overdrive = "FS15C";
+    public const string ComboFixed = "FSC1", ComboChase = "FSC2";   // 천염폭풍 (고정 폭풍 + 쌍둥이 태풍 / 추적 폭풍 + 쌍둥이 태풍)
+
+    // 특수 강화 확정 수치 (노션)
+    const float GiantRange = 0.3f, GiantDuration = 1f;           // 거대한 폭풍: 범위 +30% · 지속 시간 +1초
+    const float AccelInterval = 0.5f;                            // 가속 회전: 피해 간격 -50% (배율 0.5)
+    const float EveVortexFinal = 0.25f, EveBlastFinal = 2f;      // 폭풍전야: 소용돌이 최종 피해량 -75% · 폭발 +100%
+    const float FixedRange = 0.5f, FixedDurationPct = 1f;        // 고정 폭풍: 범위 +50% · 지속 시간 +100%
+    const float ChaseCooldown = 0.75f;                           // 추적 폭풍: 쿨타임 감소 +25% (배율 0.75)
+    const float EmberPerStack = 0.05f;                           // 타오르는 불씨: 받는 최종 피해량 +5% 부여
+    const int EmberMaxStacks = 10;                               // 최대 스택 10
+    const float CollapseDurationPct = -0.75f, CollapseFinal = 3f;   // 폭심 붕괴: 지속 시간 -75% · 최종 피해량 +200%
+    const float OverdriveInterval = 0.25f;                       // 초가속: 공격 간격 -75% (배율 0.25)
+    const int TwinCount = 1;                                     // 쌍둥이 태풍: 추가 소용돌이 1개 [해석]
+    const int ComboCount = 10;                                   // 천염폭풍: 추가 소용돌이 10개
+    const float ComboRange = -0.5f, ComboFinal = 1.5f, ComboCooldown = 1.25f;   // 천염폭풍: 범위 -50% · 최종 피해량 +50% · 쿨타임 +25%
+    // [임시] 노션에 없는 수치
+    const float ExtraMinDist = 2.5f, ExtraMaxDist = 7f;          // 추가 소용돌이가 생기는 플레이어로부터의 거리
+    const float ChaseSpeed = 3.5f;                               // 추적 폭풍: 소용돌이 이동 속도 (월드/초)
+    const float ChaseSearch = 30f;                               // 추적 폭풍: 적 탐색 거리
+    const float MinTickInterval = 0.1f;                          // 피해 간격 하한 (가속 연소 규칙과 같게)
+
     // 소용돌이 고리 그림 ErnStray_FireStormRing (2026-11-20 사용자 전달 1장, 1254px 정사각, 원본 webp = Art/Incoming/ErnStray/FireStorm_Ring_source.webp)
     // 생성: 플레이어 위치에서 점점 커져 판정 크기에 맞춤 → 지속 중 시계 반대 회전 → 폭발: 커지면서 사라짐 (2026-11-20 사용자)
     const string RingSprite = "ErnStray_FireStormRing";
@@ -1308,47 +1676,205 @@ public class FireStorm : AutoSkill
     const float RingSpin = 180f;        // [임시] 회전 속도 (도/초, + = 시계 반대)
     const float RingBurstTime = 0.3f;   // [임시] 폭발 때 판정 크기 → 폭발 범위까지 커지며 사라지는 시간
 
+    // ---------- 특수 강화 · 조합 ----------
+    public override SpecialUpgradeOption[] SpecialOptions(int lv)
+    {
+        switch (lv)
+        {
+            case 5: return new[]
+            {
+                new SpecialUpgradeOption { id = Giant, title = "거대한 폭풍", desc = "범위 +30%, 지속 시간 +1초" },
+                new SpecialUpgradeOption { id = Accel, title = "가속 회전", desc = "피해 간격 -50%" },
+                new SpecialUpgradeOption { id = Eve, title = "폭풍전야", desc = "소용돌이 최종 피해량 -75%, 폭발 최종 피해량 +100%" },
+            };
+            case 10: return new[]
+            {
+                new SpecialUpgradeOption { id = FixedStorm, title = "고정 폭풍", desc = "소용돌이가 더이상 플레이어를 따라오지 않습니다. 범위 +50%, 지속 시간 +100%" },
+                new SpecialUpgradeOption { id = Chase, title = "추적 폭풍", keywords = new[] { "추적", "유도" }, desc = "소용돌이가 적을 추적 및 유도합니다. 쿨타임 감소 +25%" },
+                new SpecialUpgradeOption { id = Ember, title = "타오르는 불씨", desc = "화상 상태 적 적중 시 받는 최종 피해량 5% 부여, 최대 스택 10" },
+            };
+            case 15: return new[]
+            {
+                new SpecialUpgradeOption { id = Collapse, title = "폭심 붕괴", desc = "지속 시간 -75%, 최종 피해량 +200%" },
+                new SpecialUpgradeOption { id = Twin, title = "쌍둥이 태풍", desc = "주위 무작위 장소에 추가 소용돌이를 생성합니다." },
+                new SpecialUpgradeOption { id = Overdrive, title = "초가속", desc = "공격 간격 -75%" },
+            };
+        }
+        return base.SpecialOptions(lv);
+    }
+
+    public override SpecialComboOption[] SpecialCombos() => new[]
+    {
+        new SpecialComboOption
+        {
+            id = ComboFixed, title = "천염폭풍", recipe = "고정 폭풍 + 쌍둥이 태풍", requires = new[] { FixedStorm, Twin },
+            specs = new[] { "폭발 삭제", "무작위 장소에 10개의 추가 소용돌이 생성", "'범위' -50%", "'최종 피해량' +50%", "'쿨타임' +25%" },
+        },
+        new SpecialComboOption
+        {
+            id = ComboChase, title = "천염폭풍", recipe = "추적 폭풍 + 쌍둥이 태풍", requires = new[] { Chase, Twin },
+            specs = new[] { "폭발 삭제", "무작위 장소에 10개의 추가 소용돌이 생성", "'범위' -50%", "'최종 피해량' +50%", "'쿨타임' +25%" },
+        },
+    };
+
+    bool Combo => HasCombo(ComboFixed) || HasCombo(ComboChase);
+
+    // ---------- 수치 ----------
+    /// <summary>지속 시간 = (기본 + 고정 증가) × (1 + % 증가 합) — 화염의 검과 같은 규칙. 최소 0.3초</summary>
+    float DurationNow
+    {
+        get
+        {
+            float flat = Duration + (HasSpecial(Giant) ? GiantDuration : 0f);
+            float pct = (HasSpecial(FixedStorm) ? FixedDurationPct : 0f) + (HasSpecial(Collapse) ? CollapseDurationPct : 0f);
+            return Mathf.Max(0.3f, flat * (1f + pct));
+        }
+    }
+
+    /// <summary>피해 간격 기본값 (가속 회전 · 초가속은 서로 다른 효과라 곱연산 [해석]). 가속 연소는 이 값에서 더 줄임</summary>
+    float BaseInterval => TickInterval * (HasSpecial(Accel) ? AccelInterval : 1f) * (HasSpecial(Overdrive) ? OverdriveInterval : 1f);
+
+    protected override float SpecialRangeBonus =>
+        (HasSpecial(Giant) ? GiantRange : 0f) + (HasSpecial(FixedStorm) ? FixedRange : 0f) + (Combo ? ComboRange : 0f);
+    /// <summary>소용돌이 · 폭발 공통 최종 피해량 (폭심 붕괴 · 천염폭풍). 폭풍전야는 둘이 달라 따로</summary>
+    protected override float SpecialFinalDamageMul => (HasSpecial(Collapse) ? CollapseFinal : 1f) * (Combo ? ComboFinal : 1f);
+    protected override float SpecialCooldownMul => (HasSpecial(Chase) ? ChaseCooldown : 1f) * (Combo ? ComboCooldown : 1f);
+
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
+
+    // ---------- 타오르는 불씨: 받는 최종 피해량 증가 부여 (대상마다 스택) ----------
+    readonly Dictionary<Enemy, int> embers = new Dictionary<Enemy, int>();
+    EmberModifier emberMod;
+
+    sealed class EmberModifier : CombatModifier
+    {
+        readonly FireStorm owner;
+        public EmberModifier(FireStorm o) { owner = o; }
+        public override float ReceivedMul(Enemy target, in DamageInfo d)
+            => owner != null && owner.embers.TryGetValue(target, out int n) && n > 0 ? 1f + EmberPerStack * n : 1f;
+    }
+
+    void AddEmber(Enemy e)
+    {
+        if (e == null || e.hp <= 0) return;
+        if (emberMod == null) { emberMod = new EmberModifier(this); CombatMods.Add(emberMod); }
+        embers.TryGetValue(e, out int n);
+        embers[e] = Mathf.Min(EmberMaxStacks, n + 1);
+    }
+
+    protected override void OnDisable()
+    {
+        base.OnDisable();
+        if (emberMod != null) { CombatMods.Remove(emberMod); emberMod = null; }
+        embers.Clear();
+    }
+
+    // ---------- 발동 ----------
+    static readonly List<Enemy> scan = new List<Enemy>();
 
     protected override bool Fire()
     {
         // 인식 범위 없음: 주변에 적이 없어도 쿨타임마다 상시 발동 (사용자 2026-11-22)
-        StartCoroutine(Run());
+        var cast = DirectCast;
+        Vector2 me = P.transform.position;
+        // 천염폭풍: 폭발 삭제, 추가 소용돌이 10개. 쌍둥이 태풍: 추가 소용돌이 1개
+        StartCoroutine(Storm(me, !HasSpecial(FixedStorm) && !HasSpecial(Chase), HasSpecial(Chase), cast, false, !Combo));
+        int extras = Combo ? ComboCount : (HasSpecial(Twin) ? TwinCount : 0);
+        for (int i = 0; i < extras; i++)
+        {
+            float ang = Random.Range(0f, Mathf.PI * 2f), dist = Random.Range(ExtraMinDist, ExtraMaxDist);
+            Vector2 at = me + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * dist;
+            StartCoroutine(Storm(at, false, HasSpecial(Chase), cast.AsIndirect, true, !Combo));   // 추가 소용돌이: 그 자리에 남음 (추적 폭풍이면 같이 추적), 간접 사용
+        }
         return true;
     }
 
-    IEnumerator Run()
+    /// <summary>
+    /// 소용돌이 1개: 지속 시간 동안 틱마다 범위 안 지속 피해 + 감속 → 끝나면 폭발 (explode). follow = 플레이어를 따라감, chase = 가장 가까운 적을 추적.
+    /// extra = 추가 소용돌이 (모두 간접 사용). 폭풍전야는 소용돌이와 폭발의 최종 피해량을 따로 조정
+    /// </summary>
+    IEnumerator Storm(Vector2 startPos, bool follow, bool chase, CastRef cast, bool extra, bool explode)
     {
-        // 화염 소용돌이 = 간접 사용 · 지속 피해 (틱마다 내림), 마지막 폭발 = 직접 사용 · 직접 피해
-        var cast = DirectCast;
-        DamageInfo perTick = MakeDamage(DotDamage, cast.AsIndirect, DamageType.DoT);
+        // 화염 소용돌이 = 간접 사용 · 지속 피해 (틱마다 내림), 마지막 폭발 = 직접 사용 · 직접 피해 (추가 소용돌이의 폭발은 간접 사용)
+        DamageInfo perTick = MakeDamage(DotDamage, extra ? cast : cast.AsIndirect, 0f, HasSpecial(Eve) ? EveVortexFinal : 1f, DamageType.DoT);
         float rSmall = Range(Tier.Short) * RangeMul;
+        float duration = DurationNow;
 
-        // [임시 해석] '주변' = 플레이어를 따라다니는 범위
+        Vector2 pos = follow ? (Vector2)P.transform.position : startPos;
         var ringFrames = SpriteEffect.LoadFrames(RingSprite, 1, 1, 1f);
         FireStormRingFx vortex = null;
         FxShape ring = null;
-        if (ringFrames != null) vortex = FireStormRingFx.Spawn(ringFrames[0], P.transform, rSmall * RingCanvasPx / RingMidPx, RingGrowTime, RingSpin);
-        else ring = Fx.GroundCircle(P.transform.position, rSmall, Fx.FireDeep, Duration, P.transform);   // 그림이 없으면 장판 도형 (바닥 레이어)
-        // 틱 피해는 기본 간격 기준으로 정하고, 가속 연소면 같은 피해가 더 자주
-        for (float elapsed = 0f; elapsed < Duration - 1e-4f;)
+        if (ringFrames != null) vortex = FireStormRingFx.Spawn(ringFrames[0], pos, rSmall * RingCanvasPx / RingMidPx, RingGrowTime, RingSpin);
+        else ring = Fx.GroundCircle(pos, rSmall, Fx.FireDeep, duration);   // 그림이 없으면 장판 도형 (바닥 레이어)
+
+        float tickT = 0f;   // 틱 타이머: 시작 즉시 첫 틱 (기존과 같게)
+        bool first = true;
+        for (float elapsed = 0f; elapsed < duration - 1e-4f;)
         {
-            float iv = CombatMods.DotInterval(TickInterval);
-            SkillHits.Circle(P.transform.position, rSmall, perTick, 0.3f,
-                             e => e.SustainSlow(SlowMul, iv + 0.1f));   // 범위 안에 있는 동안 유지 (누적 없음)
-            yield return new WaitForSeconds(iv);
-            elapsed += iv;
+            float dt = Time.deltaTime;
+            if (follow && P != null) pos = P.transform.position;
+            else if (chase) pos = ChaseStep(pos, dt);
+            if (vortex != null) vortex.transform.position = pos;
+            else if (ring != null) ring.transform.position = pos;
+
+            float iv = Mathf.Max(MinTickInterval, CombatMods.DotInterval(BaseInterval));
+            tickT += dt;
+            if (first || tickT >= iv)
+            {
+                if (!first) tickT -= iv;
+                first = false;
+                if (CheatDisabled) break;
+                TickAt(pos, rSmall, perTick, iv);
+            }
+            elapsed += dt;
+            yield return null;
         }
         if (ring != null) Destroy(ring.gameObject);
 
-        Vector2 at = P.transform.position;
         float rBig = Range(Tier.Mid) * RangeMul;
+        if (!explode)
+        {
+            // 천염폭풍: 폭발 삭제 — 고리는 그대로 옅어지며 사라짐
+            if (vortex != null) vortex.Burst(rSmall * RingCanvasPx / RingMidPx, RingBurstTime);
+            yield break;
+        }
         // 폭발: 고리가 폭발 범위까지 커지며 사라짐 (그림이 없으면 도형 폭발)
         if (vortex != null) vortex.Burst(rBig * RingCanvasPx / RingMidPx, RingBurstTime);
-        else Fx.Disc(at, rBig, Fx.Fire, 0.3f);
-        HitDebug.Circle(at, rBig, HitDebug.BlastColor);
-        SkillHits.Circle(at, rBig, MakeDamage(ExplosionDamage, cast), Knock);
+        else Fx.Disc(pos, rBig, Fx.Fire, 0.3f);
+        HitDebug.Circle(pos, rBig, HitDebug.BlastColor);
+        DamageInfo blast = MakeDamage(ExplosionDamage, cast, 0f, HasSpecial(Eve) ? EveBlastFinal : 1f);   // 추가 소용돌이의 cast 는 이미 간접 사용
+        HitWithEmber(pos, rBig, blast, Knock);
         CameraFollow.Shake(0.1f, 0.1f);
+    }
+
+    /// <summary>소용돌이 틱 1회: 범위 안 지속 피해 + 감속 (+ 타오르는 불씨)</summary>
+    void TickAt(Vector2 pos, float r, DamageInfo perTick, float iv)
+    {
+        HitWithEmber(pos, r, perTick, 0.3f, e => e.SustainSlow(SlowMul, iv + 0.1f));   // 범위 안에 있는 동안 유지 (누적 없음)
+    }
+
+    /// <summary>범위 피해 + 타오르는 불씨 (피해가 들어가기 전에 화상이던 적에게 받는 최종 피해량 +5% 부여)</summary>
+    void HitWithEmber(Vector2 pos, float r, DamageInfo dmg, float knock, System.Action<Enemy> also = null)
+    {
+        HashSet<Enemy> burning = null;
+        if (HasSpecial(Ember))
+        {
+            burning = new HashSet<Enemy>();
+            foreach (var e in SkillHits.InCircle(pos, r, scan)) if (FlameSword.IsBurning(e)) burning.Add(e);
+        }
+        SkillHits.Circle(pos, r, dmg, knock, e =>
+        {
+            also?.Invoke(e);
+            if (burning != null && burning.Contains(e)) AddEmber(e);
+        });
+    }
+
+    /// <summary>추적 폭풍: 가장 가까운 적 쪽으로 이동 (ChaseSpeed). 적이 없으면 제자리</summary>
+    Vector2 ChaseStep(Vector2 pos, float dt)
+    {
+        var t = Nearest(pos, ChaseSearch);
+        if (t == null) return pos;
+        return Vector2.MoveTowards(pos, t.transform.position, ChaseSpeed * dt);
     }
 }
 
@@ -1365,11 +1891,11 @@ public class FireStormRingFx : MonoBehaviour
     bool bursting;
     float burstFrom, burstTo, burstTime, bt;
 
-    public static FireStormRingFx Spawn(Sprite sprite, Transform follow, float size, float growTime, float spinDegPerSec)
+    /// <summary>worldPos 에 생성. 따라가는 것은 호출한 쪽이 transform.position 을 매 프레임 바꿔서 (플레이어 따라가기 · 추적 · 고정)</summary>
+    public static FireStormRingFx Spawn(Sprite sprite, Vector2 worldPos, float size, float growTime, float spinDegPerSec)
     {
         var go = new GameObject("FX_FireStormRing");
-        go.transform.SetParent(follow, false);
-        go.transform.localPosition = Vector3.zero;
+        go.transform.position = worldPos;
         go.transform.localScale = Vector3.zero;
         var fx = go.AddComponent<FireStormRingFx>();
         fx.sr = go.AddComponent<SpriteRenderer>();
