@@ -90,6 +90,12 @@ public class FlameSword : Skill
         I != null && e != null && I.burns.TryGetValue(e, out var b) ? b.stacks : 0;
     public static bool IsBurning(Enemy e) => StacksOn(e) > 0;
 
+    // 화상 상태로 죽은 적 (이번 프레임). 처치 이벤트를 받는 순서가 스킬마다 달라 화상 기록이 먼저 지워져도 판정할 수 있게 (불길의 순환 등)
+    static readonly HashSet<Enemy> diedBurning = new HashSet<Enemy>();
+    static int diedBurningFrame = -1;
+    /// <summary>화상 상태에서 죽었는지 (처치 이벤트 안에서 사용). 아직 지워지지 않았으면 지금 화상 여부로 판정</summary>
+    public static bool DiedBurning(Enemy e) => IsBurning(e) || (diedBurningFrame == Time.frameCount && diedBurning.Contains(e));
+
     /// <summary>페이즈 변경 등 명시적인 상태 초기화. 처치·확산 이벤트는 발생시키지 않음.</summary>
     public static void RemoveBurn(Enemy e)
     {
@@ -215,6 +221,11 @@ public class FlameSword : Skill
     void OnKilled(Enemy e)
     {
         if (!burns.TryGetValue(e, out var b)) return;
+        if (b.stacks > 0)
+        {
+            if (diedBurningFrame != Time.frameCount) { diedBurning.Clear(); diedBurningFrame = Time.frameCount; }
+            diedBurning.Add(e);
+        }
         if (HasSpecial(Spread) && b.stacks > 0) spreadQueue.Add(e.transform.position);
         Clear(b, removeFromMap: true);
     }
