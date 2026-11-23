@@ -1364,16 +1364,49 @@ public class SwordWaveSeeker : MonoBehaviour
 /// </summary>
 public class FireStream : Skill
 {
-    const int MaxStacks = 3;            // 기획서 확정
+    const int BaseMaxStacks = 3;        // 기획서 확정
     const float DashTime = 0.12f;       // [임시] 이동 시간 (속도 '매우 빠름')
     // [임시 해석] 스택은 한 번에 하나씩 순서대로 회복
 
-    int stacks = MaxStacks;
+    int stacks = BaseMaxStacks;
     float recharge;
     readonly HashSet<Enemy> hit = new HashSet<Enemy>();
     readonly List<Enemy> found = new List<Enemy>();
 
     const float BaseDamage = 3f, BaseCooldown = 8f;    // 스택 쿨타임 8초 (노션)
+    const float HitRadius = 0.4f;       // [임시] 이동 경로 판정 반경 (카메라 시야 7 복귀에 맞춰 0.6 × 2/3)
+
+    // ---------- 특수 강화 (노션 2026-11-23 편집본) ----------
+    public const string Continuous = "FS5A", Trail = "FS5B", Veil = "FS5C";
+    public const string Sprint = "FS10A", Reflux = "FS10B", Pierce = "FS10C";
+    public const string Lance = "FS15A", Backdraft = "FS15B", Endless = "FS15C";
+    public const string ComboIlseom = "FSC1";
+
+    // 확정 수치 (노션)
+    const int ContinuousStacks = 1;             // 연속 돌진: 최대 스택 +1
+    const float ContinuousCooldown = 1.2f;      // 연속 돌진: 쿨타임 +20%
+    const float TrailRatio = 2f;                // 불타는 궤적: 파이어 스트림 총 피해량의 200% 고정 피해
+    const float BurnFinal = 1f;                 // 불타는 궤적: 화상 상태 적에게 최종 피해량 +100%
+    const float VeilInvuln = 2f;                // 화염 장막: 종료 시 2초간 무적 유지
+    const float SprintRange = 0.5f;             // 고속 질주: 사거리 +50%
+    const float SprintCooldown = 0.75f;         // 고속 질주: 쿨타임 감소 +25% (배율 0.75)
+    const float RefluxPerHit = 0.025f;          // 화염 환류: 적중 시 남은 쿨타임 감소 2.5%
+    const float PierceFinal = 3f;               // 꿰뚫는 화염: 최종 피해량 +200% (배율 3) — [해석] 추가 사용에만 적용
+    const float LanceWaitTime = 1f;             // 화염의 창: 누르고 있을 때 최대 1초 대기
+    const float LanceFinal = 5f;                // 화염의 창: 피격 시 최종 피해량 +400% (배율 5) — 그 사용에만
+    const float LanceCooldownCut = 0.2f;        // 화염의 창: 피격 시 남은 쿨타임 감소 20%
+    const float BackdraftFinal = 2f;            // 후폭풍: 최종 피해량 +100% (배율 2) — [해석] 추가 사용에만 적용
+    const int EndlessStacks = 2;                // 무한 기동: 최대 스택 +2
+    const float EndlessCooldown = 0.5f;         // 무한 기동: 쿨타임 감소 +50% (배율 0.5)
+    const float EndlessFinal = 0.25f;           // 무한 기동: 최종 피해량 -75%
+    const float IlseomFinal = 10f;              // 화염 일섬: 최종 피해량 +1000%
+    const float IlseomPerReduction = 5f;        // 화염 일섬: 쿨타임 감소 능력치 무효화 1% 당 최종 피해량 +5% (전환율 1 = 100% → +500%)
+    const float IlseomPerStack = 1.5f;          // 화염 일섬: 최대 스택 능력치 무효화 1당 최종 피해량 +150%
+    // [임시] 노션에 없는 수치
+    const float TrailTime = 3f;                 // 불타는 궤적: 장판 지속 시간 (파이어 차지 불타는 궤적과 같게)
+    const float TrailTick = 0.5f;               // 불타는 궤적: 지속 피해 간격
+    const bool LanceBlocksHit = true;           // [해석] 화염의 창 대기 중 맞은 공격은 막음 (반격 자세). false = 피해는 받고 돌진만
+    const float BackdraftDelay = 0.05f;         // 후폭풍: 돌진이 끝난 뒤 지나온 경로를 훑기까지
 
     // 불꽃 줄기 (ErnStray_FireStream_StraightDash_v4 원본): 4열 × 6행 · 칸 768 × 512 · 24프레임 (마지막 = 투명) · 1회
     // 오른쪽으로 곧게 자라는 나선 불꽃 (월드에 고정, 캐릭터를 따라가지 않음) · 뒤 레이어 + 앞 레이어
@@ -1420,7 +1453,82 @@ public class FireStream : Skill
         return true;
     }
     float StackCooldown => CooldownOf(BaseCooldown);
-    float Distance => Reach(Tier.Short) * DistanceMul;
+    float Distance => Reach(Tier.Short) * DistanceMul * (1f + (HasSpecial(Sprint) ? SprintRange : 0f));
+
+    // ---------- 특수 강화 선택지 ----------
+    public override SpecialUpgradeOption[] SpecialOptions(int lv)
+    {
+        switch (lv)
+        {
+            case 5: return new[]
+            {
+                new SpecialUpgradeOption { id = Continuous, title = "연속 돌진", desc = "최대 스택 +1, 쿨타임 +20%" },
+                new SpecialUpgradeOption { id = Trail, title = "불타는 궤적", keywords = new[] { "간접 사용", "지속 피해", "고정 피해" }, desc = "지나간 경로에 화염 장판이 생성됩니다.",
+                    specs = new[] { "'파이어 스트림' '총 피해량'의 200% '고정 피해'", "화상 상태 적에게 '최종 피해량' +100%" } },
+                new SpecialUpgradeOption { id = Veil, title = "화염 장막", desc = "종료 시 2초간 무적이 유지됩니다." },
+            };
+            case 10: return new[]
+            {
+                new SpecialUpgradeOption { id = Sprint, title = "고속 질주", desc = "사거리 +50%, 쿨타임 감소 +25%" },
+                new SpecialUpgradeOption { id = Reflux, title = "화염 환류", desc = "적중 시 남은 쿨타임 감소 2.5%" },
+                new SpecialUpgradeOption { id = Pierce, title = "꿰뚫는 화염", desc = "종료 시 진행 방향으로 한 번 더 사용합니다.", specs = new[] { "추가 사용 '최종 피해량' +200%" } },
+            };
+            case 15: return new[]
+            {
+                new SpecialUpgradeOption { id = Lance, title = "화염의 창", desc = "누르고 있으면 1초간 대기합니다. 대기 중 피격당하거나 1초가 지나면 돌진합니다.\n피격 시 남은 쿨타임 감소 및 최종 피해량 증가.",
+                    specs = new[] { "피격 시 '최종 피해량' +400%", "피격 시 남은 쿨타임 감소 20%" } },
+                new SpecialUpgradeOption { id = Backdraft, title = "후폭풍", desc = "종료 시 지나온 경로에 한 번 더 사용합니다.", specs = new[] { "추가 사용 '최종 피해량' +100%" } },
+                new SpecialUpgradeOption { id = Endless, title = "무한 기동", desc = "최대 스택 +2, 쿨타임 감소 +50%, 최종 피해량 -75%" },
+            };
+        }
+        return base.SpecialOptions(lv);
+    }
+
+    public override SpecialComboOption[] SpecialCombos() => new[]
+    {
+        new SpecialComboOption
+        {
+            id = ComboIlseom, title = "화염 일섬", recipe = "꿰뚫는 화염 + 화염의 창", requires = new[] { Pierce, Lance },
+            desc = "쿨타임 감소 · 최대 스택 능력치가 무효화되고, 무효화한 만큼 최종 피해량이 증가합니다.",
+            specs = new[] { "'최종 피해량' +1000%", "쿨타임 감소 능력치 무효화 1% 당 '최종 피해량' +5%", "최대 스택 능력치 무효화 1당 '최종 피해량' +150%" },
+        },
+    };
+
+    bool Ilseom => HasCombo(ComboIlseom);
+    /// <summary>특수 강화로 늘어난 최대 스택 (화염 일섬이 무효화하는 양) — [해석] 기본 3 스택은 그대로 (파이어 차지 화염 질주와 같은 해석)</summary>
+    int BonusStacks => (HasSpecial(Continuous) ? ContinuousStacks : 0) + (HasSpecial(Endless) ? EndlessStacks : 0);
+    int MaxStacks => BaseMaxStacks + (Ilseom ? 0 : BonusStacks);
+
+    /// <summary>특수 강화의 쿨타임 '감소' 배율만 (고속 질주 · 무한 기동). 화염 일섬이 무효화</summary>
+    float SpecialReductionMul => (HasSpecial(Sprint) ? SprintCooldown : 1f) * (HasSpecial(Endless) ? EndlessCooldown : 1f);
+    /// <summary>특수 강화의 쿨타임 '증가' 배율 (연속 돌진). 무효화 대상 아님</summary>
+    float SpecialIncreaseMul => HasSpecial(Continuous) ? ContinuousCooldown : 1f;
+    protected override float SpecialCooldownMul => SpecialReductionMul * SpecialIncreaseMul;
+
+    /// <summary>
+    /// 화염 일섬이 무효화한 쿨타임 감소율 (0.3 = 30%): 기본 강화 · 전역 · 플레이어 · 고속 질주 · 무한 기동. 90% 상한 그대로.
+    /// [해석] 츠바메가에시와 같이 '감소' 만 무효화 — 연속 돌진의 쿨타임 +20% 는 그대로 곱함
+    /// </summary>
+    float IlseomConvertedReduction
+    {
+        get
+        {
+            float m = Mathf.Max(1f - T.cooldownReductionCap, BasicCooldownMul * SpecialReductionMul * CombatMods.CooldownMul(this) * P.cooldownMul);
+            return Mathf.Round(Mathf.Max(0f, 1f - m) * 10000f) / 10000f;
+        }
+    }
+
+    protected override float CooldownMultiplier => Ilseom ? SpecialIncreaseMul : GeneralCooldownMultiplier;
+    /// <summary>무한 기동 ×0.25 · 화염 일섬 (1 + 10 + 전환 쿨감 × 5 + 무효화 스택 × 1.5) 를 곱한 최종 배율</summary>
+    protected override float SpecialFinalDamageMul =>
+        (HasSpecial(Endless) ? EndlessFinal : 1f)
+        * (Ilseom ? 1f + IlseomFinal + IlseomConvertedReduction * IlseomPerReduction + BonusStacks * IlseomPerStack : 1f);
+
+    protected override void OnSpecialUpgrade(int lv, string id)
+    {
+        if (id == Continuous || id == Endless) stacks = Mathf.Min(MaxStacks, stacks + (id == Continuous ? ContinuousStacks : EndlessStacks));   // 늘어난 만큼 바로 채움
+    }
+    protected override void OnComboChanged(string id, bool on) { stacks = Mathf.Min(stacks, MaxStacks); }
 
     public override string Badge => stacks.ToString();
     public override float CooldownFraction =>
@@ -1429,7 +1537,8 @@ public class FireStream : Skill
     /// <summary>다음 스택 회복 진행도 (HUD)</summary>
     public float RechargeFraction => stacks >= MaxStacks ? 0f : Mathf.Clamp01(recharge / Mathf.Max(0.01f, StackCooldown));
 
-    /// <summary>남은 쿨타임 감소 (불길의 순환): 지금 충전 중인 스택 기준</summary>
+    /// <summary>남은 쿨타임 감소 (불길의 순환 · 화염 환류 · 화염의 창): 지금 충전 중인 스택 기준.
+    /// [해석] 화염 일섬은 '쿨타임 감소 능력치' 만 무효화 — 남은 쿨타임 감소는 그대로 받음 (조합 재료인 화염의 창 효과라서)</summary>
     public override void ReduceRemainingCooldown(float ratio)
     {
         if (stacks < MaxStacks && recharge > 0f) recharge *= Mathf.Clamp01(1f - ratio);
@@ -1437,7 +1546,8 @@ public class FireStream : Skill
 
     public override void Tick(float dt)
     {
-        if (stacks >= MaxStacks) { recharge = 0f; return; }
+        if (DebugCheats.NoCooldown) { stacks = MaxStacks; recharge = 0f; return; }
+        if (stacks >= MaxStacks) { stacks = MaxStacks; recharge = 0f; return; }
         if (recharge <= 0f) recharge = StackCooldown;
         recharge -= dt;
         if (recharge <= 0f) { stacks++; recharge = stacks < MaxStacks ? StackCooldown : 0f; }
@@ -1445,27 +1555,159 @@ public class FireStream : Skill
 
     public override void DebugResetForCast() { if (stacks <= 0) stacks = 1; }   // 디버그 맵 버튼: 스택이 없어도 사용
 
+    bool running;   // 화염의 창 대기 ~ 추가 사용까지 (중복 사용 방지)
+
     public override bool TryActivate()
     {
         if (CheatDisabled) return false;   // 치트: 스킬별 사용 금지
-        if (stacks <= 0 || P.IsBusy || P.IsStunned) return false;
-        if (stacks == MaxStacks) recharge = StackCooldown;
+        if (running || stacks <= 0 || P.IsBusy || P.IsStunned) return false;
+        if (stacks >= MaxStacks) recharge = StackCooldown;
         stacks--;
         BeginCast();
-
-        hit.Clear();
-        DamageInfo dmg = MakeDamage(BaseDamage);
-        float r = 0.4f;                 // [임시] 이동 경로 판정 반경 (카메라 시야 7 복귀에 맞춰 0.6 × 2/3)
-        bool drawn = SpawnStream(P.transform.position, P.Facing, Distance);
-        if (!drawn) Fx.Circle(P.transform.position, r, Fx.FireBright, 0.2f);   // 그림이 없을 때만
-        P.Dash(P.Facing, Distance, DashTime, true, onStep: () =>
-        {
-            Vector2 at = P.transform.position;
-            if (!drawn) Fx.Disc(at, r * 0.6f, Fx.Fire, 0.18f, 0f);
-            foreach (var e in SkillHits.InCircle(at, r, found))
-                if (hit.Add(e)) e.Hit(dmg, (Vector2)e.transform.position - at, 1f);
-        });
+        StartCoroutine(Run());
         return true;
+    }
+
+    void OnDisable()
+    {
+        if (running && P != null) P.HitCounter = null;
+        running = false;
+    }
+
+    IEnumerator Run()
+    {
+        running = true;
+        var cast = DirectCast;
+        float useFinal = 1f;
+
+        // 화염의 창: 이동 키를 누르고 있는 동안 최대 1초 대기 (방향 전환만 가능). 대기 중 피격 → 즉시 돌진 + 최종 피해량 +400% · 남은 쿨타임 -20%
+        // [해석] 키를 일찍 떼면 그때 바로 돌진. 디버그 맵 버튼처럼 누르고 있지 않으면 대기 없이 돌진
+        if (HasSpecial(Lance) && Input.GetKey(T.movementKey))
+        {
+            bool countered = false;
+            P.Root(LanceWaitTime);
+            P.HitCounter = () => { countered = true; return LanceBlocksHit; };
+            var mark = Fx.Circle(P.transform.position, HitRadius * 2f, Fx.FireBright, LanceWaitTime, P.transform, 0f);   // [임시] 대기 표시
+            for (float t = 0f; t < LanceWaitTime && !countered && Input.GetKey(T.movementKey); t += Time.deltaTime) yield return null;
+            P.HitCounter = null;
+            P.EndRoot();
+            if (mark != null) Destroy(mark.gameObject);
+            if (countered)
+            {
+                useFinal = LanceFinal;
+                ReduceRemainingCooldown(LanceCooldownCut);
+                CameraFollow.Shake(0.1f, 0.12f);
+            }
+        }
+
+        Vector2 dir = P.Facing.sqrMagnitude > 0.01f ? P.Facing.normalized : Vector2.right;
+        Vector2 start = P.transform.position;
+        float distance = Distance;
+        bool veil = HasSpecial(Veil);
+
+        yield return DashOnce(dir, distance, cast, useFinal);
+
+        // 꿰뚫는 화염: 끝난 자리에서 같은 방향으로 한 번 더 (간접 사용, 스택 소모 없음)
+        if (HasSpecial(Pierce) && P != null && !P.IsStunned)
+            yield return DashOnce(dir, distance, cast.AsIndirect, useFinal * PierceFinal);
+
+        Vector2 end = P.transform.position;
+        float total = FinalDamageOf(BaseDamage) * useFinal;   // [해석] 파이어 스트림 총 피해량 = 돌진 1회의 최종 피해량 (적중 1회분)
+
+        if (veil) P.SetInvulnerable(VeilInvuln);   // 화염 장막: 종료 시 2초 무적
+        if (HasSpecial(Trail)) StartCoroutine(TrailField(start, end, HitRadius, total, cast.AsIndirect));
+        if (HasSpecial(Backdraft))
+        {
+            yield return new WaitForSeconds(BackdraftDelay);
+            Backdraft_Sweep(end, start, cast.AsIndirect, useFinal * BackdraftFinal);
+        }
+        running = false;
+    }
+
+    /// <summary>돌진 1회: 경로의 적에게 한 번씩 피해 (화염 환류: 적중마다 남은 쿨타임 -2.5%)</summary>
+    IEnumerator DashOnce(Vector2 dir, float distance, CastRef cast, float extraFinal)
+    {
+        hit.Clear();
+        DamageInfo dmg = MakeDamage(BaseDamage, cast, 0f, extraFinal);
+        bool drawn = SpawnStream(P.transform.position, dir, distance);
+        if (!drawn) Fx.Circle(P.transform.position, HitRadius, Fx.FireBright, 0.2f);   // 그림이 없을 때만
+        bool done = false;
+        P.Dash(dir, distance, DashTime, true,
+            onStep: () =>
+            {
+                Vector2 at = P.transform.position;
+                if (!drawn) Fx.Disc(at, HitRadius * 0.6f, Fx.Fire, 0.18f, 0f);
+                foreach (var e in SkillHits.InCircle(at, HitRadius, found))
+                {
+                    if (!hit.Add(e)) continue;
+                    e.Hit(dmg, (Vector2)e.transform.position - at, 1f);
+                    if (HasSpecial(Reflux)) ReduceRemainingCooldown(RefluxPerHit);
+                }
+            },
+            onEnd: () => done = true);
+        // 돌진이 끊겨 (보스 잡기 등) onEnd 가 오지 않아도 멈추지 않게 시간으로도 끝냄
+        for (float t = 0f; !done && t < DashTime + 0.3f; t += Time.deltaTime) yield return null;
+    }
+
+    /// <summary>후폭풍: 지나온 경로 (도착 → 출발) 를 한 번 훑음. 플레이어는 움직이지 않음 [해석]</summary>
+    void Backdraft_Sweep(Vector2 from, Vector2 to, CastRef cast, float extraFinal)
+    {
+        Vector2 d = to - from;
+        float len = d.magnitude;
+        if (len < 0.01f) return;
+        DamageInfo dmg = MakeDamage(BaseDamage, cast, 0f, extraFinal);
+        if (!SpawnStream(from, d / len, len)) Fx.Box(from, d / len, len, HitRadius * 2f, Fx.FireBright, 0.25f);
+        foreach (var e in NearSegment(from, to, HitRadius))
+        {
+            e.Hit(dmg, d, 1f);
+            if (HasSpecial(Reflux)) ReduceRemainingCooldown(RefluxPerHit);
+        }
+        HitDebug.Circle(from + d * 0.5f, len * 0.5f, HitDebug.BlastColor);
+    }
+
+    /// <summary>선분 a-b 에서 halfWidth 안의 살아 있는 적 (파이어 차지와 같은 계산)</summary>
+    static List<Enemy> NearSegment(Vector2 a, Vector2 b, float halfWidth)
+    {
+        var all = Enemy.CopyAll(new List<Enemy>());
+        var res = new List<Enemy>();
+        Vector2 ab = b - a;
+        float len2 = ab.sqrMagnitude;
+        foreach (var e in all)
+        {
+            if (e == null || e.hp <= 0) continue;
+            Vector2 p = e.transform.position;
+            float t = len2 > 0.0001f ? Mathf.Clamp01(Vector2.Dot(p - a, ab) / len2) : 0f;
+            float rr = halfWidth + e.radius;
+            if ((p - (a + ab * t)).sqrMagnitude < rr * rr) res.Add(e);
+        }
+        return res;
+    }
+
+    DamageInfo FixedOf(float amount, CastRef cast)
+    {
+        var d = FixedDamage(amount, DamageType.Direct, CastKind.Indirect);
+        d.castId = cast.id;
+        return d;
+    }
+
+    /// <summary>불타는 궤적: 지나간 경로에 장판 · 0.5초마다 고정 피해 (합계 = 총 피해량의 200%, 화상 상태 적은 ×2) — 노션 키워드 '지속 피해'</summary>
+    IEnumerator TrailField(Vector2 a, Vector2 b, float halfWidth, float total, CastRef cast)
+    {
+        int ticks = Mathf.Max(1, Mathf.RoundToInt(TrailTime / TrailTick));
+        float per = total * TrailRatio / ticks;
+        Vector2 d = b - a;
+        float len = d.magnitude;
+        if (len > 0.01f) Fx.Box(a, d / len, len, halfWidth * 2f, Fx.FireDeep, TrailTime);
+        for (int i = 0; i < ticks; i++)
+        {
+            foreach (var e in NearSegment(a, b, halfWidth))
+            {
+                var dmg = FixedOf(per * (FlameSword.IsBurning(e) ? 1f + BurnFinal : 1f), cast);
+                dmg.type = DamageType.DoT;
+                e.Hit(dmg, d, Enemy.NoKnock);
+            }
+            yield return new WaitForSeconds(TrailTick);
+        }
     }
 }
 
