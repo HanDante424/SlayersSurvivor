@@ -126,12 +126,34 @@ public static class RaidStage
         if (!subscribed) { Enemy.Killed += OnKilled; subscribed = true; }
     }
 
+    // 페이즈별 체력 (2026-11-23 사용자 확정 · 밸런스 시뮬레이터 BOSS_PRESETS 와 같은 값). 페이즈마다 따로 채워짐
+    // 하드 · 익스트림은 아직 없어서 노말 값을 씀 [임시]
+    const float GaniacEasy1 = 1000000f, GaniacNormal1 = 1500000f, GaniacNormal2 = 2000000f;
+    const float KagutsuchiEasy1 = 2500000f, KagutsuchiNormal1 = 4000000f, KagutsuchiNormal2 = 5500000f;
+
+    /// <summary>이 보스 · 난이도 · 페이즈의 최대 체력 (표에 없으면 0 → 기존 체력 유지)</summary>
+    public static float PhaseMaxHp(EnemyKind kind, RaidDifficulty diff, int phase)
+    {
+        bool easy = diff == RaidDifficulty.Easy;
+        if (kind == EnemyKind.Ganiac) return easy ? GaniacEasy1 : (phase >= 2 ? GaniacNormal2 : GaniacNormal1);
+        if (kind == EnemyKind.Kagutsuchi) return easy ? KagutsuchiEasy1 : (phase >= 2 ? KagutsuchiNormal2 : KagutsuchiNormal1);
+        return 0f;
+    }
+
+    static void ApplyPhaseHp(Enemy e)
+    {
+        float hp = PhaseMaxHp(e.kind, Difficulty, Phase);
+        if (hp > 0f) e.maxHp = hp;
+    }
+
     public static void Begin(Player p)
     {
         Reset();
         p.transform.position = Stage.Center + new Vector2(0f, PlayerStartY);
         // 처음 위치 · 등장은 보스 AI 가 정함 (가니악 = 맵 이탈 상태 · 카구츠치 = 맵 밖 위에서 걸어 들어옴)
         boss = Enemy.Spawn(SelectedInfo.kind, Stage.Center, 1f);
+        ApplyPhaseHp(boss);
+        boss.hp = boss.maxHp;
     }
 
     /// <summary>
@@ -144,6 +166,7 @@ public static class RaidStage
         if (e == null || e != boss || InTransition || Phase >= MaxPhase) return false;
         InTransition = true;
         Phase++;
+        ApplyPhaseHp(e);         // 다음 페이즈 최대 체력 (회복 연출이 이 값까지 채움)
         e.hp = 0.01f;            // 살아 있음 (Boss != null) · 체력 바는 0 에서 다시 참
         e.SetScripted(true);
         e.GetComponent<IRaidBossAI>()?.OnPhaseEnd();
@@ -173,6 +196,7 @@ public static class RaidStage
         if (!Stage.IsDebug || e == null || e != boss) return;
         InTransition = true;
         Phase = 2;
+        ApplyPhaseHp(e);
         e.hp = 0.01f;
         e.SetScripted(true);
         e.GetComponent<IRaidBossAI>()?.OnPhaseEnd();
