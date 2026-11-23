@@ -32,18 +32,19 @@ public class Hellfire : Skill
     const int SlaughterMax = 10;
     const float CrimsonBurn = 1f;           // 홍련지옥: 화상 최종 피해량 +100%
     const float ExtremeFinal = 0.5f;        // 극화: 최종 피해량 +50%
-    const float CycleReduce = 0.05f;        // 불길의 순환: 처치 시 자동·수동·이동 스킬 남은 쿨타임 5% 감소
+    const float CycleReduce = 0.025f;       // 불길의 순환: 화상 상태 적 사망 시 자동·수동·이동 스킬 남은 쿨타임 2.5% 감소 (노션 2026-11-23, 이전 5% · 모든 처치)
     const float IncinerateNormal = 0.01f;   // 소각: 지속 피해마다 최대 체력 1% 고정 피해 (보스 0.4%)
     const float IncinerateBoss = 0.004f;
     const float IncinerateMin = 1f;         //       최소 1 (결정 2026-11-10)
     const float OverburnFinal = 0.75f;      // 극한 연소: 최종 피해량 +75%
-    const float ResonanceGauge = 0.01f;     // 화염 공명: 직접 발동 적중 시 궁극기 게이지 +1% (발동 1번당 1회)
+    const float ResonanceGauge = 0.01f;     // 화염 공명: 적중 시 궁극기 게이지 +1%
+    const float ResonanceCooldown = 0.5f;   //           쿨타임 0.5초 (노션 2026-11-23, 이전 '사용 1번당 1회')
 
     int finalUps, mobilityUps, dotUps;
     int slaughterStacks;
     float slaughterLeft;
     float appliedMoveMul = 1f;
-    readonly HashSet<int> resonated = new HashSet<int>();
+    float resonanceReadyAt;   // 화염 공명 쿨타임이 끝나는 시각 (Time.time)
     Mod mod;
 
     // ---------- 수치 ----------
@@ -125,13 +126,13 @@ public class Hellfire : Skill
             {
                 new SpecialUpgradeOption { id = Crimson, title = "홍련지옥", desc = "모든 화상 최종 피해량 +100%" },
                 new SpecialUpgradeOption { id = Extreme, title = "극화", desc = "최종 피해량 +50%" },
-                new SpecialUpgradeOption { id = Cycle, title = "불길의 순환", desc = "적 처치 시 자동·수동·이동 스킬의 현재 남은 쿨타임 5% 감소" },
+                new SpecialUpgradeOption { id = Cycle, title = "불길의 순환", desc = "화상 상태의 적 사망 시 자동·수동·이동 스킬의 현재 남은 쿨타임 2.5% 감소" },
             };
             case 15: return new[]
             {
                 new SpecialUpgradeOption { id = Incinerate, title = "소각", keywords = new[] { "지속 시간", "고정 피해" }, desc = "지속 피해가 적용될 때마다 대상 최대 체력의 1% (보스 0.4%) 고정 피해 (특수 피해)" },
                 new SpecialUpgradeOption { id = Overburn, title = "극한 연소", desc = "최종 피해량 +75%" },
-                new SpecialUpgradeOption { id = Resonance, title = "화염 공명", desc = "'직접 사용'한 스킬이 적중 시 궁극기 게이지 +1% (사용 1번당 1회)" },
+                new SpecialUpgradeOption { id = Resonance, title = "화염 공명", desc = "적중 시 궁극기 게이지 +1% (쿨타임 0.5초)" },
             };
         }
         return base.SpecialOptions(lv);
@@ -154,7 +155,7 @@ public class Hellfire : Skill
         Enemy.Killed -= OnKilled;
         if (P != null) P.moveSpeedMul /= appliedMoveMul;
         appliedMoveMul = 1f;
-        resonated.Clear();
+        resonanceReadyAt = 0f;
     }
 
     /// <summary>기동력 강화 이동속도: 옥염 몫만 곱하고 갱신 시 이전 몫을 나눔 (다른 이동속도 효과와 곱연산)</summary>
@@ -178,15 +179,13 @@ public class Hellfire : Skill
                   Vector2.zero, Enemy.NoKnock);
         }
 
-        // 화염 공명: '직접 사용'한 스킬이 적중 시, 사용 1번당 1회 (2026-11-11 결정).
-        // 그 사용에서 나온 공격이면 간접 사용(난사 나머지 방향 · 검기 · 연속 공격 …)이 맞아도 충전.
-        // 사용 번호가 없는 공격(죽음의 메아리 · 솔라 메아리 재발동 · 화상 틱)은 제외. 직접 피해만 · 고정 피해 · 궁극기 제외
-        if (HasSpecial(Resonance) && d.type == DamageType.Direct && d.castId != 0 && !d.isFixed
-            && (d.source == null || d.source.Entry == null || d.source.Entry.kind != SkillKind.Ultimate)
-            && resonated.Add(d.castId))
+        // 화염 공명 (노션 2026-11-23): 적중 시 궁극기 게이지 +1%, 쿨타임 0.5초.
+        // [해석] '적중' = 스킬의 직접 피해 적중 (화상 틱 등 지속 피해 · 특수 피해 제외), 궁극기 자신은 제외 (예전 규칙에서 유지)
+        if (HasSpecial(Resonance) && d.type == DamageType.Direct && Time.time >= resonanceReadyAt
+            && (d.source == null || d.source.Entry == null || d.source.Entry.kind != SkillKind.Ultimate))
         {
             GameManager.I?.AddUltimateGauge(ResonanceGauge);
-            if (resonated.Count > 512) { resonated.Clear(); resonated.Add(d.castId); }   // 오래된 발동 번호 정리
+            resonanceReadyAt = Time.time + ResonanceCooldown;
         }
     }
 
@@ -197,7 +196,7 @@ public class Hellfire : Skill
             slaughterStacks = Mathf.Min(SlaughterMax, slaughterStacks + 1);
             slaughterLeft = SlaughterSeconds;   // 처치마다 모든 스택 갱신
         }
-        if (HasSpecial(Cycle) && P != null)
+        if (HasSpecial(Cycle) && P != null && FlameSword.DiedBurning(e))   // 화상 상태로 죽은 적만 (노션)
             foreach (var s in P.skills)
             {
                 var k = s.Entry.kind;
