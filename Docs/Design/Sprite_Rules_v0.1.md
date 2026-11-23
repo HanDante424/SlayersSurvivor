@@ -88,6 +88,11 @@
 - 이펙트 시트 · 칸 격자 시트는 칸 크기 · 픽셀 좌표 상수를 코드가 직접 써서 제외 (개별 판단).
 - 적용 현황: 에른 스탠드와 연출 포즈 9장 (`Atk_SlashReady` · `Atk_HorizontalSlashReady` · `Atk_OneHandSlash` · `Atk_HorizontalSlash` · `Atk_VerticalSlash` · `UltCharge` · `OverheadRaise` · `RearReach` · `RisingSlash_02`) 에 복사본 생성 (Play 미확인). 원본은 아직 `Resources` 에 있음.
 
+## 이펙트 큰 정사각형 시트 압축 (2026-11-23 사용자)
+- `Fx` 폴더 + 가로 · 세로 2의 거듭제곱 + 원본 4 MB 이상 → **밉맵 유지 + Windows BC7** (`Assets/Editor/SpriteImportSettings.cs`, 버전 7). 이전 규칙은 2의 거듭제곱이 아닌 큰 그림만 압축해서 2048² 시트가 오히려 무압축 + 밉맵 (장당 21 MB) 으로 남았음.
+- 비교 빌드 (프로젝트 복사본, 2026-11-23): 전체 808.9 → 732.9 MB, 텍스처 672.2 → 596.3 MB. 대상 7장 각 1/4 — `FireBreakerEruption` · `FireBreakerEruptionParticles` · `FireBreakerGroundRing` · `SolarSlashRing` (21.3 → 5.3 MB), `FireBreakerMark` · `SolarSlashBurnField` · `Kagutsuchi_P2_Fx_StompCrack` (5.3 → 1.3 MB). 사용자가 두 빌드를 보고 적용 결정.
+- 크기 · 픽셀 좌표는 그대로라 코드 수정 없음. 특정 그림이 거슬리면 `NoCompress` 에 이름 추가.
+
 ## 폴더 분류 (2026-11-22 사용자)
 - `Assets/Resources/Sprites/` 를 하위 폴더로 분류: `ErnStray/Character` (Idle · Run · RunSide · Stand) · `ErnStray/Pose` (Atk_* · 연출 포즈 · 가드, 줄인 `_s3` 복사본 포함) · `ErnStray/Fx` (스킬 이펙트 · 폭풍 재료) · `Kagutsuchi/Body` · `Kagutsuchi/Fx` · `Kagutsuchi/Map` · `Lenia/Character` · `Lenia/Fx` · `Ganiac` (Ganiak 포함) · `Enemy` · `Common` (Ground · Soul · Player_Run · FX_BurnFlame).
 - 파일 이름은 그대로 (폴더가 달라도 이름은 겹치면 안 됨). `.meta` 는 파일과 함께 이동했으므로 GUID · 임포트 설정 유지.
