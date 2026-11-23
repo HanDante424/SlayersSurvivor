@@ -73,6 +73,13 @@ public class Player : MonoBehaviour
     bool dashInvuln;
 
     public void SetInvulnerable(float seconds) => skillInvuln = Mathf.Max(skillInvuln, seconds);
+
+    /// <summary>
+    /// 피격 가로채기 (파이어 스트림 '화염의 창' 대기 중 반격): 피해를 받기 직전에 호출. true 를 돌려주면 그 피격 (피해 · 기절 · 밀려남) 을 막음.
+    /// 무적 · 치트 · 게임 상태 검사를 통과한 '실제로 맞을 피격' 에서만 호출됨. 쓰는 쪽이 끝나면 null 로 되돌릴 것
+    /// </summary>
+    public System.Func<bool> HitCounter;
+    bool CounterHit() => HitCounter != null && HitCounter();
     public void Root(float seconds) => rootLeft = Mathf.Max(rootLeft, seconds);
 
     // 홀드는 발동자가 소유하며, 높이는 표시 자식에만 적용한다.
@@ -244,6 +251,7 @@ public class Player : MonoBehaviour
     public void HitByBoss(float damage, float stun, Vector2 knockDir, float knockDistance)
     {
         if (DebugCheats.God || IsInvulnerable || GameManager.I.State != GameState.Playing) return;
+        if (CounterHit()) return;
         TakeDamage(damage);
         if (stun > 0f) { stunLeft = Mathf.Max(stunLeft, stun); Root(stun); }
         if (knockDistance > 0f && knockDir.sqrMagnitude > 0.0001f) knockVel = knockDir.normalized * Enemy.KnockSpeed(knockDistance);
@@ -672,6 +680,7 @@ public class Player : MonoBehaviour
     public void TakeDamage(float dmg, bool ignoreHitInvuln = false)
     {
         if (DebugCheats.God || (invuln > 0 && !ignoreHitInvuln) || IsInvulnerable || GameManager.I.State != GameState.Playing) return;
+        if (CounterHit()) return;
         hp -= dmg;
         invuln = 0.35f;
         CameraFollow.Shake(0.12f, 0.15f);
