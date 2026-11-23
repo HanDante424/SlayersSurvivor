@@ -116,6 +116,16 @@ public class FlameSword : Skill
         return (float)ticks * perTick;
     }
 
+    /// <summary>
+    /// 지속 피해의 "총 피해량" = 1틱 × 스택 (사용자 2026-11-23): 이 적 화상의 지금 1틱 피해 (스택 반영, 실제 화상과 같은 내림).
+    /// 타오르는 검 · 연쇄 폭발이 사용. 전체 지속시간까지 곱하는 것은 일괄 적용 (강제 발화 · 일촉즉발) 만 — TotalBurnDamage
+    /// </summary>
+    public static float OneTickDamage(Enemy e)
+    {
+        if (I == null || e == null || !I.burns.TryGetValue(e, out var b) || b.stacks <= 0) return 0f;
+        return Mathf.FloorToInt(I.TickDamage(b).amount + 1e-4f);
+    }
+
     /// <summary>화상 1틱 피해 (공격자 단계, 내림 전) — 살아있는 폭탄 · 일촉즉발 · 강제 발화가 참조</summary>
     DamageInfo TickDamage(Burn b, float scale = 1f)
     {
@@ -199,6 +209,7 @@ public class FlameSword : Skill
         if (melt != null) { CombatMods.Remove(melt); melt = null; }
         foreach (var b in burns.Values) Clear(b, removeFromMap: false);
         burns.Clear();
+        detonateReady.Clear();
         spreadQueue.Clear();
     }
 
@@ -220,6 +231,7 @@ public class FlameSword : Skill
     /// <summary>확산되는 불길: 화상 상태로 죽은 적 → 다음 Tick 에 주변 1스택 (연쇄가 한 프레임 재귀로 쌓이지 않게)</summary>
     void OnKilled(Enemy e)
     {
+        detonateReady.Remove(e);
         if (!burns.TryGetValue(e, out var b)) return;
         if (b.stacks > 0)
         {
@@ -243,8 +255,13 @@ public class FlameSword : Skill
         b.stacks = Mathf.Min(max, b.stacks + n);
         b.left = Duration;                              // 갱신: 피해 간격 타이머는 그대로
         ShowFx(b);
-        if (HasSpecial(Detonate) && b.stacks >= max) DetonateNow(b);
+        if (HasSpecial(Detonate) && b.stacks >= max && Time.time >= DetonateReadyAt(b.e)) DetonateNow(b);   // 대상당 쿨타임 안에는 다시 터지지 않음 (스택은 최대로 유지)
     }
+
+    // 일촉즉발 대상당 쿨타임 (사용자 2026-11-23): 한 적에게 터진 뒤 이 시간 동안은 다시 터지지 않음 — 연타 스킬이 최대 스택을 반복해서 채워 전체 지속시간분을 매번 지급받는 것을 막음
+    const float DetonateCooldown = 3f;
+    readonly Dictionary<Enemy, float> detonateReady = new Dictionary<Enemy, float>();
+    float DetonateReadyAt(Enemy e) => e != null && detonateReady.TryGetValue(e, out float t) ? t : 0f;
 
     /// <summary>일촉즉발: 남은 화상 피해 (남은 틱 수 × 틱 피해)를 지속 피해로 즉시, 모든 스택 소모</summary>
     void DetonateNow(Burn b)
@@ -253,6 +270,7 @@ public class FlameSword : Skill
         float remain = Permanent ? DurationStat : Mathf.Max(0f, b.left);
         var dmg = TickDamage(b, remain / Interval);
         var e = b.e;
+        detonateReady[e] = Time.time + DetonateCooldown;
         Clear(b, removeFromMap: true);
         e.Hit(dmg, Vector2.zero, Enemy.NoKnock);
     }

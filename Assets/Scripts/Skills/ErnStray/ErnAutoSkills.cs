@@ -1242,7 +1242,7 @@ public class FireBuster : AutoSkill
         {
             burning = new Dictionary<Enemy, float>();
             foreach (var e in SkillHits.InCircle(at, r, scan))
-                if (FlameSword.IsBurning(e)) burning[e] = FlameSword.TotalBurnDamage(e);
+                if (FlameSword.IsBurning(e)) burning[e] = FlameSword.OneTickDamage(e);   // 총 피해량 = 1틱 × 스택 (전체 지속시간 아님, 사용자 2026-11-23)
         }
 
         SkillHits.Circle(at, r, dmg, knock, e =>

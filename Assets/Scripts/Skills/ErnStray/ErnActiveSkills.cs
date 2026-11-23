@@ -843,6 +843,7 @@ public class FireBreaker : ActiveSkill
     const float GravityRange = 0.5f, GravityStun = 2f;      // 중력 붕괴: 공격 횟수 능력치 무효화 1당 범위 +50% · 기절 +2초
     const float ComboFinal = 0.4f;                          // 오버 드라이브 플레임 브레이커: 최종 피해량 -60% (×0.4)
     const int ComboBonus = 5;                               // 공격 횟수 +5
+    const int ComboExtraMul = 2;                            // 오버 드라이브 플레임 브레이커: 폭발마다 공격 횟수 × 2 만큼 추가 폭발
     // [임시] 노션에 없는 수치
     const float ReleaseKnock = 8f;                          // 방출: 적중 시 넉백 (기본 1)
     const float HotTime = 3f, HotStep = 0.25f;              // 불타는 대지: 장판 지속 시간 · 감속 갱신 간격 (화상 스택은 매 초)
@@ -890,8 +891,8 @@ public class FireBreaker : ActiveSkill
         new SpecialComboOption
         {
             id = ComboFlame, title = "오버 드라이브 플레임 브레이커", recipe = "연쇄 분출 + 지각 붕괴", requires = new[] { Chain, Crust },
-            desc = "매 공격 시 공격 횟수에 비례해 무작위 대상의 위치에 추가 사용합니다. 같은 적에게 중복 생성될 수 있습니다.",
-            specs = new[] { "'최종 피해량' -60%", "공격 횟수 +5", "공격 횟수 1당 추가 사용 +1" },
+            desc = "매 공격 시 공격 횟수의 2배만큼 무작위 대상의 위치에 추가 사용합니다. 같은 적에게 중복 생성될 수 있습니다.",
+            specs = new[] { "'최종 피해량' -60%", "공격 횟수 +5", "공격 횟수 1당 추가 사용 +2" },
         },
     };
 
@@ -951,7 +952,7 @@ public class FireBreaker : ActiveSkill
             rLast = r;
             bool last = i == count - 1;
             if (!Combo) Burst(at, r, cast, stun, last, true);   // 특수 조합: 기본 폭발 제거 (추가 사용만 발생, 사용자 2026-11-22)
-            if (Combo) StartCoroutine(Extras(at, r, cast.AsIndirect, stun, count, last));
+            if (Combo) StartCoroutine(Extras(at, r, cast.AsIndirect, stun, count * ComboExtraMul, last));   // 공격 횟수의 2배만큼 (사용자 2026-11-23)
             if (last) break;
             // 다음 폭발 위치 표시 = 바닥 레이어. 고리 그림 한 장을 코드로 차오르게 함 (시트 대신, 용량 절약). 그림이 없으면 예전 단색 원
             float rNext = ExplosionRadius(i + 1, nullified);
@@ -1099,11 +1100,13 @@ public class FireExecution : ActiveSkill
     const float BlazingRatio = 1f;          // 타오르는 검: 폭발 화상 총 피해량의 100% 고정 피해
     const int ComboBonus = 30;              // 플레임 디멘션 블레이드: 공격 횟수 +30
     const int ComboWaveEvery = 3;           // 플레임 디멘션 블레이드: 공격 횟수 3당 검기 1개
+    const float DimensionSlashRatio = 1f;   // 플레임 디멘션 블레이드: 검기가 맞은 자리의 연속 베기 = 기존 총 피해량의 100% (검기 40% 와 합쳐 140%) [해석, 사용자 의도]
 
     // [임시] 노션에 없는 수치
     const float WaveSpeed = 14f, WaveRange = 10f, WaveSize = 0.55f;   // 검기 속도 · 사거리 · 크기
-    const float SeekTurn = 540f;            // 유도 검기가 방향을 트는 속도 (도/초)
-    const float SeekRange = 12f;            // 유도 검기가 적을 찾는 거리
+    const float SeekTurn = 900f;            // 유도 검기가 방향을 트는 속도 (도/초). 사용자 2026-11-23: 유도 강화 (540 → 900)
+    const float SeekRange = 20f;            // 유도 검기가 적을 찾는 거리 (12 → 20, 화면 전체 정도)
+    const float SeekLife = 1.6f;            // 유도 검기가 날아가는 최대 시간 (일반 검기는 사거리 10 / 속도 14 ≈ 0.7초라 멀리 있는 적에게 닿기 전에 사라졌음)
     const float AfterimageMin = 2.5f, AfterimageMax = 7f;   // 잔영이 생기는 거리 (플레이어 기준)
     const float SmallComboScale = 0.35f;    // 소형 연속 베기 반경 = 본 베기 반경 × 이 값
     const int SmallComboHits = 8;           // 소형 연속 베기 1개의 베기 횟수
@@ -1215,6 +1218,14 @@ public class FireExecution : ActiveSkill
         float smallComboTotal = dimension
             ? (waves > 0 ? totalDamage * AfterimageRatio / waves : 0f)
             : totalDamage * AfterimageRatio / AfterimageCount;
+        if (dimension)
+        {
+            // 플레임 디멘션 블레이드 (사용자 2026-11-23 의도): 검기 하나마다 총 피해량의 40% (검기) + 그 자리에 생기는 연속 베기 100% = 140%.
+            // 총 피해량 = 최종 피해량 × 공격 횟수 (조합의 공격 횟수 +30 이 먼저 적용된 횟수). 검기 수는 공격 횟수 3당 1개 (나누지 않음)
+            float baseTotal = FinalDamageOf(BaseDamage) * hits;
+            waveDamage = baseTotal * WindRatio;
+            smallComboTotal = baseTotal * DimensionSlashRatio;
+        }
 
         // 그림 반지름 = 판정 반경 (범위 중간). 발동 동안 플레이어를 따라감. 조합은 연속 베기 삭제
         SpriteLoopEffect loop = null;
@@ -1246,7 +1257,7 @@ public class FireExecution : ActiveSkill
                 if (dimension)
                 {
                     // 연속 베기 없음: 공격 횟수 3당 유도 검기 1개
-                    if ((i + 1) % ComboWaveEvery == 0) FireWave(at, RandomDir(), waveDamage, indirect, true, smallComboTotal, r);
+                    if ((i + 1) % ComboWaveEvery == 0) FireWave(at, RandomDir(), waveDamage, indirect, true, smallComboTotal, r, hits, interval);   // 검기가 맞은 자리의 연속 베기 = 공격 횟수 (조합의 +30 포함) 만큼, 공격 간격마다 (사용자 2026-11-23)
                 }
                 else
                 {
@@ -1298,35 +1309,49 @@ public class FireExecution : ActiveSkill
         counts.Remove(e);
         Vector2 at = e.transform.position;
         float r = Range(Tier.Short) * BlazingRadiusMul;
-        float burn = FlameSword.TotalBurnDamage(e) * BlazingRatio;
+        float burn = FlameSword.OneTickDamage(e) * BlazingRatio;   // 화상 총 피해량 = 1틱 × 스택 (전체 지속시간 아님, 사용자 2026-11-23)
         Fx.Disc(at, r, Fx.FireBright, 0.25f);
         HitDebug.Circle(at, r, HitDebug.BlastColor);
         SkillHits.Circle(at, r, FixedOf(burn, cast), 1f);
     }
 
     /// <summary>검기 1개: 고정 피해 · 1회 적중 · 조합이면 적을 따라 휘고 적중 위치에 소형 연속 베기</summary>
-    void FireWave(Vector2 from, Vector2 dir, float damage, CastRef cast, bool seek, float comboTotal, float baseRadius)
+    void FireWave(Vector2 from, Vector2 dir, float damage, CastRef cast, bool seek, float comboTotal, float baseRadius, int slashCount = SmallComboHits, float slashStep = SmallComboTime / SmallComboHits)
     {
-        var p = Projectile.Spawn(from, dir, WaveSpeed, FixedOf(damage, cast), 1, WaveRange / WaveSpeed,
+        Enemy chosen = null;
+        if (seek)
+        {
+            // 유도: 쏠 때부터 적 한 마리를 골라 그쪽으로 겨냥 (범위 안 무작위 → 검기가 여러 적에게 나뉨), 없으면 받은 방향 그대로
+            var near = new List<Enemy>();
+            foreach (var e in Enemy.All)
+                if (e.hp > 0 && !e.IsWall && !e.Hidden && !e.Scripted && ((Vector2)e.transform.position - from).sqrMagnitude < SeekRange * SeekRange) near.Add(e);
+            if (near.Count > 0)
+            {
+                chosen = near[Random.Range(0, near.Count)];
+                Vector2 to = (Vector2)chosen.transform.position - from;
+                if (to.sqrMagnitude > 0.0001f) dir = to.normalized;
+            }
+        }
+        var p = Projectile.Spawn(from, dir, WaveSpeed, FixedOf(damage, cast), 1, (seek ? SeekLife : WaveRange / WaveSpeed),
                                  "FireBall", new Color(1f, 0.5f, 0.12f), WaveSize);
         if (seek)
         {
             var s = p.gameObject.AddComponent<SwordWaveSeeker>();
-            s.projectile = p; s.turn = SeekTurn; s.range = SeekRange;
+            s.projectile = p; s.turn = SeekTurn; s.range = SeekRange; s.target = chosen;
             float sr = baseRadius * SmallComboScale;
-            p.onHit = (e, pos) => StartCoroutine(SmallCombo(pos, sr, comboTotal, cast));
+            p.onHit = (e, pos) => StartCoroutine(SmallCombo(pos, sr, comboTotal, cast, slashCount, slashStep));
         }
     }
 
     /// <summary>소형 연속 베기: 그 자리에서 짧게 여러 번 베기 (고정 피해, 합계 total)</summary>
-    IEnumerator SmallCombo(Vector2 at, float r, float total, CastRef cast)
+    IEnumerator SmallCombo(Vector2 at, float r, float total, CastRef cast, int count = SmallComboHits, float step = SmallComboTime / SmallComboHits)
     {
         var frames = SpriteEffect.LoadFrames(SlashLoopSheet, SlashLoopRows, SlashLoopCols, 1f);
         var fx = SpriteLoopEffect.Spawn(frames, SlashLoopFps, null, at, SlashLoopOrder, r * SlashLoopCellPx / SlashLoopRadiusPx);
         if (fx == null) Fx.Circle(at, r, Fx.Fire, SmallComboTime);
-        DamageInfo d = FixedOf(total / SmallComboHits, cast);
-        float step = SmallComboTime / SmallComboHits;
-        for (int i = 0; i < SmallComboHits; i++)
+        count = Mathf.Max(1, count);
+        DamageInfo d = FixedOf(total / count, cast);
+        for (int i = 0; i < count; i++)
         {
             SkillHits.Circle(at, r, d, 0.5f);
             yield return new WaitForSeconds(step);
@@ -1340,18 +1365,25 @@ public class SwordWaveSeeker : MonoBehaviour
 {
     public Projectile projectile;
     public float turn, range;
+    /// <summary>쏠 때 고른 적 (죽거나 사라지면 가장 가까운 적으로 다시 고름)</summary>
+    public Enemy target;
 
     void Update()
     {
         if (projectile == null) return;
         Vector2 me = transform.position;
-        Enemy best = null;
-        float bestSq = range * range;
-        foreach (var e in Enemy.All)
+        Enemy best = target;
+        if (best == null || best.hp <= 0 || best.Hidden || best.Scripted || projectile.HasHit(best))
         {
-            if (e.hp <= 0 || e.IsWall || e.Hidden || e.Scripted || projectile.HasHit(e)) continue;
-            float sq = ((Vector2)e.transform.position - me).sqrMagnitude;
-            if (sq < bestSq) { bestSq = sq; best = e; }
+            best = null;
+            float bestSq = range * range;
+            foreach (var e in Enemy.All)
+            {
+                if (e.hp <= 0 || e.IsWall || e.Hidden || e.Scripted || projectile.HasHit(e)) continue;
+                float sq = ((Vector2)e.transform.position - me).sqrMagnitude;
+                if (sq < bestSq) { bestSq = sq; best = e; }
+            }
+            target = best;
         }
         if (best == null) return;
         Vector3 want = ((Vector2)best.transform.position - me).normalized;
@@ -1495,9 +1527,14 @@ public class FireStream : Skill
     };
 
     bool Ilseom => HasCombo(ComboIlseom);
-    /// <summary>특수 강화로 늘어난 최대 스택 (화염 일섬이 무효화하는 양) — [해석] 기본 3 스택은 그대로 (파이어 차지 화염 질주와 같은 해석)</summary>
+    /// <summary>특수 강화로 늘어난 최대 스택</summary>
     int BonusStacks => (HasSpecial(Continuous) ? ContinuousStacks : 0) + (HasSpecial(Endless) ? EndlessStacks : 0);
-    int MaxStacks => BaseMaxStacks + (Ilseom ? 0 : BonusStacks);
+    /// <summary>무효화 전 최대 스택 = 기본 3 + 특수 강화로 늘어난 스택</summary>
+    int OriginalMaxStacks => BaseMaxStacks + BonusStacks;
+    /// <summary>화염 일섬이 최대 스택 능력치를 무효화하면 최대 스택 1 (사용자 2026-11-23: 스택 능력치 무효화 = 최대 스택을 1로, 예외 처리는 추후)</summary>
+    int MaxStacks => Ilseom ? 1 : OriginalMaxStacks;
+    /// <summary>무효화한 스택 수 = 무효화 전 최대 스택 - 1 (최종 피해량 증가의 기준)</summary>
+    int NullifiedStacks => Ilseom ? OriginalMaxStacks - 1 : 0;
 
     /// <summary>특수 강화의 쿨타임 '감소' 배율만 (고속 질주 · 무한 기동). 화염 일섬이 무효화</summary>
     float SpecialReductionMul => (HasSpecial(Sprint) ? SprintCooldown : 1f) * (HasSpecial(Endless) ? EndlessCooldown : 1f);
@@ -1522,7 +1559,7 @@ public class FireStream : Skill
     /// <summary>무한 기동 ×0.25 · 화염 일섬 (1 + 10 + 전환 쿨감 × 5 + 무효화 스택 × 1.5) 를 곱한 최종 배율</summary>
     protected override float SpecialFinalDamageMul =>
         (HasSpecial(Endless) ? EndlessFinal : 1f)
-        * (Ilseom ? 1f + IlseomFinal + IlseomConvertedReduction * IlseomPerReduction + BonusStacks * IlseomPerStack : 1f);
+        * (Ilseom ? 1f + IlseomFinal + IlseomConvertedReduction * IlseomPerReduction + NullifiedStacks * IlseomPerStack : 1f);
 
     protected override void OnSpecialUpgrade(int lv, string id)
     {

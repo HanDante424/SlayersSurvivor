@@ -1,0 +1,1519 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>슬레이어즈 서바이버 밸런스 시뮬레이터</title>
+<style>
+  :root { --bg:#14161b; --panel:#1c1f27; --panel2:#232733; --line:#2f3443; --text:#e6e8ee; --dim:#9aa1b2; --accent:#ff9a3c; --good:#5ad17a; --bad:#ff6b6b; --warn:#f4c04e; }
+  * { box-sizing: border-box; }
+  html, body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--text); font:13px/1.45 system-ui, "Malgun Gothic", sans-serif; display:flex; flex-direction:column; overflow:hidden; }
+  header { flex:none; }
+  header { padding:10px 16px; border-bottom:1px solid var(--line); display:flex; gap:12px; align-items:baseline; flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0; }
+  header .sub { color:var(--dim); font-size:12px; }
+  /* 왼쪽 (조정 메뉴) · 오른쪽 (결과 시트) 이 각자 따로 스크롤됨 */
+  .layout { flex:1; min-height:0; display:grid; grid-template-columns: minmax(400px, 480px) 1fr; gap:12px; padding:12px; align-items:stretch; overflow:hidden; }
+  .layout > div { min-height:0; overflow-y:auto; overflow-x:hidden; padding-right:6px; scrollbar-width:thin; scrollbar-color:#3a4052 transparent; }
+  .layout > div::-webkit-scrollbar { width:8px; }
+  .layout > div::-webkit-scrollbar-thumb { background:#3a4052; border-radius:4px; }
+  @media (max-width: 1000px) {
+    body { display:block; overflow:auto; }
+    .layout { display:block; overflow:visible; }
+    .layout > div { overflow:visible; padding-right:0; }
+  }
+  .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:12px; }
+  .panel h2 { font-size:13px; margin:0 0 8px; color:var(--accent); display:flex; justify-content:space-between; align-items:center; }
+  .row { display:flex; align-items:center; gap:8px; margin:3px 0; }
+  .row label { flex:1; color:var(--dim); font-size:12px; }
+  .row .u { color:var(--dim); font-size:11px; min-width:0; }
+  input[type=number], input[type=text] { background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:4px; padding:3px 5px; font:inherit; }
+  input[type=number] { width:78px; text-align:right; }
+  input[type=number].changed { border-color:var(--accent); color:var(--accent); }
+  select, button { background:var(--panel2); border:1px solid var(--line); color:var(--text); border-radius:4px; padding:4px 9px; font:inherit; cursor:pointer; }
+  button:hover { border-color:var(--accent); }
+  button.primary { background:#3a2a17; border-color:var(--accent); color:var(--accent); }
+  button.small { padding:1px 7px; font-size:11px; }
+  details { border:1px solid var(--line); border-radius:6px; margin:6px 0; background:var(--panel2); }
+  details > summary { cursor:pointer; padding:6px 9px; display:flex; align-items:center; gap:8px; list-style:none; }
+  details > summary::-webkit-details-marker { display:none; }
+  details[open] > summary { border-bottom:1px solid var(--line); }
+  details .body { padding:6px 10px 8px; }
+  .tag { font-size:10px; padding:1px 5px; border-radius:3px; background:#2c3142; color:var(--dim); }
+  .tag.auto { color:#7fc4ff; } .tag.manual { color:#ffb36b; } .tag.move { color:#9be59b; } .tag.pas { color:#ff8a70; }
+  .tier { margin:6px 0 2px; color:var(--dim); font-size:11px; }
+  .opt { display:flex; gap:6px; align-items:flex-start; margin:2px 0; font-size:12px; }
+  .opt .d { color:var(--dim); font-size:11px; }
+  .opt .n { color:var(--warn); font-size:10px; }
+  .combo { border:1px dashed var(--accent); border-radius:5px; padding:4px 7px; margin-top:6px; }
+  .combo.off { opacity:.45; border-color:var(--line); }
+  .cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px; margin-bottom:10px; }
+  .card { background:var(--panel2); border:1px solid var(--line); border-radius:6px; padding:8px 10px; }
+  .card .k { color:var(--dim); font-size:11px; } .card .v { font-size:18px; font-weight:600; margin-top:2px; }
+  .card .dl { font-size:11px; }
+  table { border-collapse:collapse; width:100%; font-size:12px; }
+  th, td { padding:4px 7px; border-bottom:1px solid var(--line); text-align:right; white-space:nowrap; }
+  th:first-child, td:first-child { text-align:left; }
+  th { color:var(--dim); font-weight:500; }
+  tr.sub td { color:var(--dim); font-size:11px; padding-left:18px; }
+  tr.sub td:first-child { padding-left:22px; }
+  .up { color:var(--good); } .down { color:var(--bad); } .dim { color:var(--dim); }
+  canvas { width:100%; height:200px; background:var(--panel2); border:1px solid var(--line); border-radius:6px; display:block; }
+  .legend { display:flex; flex-wrap:wrap; gap:4px 12px; margin:6px 0 0; font-size:11px; color:var(--dim); }
+  .legend i { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:4px; vertical-align:middle; }
+  .tabs { display:flex; gap:6px; margin-bottom:10px; }
+  .tabs button.on { border-color:var(--accent); color:var(--accent); }
+  .hint { color:var(--dim); font-size:11px; margin:4px 0; }
+  .toolbar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; align-items:center; }
+  .note { border-left:3px solid var(--warn); padding:4px 8px; color:var(--dim); font-size:11px; background:#1f1d14; margin:6px 0; }
+  .calc td.s { color:var(--dim); text-align:left; }
+  .calc td.f { text-align:right; font-variant-numeric:tabular-nums; }
+  .chip { display:inline-flex; gap:4px; align-items:center; background:#2c3142; border-radius:10px; padding:1px 4px 1px 8px; margin:2px 3px 2px 0; font-size:11px; }
+  .chip button { padding:0 5px; border:none; background:transparent; color:var(--dim); }
+  .item { border:1px solid var(--line); border-radius:6px; padding:6px 8px; margin:6px 0; background:var(--panel2); }
+  .stats { display:grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap:5px; margin:2px 0 8px; }
+  .stats .st { background:var(--panel); border:1px solid var(--line); border-radius:5px; padding:4px 7px; }
+  .stats .k { color:var(--dim); font-size:10px; } .stats .v { font-size:15px; font-weight:600; } .stats .s { color:var(--dim); font-size:10px; }
+  .layout .panel > h2 { cursor:pointer; user-select:none; }
+  .layout .panel > h2::before { content:'▾'; color:var(--dim); margin-right:6px; }
+  .layout .panel.collapsed > h2::before { content:'▸'; }
+  .nbar { display:flex; align-items:center; gap:6px; margin-bottom:10px; padding:6px 10px; background:var(--panel); border:1px solid var(--line); border-radius:8px; flex-wrap:wrap; }
+  .nbar b { font-size:12px; color:var(--dim); font-weight:500; }
+  .nbar button { min-width:42px; }
+  .nbar button.on { background:#3a2a17; border-color:var(--accent); color:var(--accent); font-weight:600; }
+  .panel.collapsed > *:not(h2) { display:none; }
+  .panel.collapsed > h2 { margin-bottom:0; }
+  .optrow { display:flex; align-items:flex-start; gap:4px; }
+  .optrow > .opt { flex:1; }
+  .gear { padding:0 6px; font-size:11px; line-height:18px; margin-top:1px; color:var(--dim); }
+  .gear.on { border-color:var(--accent); color:var(--accent); }
+  .ed { margin:2px 0 6px 22px; padding:5px 8px; border-left:2px solid var(--accent); background:#1f1b16; border-radius:0 5px 5px 0; }
+  .ed .row label { font-size:11px; }
+  .ed .row .u { font-size:10px; }
+  .baltbl { margin-bottom:6px; } .baltbl th, .baltbl td { padding:3px 6px; } .baltbl input { width:90px; }
+  @keyframes flashbg { 0% { background:#5a3a14; } 100% { background:transparent; } }
+  details.flash { animation: flashbg 1.6s ease-out; }
+  .switch { display:inline-flex; align-items:center; gap:5px; }
+  .switch input { accent-color: var(--accent); width:15px; height:15px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>슬레이어즈 서바이버 밸런스 시뮬레이터</h1>
+  <span class="sub">에른 스트레이 · 노션 2026-11-23 기준 · 패시브 3종 + 스킬 12종의 특수 강화 · 조합 전부 · 아이템 · 게임 피해 공식 (Damage.cs) 과 같은 순서</span>
+</header>
+
+<div class="layout">
+  <!-- ───── 왼쪽: 설정 ───── -->
+  <div>
+    <div class="panel">
+      <h2>전역 설정</h2>
+      <div id="globalBox"></div>
+      <div class="toolbar" style="margin-top:8px">
+        <button id="btnReset">전부 기본값으로</button>
+        <button id="btnExport">설정 복사</button>
+        <button id="btnImport">설정 붙여넣기</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h2>계산 포함 (프리셋) <span class="hint" style="margin:0">끄면 값은 남아 있고 계산에서만 빠짐</span></h2>
+      <div id="presetBox"></div>
+    </div>
+    <div class="panel">
+      <h2>패시브 <span class="hint" style="margin:0">각각 켜고 끄며 비교</span></h2>
+      <div id="passiveBox"></div>
+    </div>
+    <div class="panel">
+      <h2>스킬</h2>
+      <div class="hint">체크한 스킬만 시뮬레이션에 들어갑니다. 수치 칸의 주황색 = 기본값에서 바꾼 것. 특수 강화는 단계마다 1개 (게임과 같음).</div>
+      <div id="skillBox"></div>
+      <div class="note">"시뮬레이터 영향 없음" 표시가 붙은 특수 강화는 이동 · 범위 · 연출만 바꾸므로 계산에는 들어가지 않습니다. 범위 증가는 "범위 안 적 수" 로 직접 가정하세요.</div>
+    </div>
+    <div class="panel">
+      <h2>아이템 · 세트 효과 <button class="small" id="btnAddItem">+ 아이템</button></h2>
+      <div class="hint">아이템이 게임에 들어오면 여기에 같은 방식으로 입력하면 됩니다. 효과는 항목을 골라 값을 넣는 방식이고, 같은 세트 이름을 가진 아이템 수가 필요 개수 이상이면 세트 효과가 켜집니다.</div>
+      <div id="itemBox"></div>
+      <div class="toolbar" style="margin-top:6px"><b class="dim" style="font-size:12px">세트 효과</b><button class="small" id="btnAddSet">+ 세트 효과</button></div>
+      <div id="setBox"></div>
+    </div>
+  </div>
+
+  <!-- ───── 오른쪽: 결과 ───── -->
+  <div>
+    <div class="nbar">
+      <b>범위 안 적 수</b>
+      <button data-n="1">1마리</button><button data-n="5">5마리</button><button data-n="10">10마리</button>
+      <span class="hint" style="margin:0 0 0 8px" id="nInfo"></span>
+      <select id="bossSel" title="주 대상 체력을 보스 체력으로 맞춤 (보스면 소각 0.4% 적용)"><option value="">대상 체력 프리셋…</option></select>
+      <span style="flex:1"></span>
+      <button id="btnResetAll" title="모든 세팅 (수치 조정 · 스킬 · 패시브 · 아이템 · 확정 · 프리셋 · 적 수 · 보스 체력) 을 처음 상태로">모든 세팅 초기화</button>
+      <button id="btnEv"title="기댓값 시트의 모든 빌드를 다시 계산">기댓값 다시 계산</button>
+      <label class="switch" title="끄면 5 · 10 · 15레벨에서 반드시 하나씩 고른 빌드만 계산"><input type="checkbox" id="evNone" checked> 선택 안 함 포함</label>
+      <span class="hint" style="margin:0" id="evStatus"></span>
+    </div>
+    <div class="tabs">
+      <button data-tab="result" class="on">결과</button>
+      <button data-tab="sweep">값 훑어보기 (민감도)</button>
+      <button data-tab="spec">스킬 스펙 시트</button>
+      <button data-tab="ev">기댓값 시트 (전체 빌드)</button>
+      <button data-tab="bal">밸패 수정</button>
+      <button data-tab="patch">패치 변경 목록</button>
+      <button data-tab="calc">피해 계산기</button>
+    </div>
+
+    <div id="tab-result">
+      <div class="toolbar">
+        <button class="primary" id="btnBase">지금 결과를 기준으로 저장</button>
+        <button id="btnBaseClear">기준 지우기</button>
+        <span class="hint" id="baseInfo"></span>
+      </div>
+      <div class="cards" id="cards"></div>
+      <div class="panel"><h2>보스 처치 시간 <span class="hint" style="margin:0" id="bossInfo"></span></h2><div id="bossTable"></div>
+        <div class="hint">주 대상 (보스 1마리) 에게 들어간 누적 피해 기준 — 범위 안 적 수가 많아도 보스 한 마리에 들어간 피해만 셉니다. 시뮬레이션 시간 안에 못 잡으면 평균 DPS 로 예상 (~). 2페이즈 합계는 1페이즈를 깎은 직후 2페이즈가 같은 DPS 로 이어진다고 가정.</div></div>
+      <div class="panel"><h2>초당 피해</h2><canvas id="chartDps" width="900" height="260"></canvas><div class="legend" id="legend"></div></div>
+      <div class="panel"><h2>스킬별 피해</h2><div id="skillTable"></div>
+        <div class="hint">▸ 를 누르면 피해 종류별 (베기 · 폭발 …) 상세. "조건부" = 화상 · 기절 상태 보너스 덕분에 더 들어간 피해량.</div></div>
+    </div>
+
+    <div id="tab-sweep" style="display:none">
+      <div class="panel">
+        <h2>값 훑어보기</h2>
+        <div class="hint">한 가지 수치를 여러 값으로 바꿔 가며 결과를 비교합니다. 예: 화상 지속시간을 1~8초로 바꾸면 화상 상태 보너스가 어디서부터 효과를 못 내는지 보입니다.</div>
+        <div class="toolbar">
+          <select id="swParam" style="max-width:340px"></select>
+          <label>시작 <input type="number" id="swFrom" step="any" value="1"></label>
+          <label>끝 <input type="number" id="swTo" step="any" value="8"></label>
+          <label>칸 수 <input type="number" id="swN" step="1" value="8" style="width:55px"></label>
+          <button class="primary" id="btnSweep">실행</button>
+        </div>
+        <div id="swOut"></div>
+      </div>
+    </div>
+
+    <div id="tab-spec" style="display:none">
+      <div class="panel">
+        <h2>스킬 스펙 시트 <span class="hint" style="margin:0" id="specInfo"></span></h2>
+        <div class="toolbar">
+          <label class="switch"><input type="checkbox" id="specOnly"> 체크한 스킬만</label>
+          <span class="hint" style="margin:0">각 스킬을 혼자 사용했을 때의 값 (패시브 · 아이템은 켜진 그대로 적용). 열 이름을 누르면 정렬, 행을 누르면 피해 종류별 상세.</span>
+        </div>
+        <div id="specTable" style="overflow-x:auto"></div>
+        <div class="hint">"기본 대비"는 특수 강화 · 기본 강화 횟수 · 조합 없이 같은 수치로 돌린 값과의 비율. 피해량 %는 기본 강화 · 특수 강화 · 전역 · 아이템의 합, 최종 피해량은 스킬 몫 × 옥염 · 흡수 가열 · 아이템 · 전역의 곱 (시간 평균).</div>
+      </div>
+    </div>
+
+    <div id="tab-ev" style="display:none">
+      <div class="panel">
+        <h2>기댓값 시트 <span class="hint" style="margin:0" id="evInfo"></span></h2>
+        <div class="hint">각 스킬이 만들 수 있는 모든 특수 강화 조합 (5 · 10 · 15레벨 각 1개 또는 선택 안 함) × 특수 조합 켜기를 하나씩 단독으로 돌려, 스킬마다 낮은 값 · 높은 값 · <b>기댓값 (모든 빌드를 같은 확률로 골랐을 때의 평균)</b> 을 구합니다. 전체 패시브 · 아이템 · 전역 설정은 지금 그대로 적용됩니다.</div>
+        <div id="evChart"></div>
+        <div id="evSummary" style="overflow-x:auto"></div>
+      </div>
+      <div class="panel">
+        <h2>모든 빌드 <select id="evFilter"></select></h2>
+        <div id="evBuilds" style="overflow-x:auto"></div>
+      </div>
+    </div>
+
+    <div id="tab-bal" style="display:none">
+      <div class="panel">
+        <h2>밸패 수정 <span class="hint" style="margin:0" id="balInfo"></span></h2>
+        <div class="toolbar">
+          <input type="text" id="balQ" placeholder="스킬 · 강화 · 항목 검색 (예: 공격 횟수, 최종, 쿨타임)" style="width:300px">
+          <label class="switch"><input type="checkbox" id="balOnly"> 바꾼 것만</label>
+          <button id="balOpenAll">모두 펼치기</button><button id="balCloseAll">모두 접기</button>
+        </div>
+        <div class="toolbar" style="padding:6px 8px;border:1px dashed var(--accent);border-radius:6px">
+          <button class="primary" id="lockBtn" title="지금 수치를 새 기본값으로 저장">밸패 확정 (현재 값을 기본값으로 적용)</button>
+          <button id="lockRevert">확정값으로 되돌리기</button>
+          <button id="lockOrig">게임 원본으로 되돌리기</button>
+          <select id="lockHist"><option value="">확정 이력…</option></select>
+          <span class="hint" style="margin:0" id="lockInfo"></span>
+        </div>
+        <div class="hint">스킬과 패시브의 수치 · 특수 강화 · 조합의 조정 가능한 값을 한 곳에서 고칩니다. "현재"를 바꾸면 모든 시트에 바로 반영되고 바꾼 칸은 주황색입니다. 각 강화의 <b>단독 효과</b> = 그 강화 하나만 골랐을 때 스킬 DPS 가 기본 (강화 없음) 의 몇 배인지.</div>
+        <div id="balTable"></div>
+      </div>
+    </div>
+
+    <div id="tab-patch" style="display:none">
+      <div class="panel">
+        <h2>패치 변경 목록 <span class="hint" style="margin:0" id="patchInfo"></span></h2>
+        <div class="toolbar">
+          <button class="primary" id="btnPatchCopy">텍스트로 복사</button>
+          <button id="btnPatchCsv">CSV 로 복사</button>
+          <button id="btnPatchReset">모든 바꾼 수치 초기화</button>
+          <span class="hint" style="margin:0">기본값에서 바꾼 스킬 수치 · 특수 강화 수치만 모아 보여줍니다 (공격 횟수 · 최종 피해량 · 쿨타임 · 기절 등). 전역 설정과 아이템은 포함하지 않습니다.</span>
+        </div>
+        <div id="patchTable" style="overflow-x:auto"></div>
+      </div>
+    </div>
+
+    <div id="tab-calc" style="display:none">
+      <div class="panel">
+        <h2>피해 계산기 (게임과 같은 순서로 한 줄씩)</h2>
+        <div class="hint">① 공격자 단계 → ② 대상 단계 → 내림. 고정 피해는 모든 증감을 건너뜀.</div>
+        <div id="calcBox"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="sim.js"></script>
+<script>
+// ═════════ 상태 ═════════
+const STORE = 'slayers.balancesim.v2';
+function defaultState() {
+  const s = {
+    G: {}, items: [], sets: [], base: null, migr: 2, ov: {}, bv: {}, lock: null, locks: [], ui: { fold: {} }, inc: { basic: true, passive: true, item: true },
+    pas: {
+      fs: { on: true, useBasic: true, useSpec: true, params: {}, ups: { dps: 0, stk: 0, dur: 0 }, picks: {}, open: false },
+      hf: { on: false, useBasic: true, useSpec: true, params: {}, ups: { fin: 0, mob: 0, dot: 0 }, picks: {}, open: false },
+      ab: { on: false, useBasic: true, useSpec: true, params: {}, ups: { fin: 0, cd: 0, stk: 0 }, picks: {}, open: false },
+    },
+    skills: [],
+    calc: { initial: 10, pct: 0.3, flat: 0, finals: '1.5, 1.2', burn: 1, stun: 1, recv: 1, fixed: false },
+  };
+  for (const k in BASE_GLOBAL) s.G[k] = BASE_GLOBAL[k].v;
+  for (const d of SKILLS) s.skills.push({ id: d.id, on: ['fireexec', 'overslash', 'firebreaker', 'firebuster'].includes(d.id), params: {}, picks: {}, combo: null, ups: { dmg: 0, cd: 0 }, useBasic: true, open: false });
+  return s;
+}
+function mergeState(d, j) {
+  d.G = Object.assign(d.G, j.G || {});
+  for (const k in BASE_GLOBAL) if (typeof d.G[k] !== 'number' || !isFinite(d.G[k])) d.G[k] = BASE_GLOBAL[k].v;   // 저장된 값이 깨졌으면 (NaN → null) 기본값으로
+  if (!(j.migr >= 1) && d.G.minDmg === 0) d.G.minDmg = 1;
+  if (!(j.migr >= 2)) d.G.killRate = 0;   // 2026-11-23: 처치 효과는 기본 미적용 (저장된 0.5 를 0 으로)   // 2026-11-23: 게임이 최소 피해 1 로 바뀜 → 이전에 저장된 0 은 새 기본값으로
+  d.migr = 2;
+  for (const k of ['fs', 'hf', 'ab']) if (j.pas && j.pas[k]) d.pas[k] = Object.assign(d.pas[k], j.pas[k]);
+  for (const sc of d.skills) { const x = (j.skills || []).find(q => q.id === sc.id); if (x) Object.assign(sc, x); }
+  d.items = j.items || []; d.sets = j.sets || [];
+  d.ui = j.ui || d.ui;
+  d.ov = j.ov || {}; d.bv = j.bv || {};
+  d.lock = j.lock || null; d.locks = j.locks || [];
+  d.inc = Object.assign(d.inc, j.inc || {});
+  d.base = j.base || null; d.calc = Object.assign(d.calc, j.calc || {});
+  return d;
+}
+let S = defaultState();
+try { const j = JSON.parse(localStorage.getItem(STORE) || 'null'); if (j) S = mergeState(defaultState(), j); } catch (e) {}
+function save() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} }
+
+const COLORS = ['#ff9a3c', '#7fc4ff', '#9be59b', '#d58cff', '#ffd36b', '#ff6b8b', '#5fd6c9', '#b0b8ff', '#e0a070', '#8fd14f', '#f0f0f0', '#c46a3a', '#6aa0ff'];
+const colorOf = {};
+SKILLS.forEach((d, i) => colorOf[d.id] = COLORS[i % COLORS.length]);
+colorOf.passive = '#ff5a3c';
+
+const fmt = n => n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e4 ? (n / 1e3).toFixed(1) + 'k' : Math.round(n).toLocaleString();
+const fmtD = n => n.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });   // DPS 는 소수점 3째 자리까지
+const fmt1 = n => (Math.round(n * 10) / 10).toLocaleString();
+const pct = n => (n * 100).toFixed(0) + '%';
+function deltaHtml(cur, base, isTime, f) {
+  f = f || fmt;
+  if (base == null) return '';
+  const d = cur - base;
+  if (Math.abs(d) < 1e-9) return '<span class="dim"> ±0</span>';
+  const rel = base ? ' (' + (d / base * 100).toFixed(0) + '%)' : '';
+  const good = isTime ? d < 0 : d > 0;
+  return ` <span class="${good ? 'up' : 'down'}">${d > 0 ? '+' : ''}${f(d)}${base ? rel : ''}</span>`;
+}
+
+// ═════════ 입력 UI 도우미 ═════════
+function numInput(value, def, step, onchange) {
+  const i = document.createElement('input');
+  i.type = 'number'; i.step = step || 'any'; i.value = value;
+  if (Math.abs(value - def) > 1e-9) i.className = 'changed';
+  i.addEventListener('change', () => { const v = parseFloat(i.value); onchange(isNaN(v) ? def : v); save(); rerender(); });
+  return i;
+}
+function row(label, input, unit) {
+  const r = document.createElement('div'); r.className = 'row';
+  const l = document.createElement('label'); l.textContent = label; r.appendChild(l); r.appendChild(input);
+  if (unit) { const u = document.createElement('span'); u.className = 'u'; u.textContent = unit; r.appendChild(u); }
+  return r;
+}
+function radioOpt(name, checked, title, desc, note, onpick) {
+  const l = document.createElement('label'); l.className = 'opt';
+  const r = document.createElement('input'); r.type = 'radio'; r.name = name; r.checked = checked;
+  r.addEventListener('change', () => { onpick(); save(); rerender(); });
+  l.appendChild(r);
+  l.insertAdjacentHTML('beforeend', `<span><b>${title}</b> <span class="d">${desc || ''}</span>${note ? ` <span class="n">[${note}]</span>` : ''}</span>`);
+  return l;
+}
+// ═════════ 특수 강화 수치 조정 ═════════
+const OPEN_ED = new Set();
+const MODLBL = {
+  dmgPct: ['피해량 %', '0.5 = +50%'], finalMul: ['최종 피해량 배율', '1.5 = ×1.5'], cdMul: ['쿨타임 배율', '0.75 = 25% 단축 · 1.25 = 25% 증가'],
+  vsBurn: ['화상 상태 적 최종 피해량 배율', ''], vsStun: ['기절 상태 적 최종 피해량 배율', ''], stunAdd: ['기절 증가', '초'], countAdd: ['공격 횟수 증가', ''],
+  intervalMul: ['공격 간격 배율', '0.25 = 4배 빠름'], delayMul: ['폭발 간격 · 딜레이 배율', ''], durAdd: ['지속 시간 증가', '초'], durPct: ['지속 시간 %', '1 = +100% · -0.75 = -75%'],
+  hitCdRed: ['적중 시 남은 쿨타임 감소', '0.025 = 2.5%'], hitCdSec: ['적중 시 남은 쿨타임 감소', '초'], burnAdd: ['적중 시 화상 스택 증가', ''], stacksAdd: ['최대 스택 증가', ''],
+  'vuln.per': ['받는 최종 피해량 (스택당)', '0.05 = +5%'], 'vuln.max': ['받는 최종 피해량 최대 스택', ''],
+  'vulnBurning.per': ['받는 최종 피해량 (스택당)', '0.05 = +5%'], 'vulnBurning.max': ['받는 최종 피해량 최대 스택', ''],
+  'nullCd.base': ['쿨타임 감소 무효화: 기본 최종 피해량', '1 = +100%'], 'nullCd.perPct': ['무효화한 감소 1%당 최종 피해량', '0.02 = +2%'], 'nullCd.perStack': ['무효화한 스택 1당 최종 피해량', '1.5 = +150%'],
+  extrasN: ['추가 사용 횟수', ''], extrasSetN: ['추가 사용 횟수', ''],
+};
+/** 이 특수 강화 · 조합에서 화면으로 조정할 수 있는 수치 목록 */
+function editFields(o) {
+  const out = [], m = o.mods || {};
+  for (const k in m) {
+    const v = m[k];
+    if (k === 'flags') continue;
+    if (k === 'extras' || k === 'extrasSet') { const kk = k + 'N'; out.push({ path: 'mods.' + kk, label: MODLBL[kk][0], unit: MODLBL[kk][1], def: v.length }); continue; }
+    if (typeof v === 'number') out.push({ path: 'mods.' + k, label: (MODLBL[k] || [k, ''])[0], unit: (MODLBL[k] || [k, ''])[1], def: v });
+    else if (v && typeof v === 'object' && !Array.isArray(v))
+      for (const kk in v) if (typeof v[kk] === 'number') out.push({ path: 'mods.' + k + '.' + kk, label: (MODLBL[k + '.' + kk] || [k + '.' + kk, ''])[0], unit: (MODLBL[k + '.' + kk] || [k + '.' + kk, ''])[1], def: v[kk] });
+  }
+  for (const k in o.nums || {}) out.push({ path: 'nums.' + k, label: o.nums[k].l, unit: o.nums[k].u || '', def: o.nums[k].v });
+  return out;
+}
+function ovChanged(id) { const o = S.ov[id]; return !!o && Object.keys(o).length > 0; }
+/** 옵션 행 (라디오 + ⚙ 수치 조정) · 조합 행에서도 사용 */
+function gearAndEditor(o, host) {
+  const fields = editFields(o);
+  if (!fields.length) return null;
+  const g = document.createElement('button'); g.className = 'small gear' + (ovChanged(o.id) ? ' on' : ''); g.textContent = '⚙'; g.title = '수치 조정' + (ovChanged(o.id) ? ' (바꾼 값 있음)' : '');
+  const ed = document.createElement('div'); ed.className = 'ed'; ed.style.display = OPEN_ED.has(o.id) ? '' : 'none';
+  for (const f of fields) {
+    const cur = S.ov[o.id] && S.ov[o.id][f.path] != null ? S.ov[o.id][f.path] : f.def;
+    const inp = numInput(cur, f.def, 'any', v => {
+      if (Math.abs(v - f.def) < 1e-9) { if (S.ov[o.id]) { delete S.ov[o.id][f.path]; if (!Object.keys(S.ov[o.id]).length) delete S.ov[o.id]; } }
+      else { (S.ov[o.id] = S.ov[o.id] || {})[f.path] = v; }
+    });
+    ed.appendChild(row(f.label, inp, f.unit));
+  }
+  if (ovChanged(o.id)) {
+    const rb = document.createElement('button'); rb.className = 'small'; rb.textContent = '이 강화 수치 초기화';
+    rb.addEventListener('click', () => { delete S.ov[o.id]; save(); rerender(); });
+    ed.appendChild(rb);
+  }
+  g.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); if (OPEN_ED.has(o.id)) OPEN_ED.delete(o.id); else OPEN_ED.add(o.id); ed.style.display = OPEN_ED.has(o.id) ? '' : 'none'; });
+  return { g, ed };
+}
+function optRow(name, checked, o, onpick) {
+  const wrap = document.createElement('div');
+  const line = document.createElement('div'); line.className = 'optrow';
+  line.appendChild(radioOpt(name, checked, o.name, o.desc, o.note, onpick));
+  const ge = gearAndEditor(o);
+  if (ge) line.appendChild(ge.g);
+  wrap.appendChild(line);
+  if (ge) wrap.appendChild(ge.ed);
+  return wrap;
+}
+
+function specialBlock(body, idPrefix, specials, picks) {
+  for (const lv of [5, 10, 15]) {
+    const list = specials.filter(x => x.lv === lv);
+    if (!list.length) continue;
+    const t = document.createElement('div'); t.className = 'tier'; t.textContent = `Lv.${lv} 특수 강화`; body.appendChild(t);
+    body.appendChild(radioOpt(idPrefix + lv, !picks[lv], '', '선택 안 함', null, () => { delete picks[lv]; }));
+    for (const o of list) body.appendChild(optRow(idPrefix + lv, picks[lv] === o.id, o, () => { picks[lv] = o.id; }));
+  }
+}
+
+/**
+ * 최고 DPS 기본 강화: 총 N 회를 스킬은 (피해량 강화, 쿨타임 강화) 에, 패시브는 고유 강화 3종에 나눠
+ * DPS 가 가장 높은 배분을 찾아 기존 강화 횟수 칸을 그대로 덮어씀. 범위 강화는 시뮬레이터에 영향이 없어 제외.
+ * 스킬은 지금 고른 특수 강화 · 조합 · 수치 기준으로 그 스킬 혼자의 DPS, 패시브는 켜져 있는 스킬 전체의 총 피해 기준.
+ */
+function fillBestBasic(N) {
+  S.inc.basic = true;
+  const base = makeCfg(S);
+  let nSkills = 0, nPass = 0;
+  // ── 스킬: 피해량 k + 쿨타임 (N-k)
+  for (const sc of S.skills) {
+    const mine = base.skills.find(x => x.id === sc.id);
+    let best = null;
+    for (let k = 0; k <= N; k++) {
+      const ups = { dmg: k, cd: N - k };
+      const R = runSim(Object.assign({}, base, { skills: [Object.assign({}, mine, { on: true, ups })] }));
+      const dps = R.perSkill[sc.id].total / R.T;
+      if (!best || dps > best.dps + 1e-9) best = { dps, ups };
+    }
+    sc.ups = best.ups; sc.useBasic = true; nSkills++;
+  }
+  // ── 패시브: 고유 강화 3종 (a + b + c = N), 켜져 있는 스킬 전체의 총 피해 기준
+  const order = { fs: ['dps', 'stk', 'dur'], hf: ['fin', 'mob', 'dot'], ab: ['fin', 'cd', 'stk'] };
+  for (const k of ['fs', 'hf', 'ab']) {
+    if (!S.pas[k].on) continue;
+    let best = null;
+    for (let a = 0; a <= N; a++) for (let b = 0; a + b <= N; b++) {
+      const ups = { [order[k][0]]: a, [order[k][1]]: b, [order[k][2]]: N - a - b };
+      const cfg = makeCfg(S); cfg.pas[k].ups = ups;
+      const R = runSim(cfg);
+      if (!best || R.total > best.total + 1e-9) best = { total: R.total, ups };
+    }
+    S.pas[k].ups = best.ups; nPass++;
+  }
+  S.ui.bestInfo = `최고 DPS 배분으로 덮어씀 (총 ${N}회) · 스킬 ${nSkills}개, 패시브 ${nPass}개 — 스킬 기준은 그 스킬 혼자의 DPS, 범위 강화는 계산에 영향이 없어 0`;
+  save(); rerender();
+}
+
+function buildPreset() {
+  const b = document.getElementById('presetBox'); b.innerHTML = '';
+  const sw = (label, checked, on, dim) => {
+    const l = document.createElement('label'); l.className = 'switch'; if (dim) l.style.opacity = '.45';
+    const c = document.createElement('input'); c.type = 'checkbox'; c.checked = checked;
+    c.addEventListener('change', () => { on(c.checked); save(); rerender(); });
+    l.append(c, document.createTextNode(label)); return l;
+  };
+  const top = document.createElement('div'); top.className = 'toolbar';
+  top.append(
+    sw('기본 강화', S.inc.basic, v => S.inc.basic = v),
+    sw('패시브', S.inc.passive, v => S.inc.passive = v),
+    sw('아이템', S.inc.item, v => S.inc.item = v));
+  b.appendChild(top);
+  const bt = document.createElement('div'); bt.className = 'toolbar';
+  const mk = (t, f) => { const x = document.createElement('button'); x.className = 'small'; x.textContent = t; x.addEventListener('click', () => { f(); save(); rerender(); }); return x; };
+  bt.append(
+    mk('전부 켜기', () => { S.inc = { basic: true, passive: true, item: true }; for (const k of ['fs', 'hf', 'ab']) Object.assign(S.pas[k], { on: true, useBasic: true, useSpec: true }); }),
+    mk('순수 특수 강화만', () => { S.inc = { basic: false, passive: false, item: false }; }),
+    mk('화염의 검만', () => { S.inc = { basic: true, passive: true, item: true }; S.pas.fs.on = true; S.pas.hf.on = false; S.pas.ab.on = false; }));
+  b.appendChild(bt);
+  const bb = document.createElement('div'); bb.className = 'toolbar'; bb.style.marginTop = '4px';
+  const nIn = document.createElement('input'); nIn.type = 'number'; nIn.min = 0; nIn.step = 1; nIn.value = S.ui.basicN != null ? S.ui.basicN : 14; nIn.style.width = '56px';
+  nIn.addEventListener('change', () => { S.ui.basicN = Math.max(0, Math.round(+nIn.value || 0)); save(); });
+  const fillBtn = document.createElement('button'); fillBtn.className = 'small primary'; fillBtn.textContent = '최고 DPS 기본 강화로 덮어쓰기';
+  fillBtn.title = '아래 총 횟수를 피해량 강화 · 쿨타임 강화 (패시브는 고유 강화 3종) 에 나눠, DPS 가 가장 높게 나오는 배분으로 기존 강화 횟수를 덮어씀';
+  fillBtn.addEventListener('click', () => { fillBestBasic(Math.max(0, Math.round(+nIn.value || 0))); });
+  bb.append(document.createTextNode('기본 강화 총 '), nIn, document.createTextNode('회 (레벨 15 = 14회)'), fillBtn);
+  b.appendChild(bb);
+  const bbInfo = document.createElement('div'); bbInfo.className = 'hint'; bbInfo.id = 'bestInfo'; bbInfo.textContent = S.ui.bestInfo || '';
+  b.appendChild(bbInfo);
+  for (const k of ['fs', 'hf', 'ab']) {
+    const q = S.pas[k], dim = !S.inc.passive;
+    const r = document.createElement('div'); r.className = 'row'; r.style.flexWrap = 'wrap';
+    const nm = document.createElement('label'); nm.style.flex = '1 1 100%'; nm.style.color = 'var(--text)'; nm.textContent = PASSIVES[k].name; r.appendChild(nm);
+    r.append(
+      sw('켜기', q.on, v => q.on = v, dim),
+      sw('기본 강화 (' + Object.values(q.ups).reduce((a, x) => a + x, 0) + '회)', q.useBasic !== false, v => q.useBasic = v, dim || !S.inc.basic),
+      sw('특수 강화 (' + Object.keys(q.picks).length + '개)', q.useSpec !== false, v => q.useSpec = v, dim));
+    b.appendChild(r);
+  }
+  const on = S.items.filter(i => i.on).length;
+  const ir = document.createElement('div'); ir.className = 'hint';
+  ir.textContent = `아이템 ${S.items.length}개 중 ${on}개 켜짐 (개별 켜기 · 끄기는 아래 아이템 패널에서)` + (S.inc.item ? '' : ' — 프리셋으로 전부 꺼짐');
+  b.appendChild(ir);
+  const t = presetText(); if (t) b.insertAdjacentHTML('beforeend', `<div class="note">${t}</div>`);
+}
+
+function buildInputs() {
+  buildPreset();
+  // 전역
+  const gb = document.getElementById('globalBox'); gb.innerHTML = '';
+  for (const k in BASE_GLOBAL) { const d = BASE_GLOBAL[k]; gb.appendChild(row(d.l, numInput(S.G[k], d.v, 'any', v => S.G[k] = v), d.u)); }
+
+  // 패시브
+  const pb = document.getElementById('passiveBox'); pb.innerHTML = '';
+  for (const k of ['fs', 'hf', 'ab']) {
+    const P = PASSIVES[k], st = S.pas[k];
+    const det = document.createElement('details'); det.open = !!st.open;
+    det.addEventListener('toggle', () => { st.open = det.open; save(); });
+    const sum = document.createElement('summary');
+    const lab = document.createElement('label'); lab.className = 'switch';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = st.on;
+    cb.addEventListener('click', e => e.stopPropagation());
+    cb.addEventListener('change', () => { st.on = cb.checked; save(); rerender(); });
+    lab.appendChild(cb); lab.insertAdjacentHTML('beforeend', st.on ? (S.inc.passive ? '켜짐' : '켜짐 (프리셋 꺼짐)') : '꺼짐');
+    sum.appendChild(lab);
+    sum.insertAdjacentHTML('beforeend', `<b>${P.name}</b><span class="tag pas">패시브</span>`);
+    det.appendChild(sum);
+    const body = document.createElement('div'); body.className = 'body';
+    for (const pk in P.params) { const d = P.params[pk]; body.appendChild(row(d.l, numInput(st.params[pk] != null ? st.params[pk] : d.v, d.v, 'any', v => st.params[pk] = v), d.u)); }
+    for (const [uk, ul] of P.basic) body.appendChild(row('기본 강화 · ' + ul + ' (횟수)', numInput(st.ups[uk], 0, 1, v => st.ups[uk] = Math.max(0, Math.round(v)))));
+    // 기본 강화 1회당 증가량 (밸패 수정 탭과 같은 값). 비율 (최종 피해량 · 쿨타임 감소 · 지속 피해) 은 퍼센트로, 스택 · 초기 피해량 · 지속시간은 그대로 입력
+    for (const bk of Object.keys(BASIC_DEF[k])) {
+      const isPct = k === 'hf' || (k === 'ab' && bk !== 'stk'), f = isPct ? 100 : 1;
+      body.appendChild(row(BASIC_LBL[k][bk][0], numInput(+(bvCur('pas', k, bk) * f).toFixed(4), BASIC_DEF[k][bk] * f, 'any', v => setBv('pas', k, bk, v / f)), isPct ? '%' : (BASIC_LBL[k][bk][1] && BASIC_LBL[k][bk][1].indexOf('=') < 0 ? BASIC_LBL[k][bk][1] : '')));
+    }
+    specialBlock(body, 'pas-' + k, P.specials, st.picks);
+    det.appendChild(body); pb.appendChild(det);
+  }
+
+  // 스킬
+  const sb = document.getElementById('skillBox'); sb.innerHTML = '';
+  for (const sc of S.skills) {
+    const def = SKILLS.find(s => s.id === sc.id);
+    const det = document.createElement('details'); det.open = !!sc.open; det.dataset.sid = sc.id;
+    det.addEventListener('toggle', () => { sc.open = det.open; save(); });
+    const sum = document.createElement('summary');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = sc.on;
+    cb.addEventListener('click', e => e.stopPropagation());
+    cb.addEventListener('change', () => { sc.on = cb.checked; save(); rerender(); });
+    sum.appendChild(cb);
+    sum.insertAdjacentHTML('beforeend', `<span style="width:9px;height:9px;border-radius:2px;background:${colorOf[def.id]};display:inline-block"></span><b>${def.name}</b><span class="tag ${def.kind}">${{ auto: '자동', manual: '수동', move: '이동' }[def.kind]}</span>`);
+    det.appendChild(sum);
+    const body = document.createElement('div'); body.className = 'body';
+    body.insertAdjacentHTML('beforeend', statStrip(def.id));
+    body.appendChild(row('기본 쿨타임' + (def.stacks ? ' (스택당)' : ''), numInput(sc.params.cd != null ? sc.params.cd : def.cd, def.cd, 'any', v => sc.params.cd = v), '초'));
+    for (const k in def.params) { const d = def.params[k]; body.appendChild(row(d.l, numInput(sc.params[k] != null ? sc.params[k] : d.v, d.v, 'any', v => sc.params[k] = v), d.u)); }
+    { const l = document.createElement('label'); l.className = 'switch'; l.style.margin = '3px 0'; const ck = document.createElement('input'); ck.type = 'checkbox'; ck.checked = sc.useBasic !== false; ck.addEventListener('change', () => { sc.useBasic = ck.checked; save(); rerender(); }); l.append(ck, document.createTextNode('이 스킬의 기본 강화 계산에 포함' + (S.inc.basic ? '' : ' (프리셋으로 전체 꺼짐)'))); body.appendChild(l); }
+    body.appendChild(row(`피해량 강화 횟수 (+${+(bvCur('skill', def.id, 'dmg') * 100).toFixed(2)}%/회)`, numInput(sc.ups.dmg, 0, 1, v => sc.ups.dmg = Math.max(0, Math.round(v)))));
+    body.appendChild(row(`쿨타임 강화 횟수 (-${+(bvCur('skill', def.id, 'cd') * 100).toFixed(2)}%/회)`, numInput(sc.ups.cd, 0, 1, v => sc.ups.cd = Math.max(0, Math.round(v)))));
+    // 기본 강화 1회당 증가량 (%) — 밸패 수정 탭과 같은 값. 퍼센트로 입력 (10 = +10%)
+    body.appendChild(row('피해량 강화 1회당 증가', numInput(+(bvCur('skill', def.id, 'dmg') * 100).toFixed(4), BASIC_DEF.skill.dmg * 100, 'any', v => setBv('skill', def.id, 'dmg', v / 100)), '%'));
+    body.appendChild(row('쿨타임 강화 1회당 감소', numInput(+(bvCur('skill', def.id, 'cd') * 100).toFixed(4), BASIC_DEF.skill.cd * 100, 'any', v => setBv('skill', def.id, 'cd', v / 100)), '%'));
+    specialBlock(body, def.id, def.specials, sc.picks);
+    if (!def.specials.length) body.insertAdjacentHTML('beforeend', '<div class="hint">특수 강화 없음</div>');
+    for (const cm of def.combos || []) {
+      const ok = comboAvailable(def, cm, sc);
+      const box = document.createElement('div'); box.className = 'combo' + (ok ? '' : ' off');
+      const l = document.createElement('label'); l.className = 'opt';
+      const c = document.createElement('input'); c.type = 'checkbox'; c.checked = sc.combo === cm.id && ok; c.disabled = !ok;
+      c.addEventListener('change', () => { sc.combo = c.checked ? cm.id : null; save(); rerender(); });
+      l.appendChild(c);
+      const need = (cm.requiresAny || [cm.requires]).map(r => r.map(id => (def.specials.find(x => x.id === id) || {}).name || id).join(' + ')).join(' 또는 ');
+      l.insertAdjacentHTML('beforeend', `<span><b>특수 조합 · ${cm.name}</b> <span class="d">(${need}) ${cm.desc}</span></span>`);
+      const line = document.createElement('div'); line.className = 'optrow'; line.appendChild(l);
+      const ge = gearAndEditor(cm);
+      if (ge) line.appendChild(ge.g);
+      box.appendChild(line); if (ge) box.appendChild(ge.ed); body.appendChild(box);
+    }
+    det.appendChild(body); sb.appendChild(det);
+  }
+
+  buildItems();
+}
+
+// ═════════ 아이템 · 세트 ═════════
+function modsEditor(container, mods) {
+  container.innerHTML = '';
+  for (const k in mods) {
+    const f = ITEM_FIELDS.find(x => x.k === k);
+    const chip = document.createElement('span'); chip.className = 'chip';
+    chip.append(`${f ? f.l : k} `);
+    const i = document.createElement('input'); i.type = 'number'; i.step = 'any'; i.value = mods[k]; i.style.width = '64px';
+    i.addEventListener('change', () => { const v = parseFloat(i.value); mods[k] = isNaN(v) ? 0 : v; save(); rerender(); });
+    chip.appendChild(i);
+    const x = document.createElement('button'); x.textContent = '×'; x.addEventListener('click', () => { delete mods[k]; save(); rerender(); });
+    chip.appendChild(x); container.appendChild(chip);
+  }
+  const sel = document.createElement('select'); sel.style.maxWidth = '180px';
+  sel.innerHTML = '<option value="">+ 효과 추가…</option>' + ITEM_FIELDS.filter(f => !(f.k in mods)).map(f => `<option value="${f.k}" title="${f.hint}">${f.l}${f.hint ? ' — ' + f.hint : ''}</option>`).join('');
+  sel.addEventListener('change', () => { if (!sel.value) return; mods[sel.value] = sel.value === 'finalMul' || sel.value === 'cdMul' ? 1 : 0; save(); rerender(); });
+  container.appendChild(sel);
+}
+function buildItems() {
+  const ib = document.getElementById('itemBox'); ib.innerHTML = '';
+  S.items.forEach((it, idx) => {
+    const d = document.createElement('div'); d.className = 'item';
+    const top = document.createElement('div'); top.className = 'row';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = it.on; cb.addEventListener('change', () => { it.on = cb.checked; save(); rerender(); });
+    const nm = document.createElement('input'); nm.type = 'text'; nm.value = it.name; nm.placeholder = '아이템 이름'; nm.style.flex = '1'; nm.addEventListener('change', () => { it.name = nm.value; save(); });
+    const st = document.createElement('input'); st.type = 'text'; st.value = it.set || ''; st.placeholder = '세트 이름'; st.style.width = '100px'; st.addEventListener('change', () => { it.set = st.value.trim(); save(); rerender(); });
+    const del = document.createElement('button'); del.className = 'small'; del.textContent = '삭제'; del.addEventListener('click', () => { S.items.splice(idx, 1); save(); rerender(); });
+    top.append(cb, nm, st, del); d.appendChild(top);
+    const mc = document.createElement('div'); modsEditor(mc, it.mods); d.appendChild(mc);
+    ib.appendChild(d);
+  });
+  if (!S.items.length) ib.innerHTML = '<div class="hint">아직 아이템이 없습니다.</div>';
+  const sb = document.getElementById('setBox'); sb.innerHTML = '';
+  S.sets.forEach((s, idx) => {
+    const d = document.createElement('div'); d.className = 'item';
+    const top = document.createElement('div'); top.className = 'row';
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = s.on; cb.addEventListener('change', () => { s.on = cb.checked; save(); rerender(); });
+    const nm = document.createElement('input'); nm.type = 'text'; nm.value = s.name; nm.placeholder = '세트 이름'; nm.style.flex = '1'; nm.addEventListener('change', () => { s.name = nm.value.trim(); save(); rerender(); });
+    const n = document.createElement('input'); n.type = 'number'; n.value = s.n; n.min = 1; n.style.width = '50px'; n.addEventListener('change', () => { s.n = Math.max(1, parseInt(n.value) || 1); save(); rerender(); });
+    const del = document.createElement('button'); del.className = 'small'; del.textContent = '삭제'; del.addEventListener('click', () => { S.sets.splice(idx, 1); save(); rerender(); });
+    top.append(cb, nm, document.createTextNode('개 이상 →'), n, del); d.appendChild(top);
+    const mc = document.createElement('div'); modsEditor(mc, s.mods); d.appendChild(mc);
+    sb.appendChild(d);
+  });
+}
+document.getElementById('btnAddItem').addEventListener('click', () => { S.items.push({ name: '새 아이템', on: true, set: '', mods: {} }); save(); rerender(); });
+document.getElementById('btnAddSet').addEventListener('click', () => { S.sets.push({ name: '', n: 2, on: true, mods: {} }); save(); rerender(); });
+
+// ═════════ 시뮬레이션 설정 만들기 ═════════
+function makeCfg(st) {
+  const inc = st.inc || { basic: true, passive: true, item: true };
+  const zero = u => Object.fromEntries(Object.keys(u).map(k => [k, 0]));
+  const pas = {};
+  for (const k of ['fs', 'hf', 'ab']) {
+    const q = st.pas[k];
+    pas[k] = {
+      on: inc.passive && q.on,
+      params: q.params,
+      ups: inc.basic && q.useBasic !== false ? q.ups : zero(q.ups),             // 프리셋: 기본 강화 끄기
+      picks: q.useSpec !== false ? Object.values(q.picks) : [],                  // 패시브별 특수 강화 끄기
+    };
+  }
+  return {
+    G: st.G, pas, ov: st.ov || {}, bv: st.bv || {}, hpList: BOSS_PRESETS.map(b => b.hp),
+    items: inc.item ? st.items : [], sets: inc.item ? st.sets : [],
+    skills: st.skills.map(s => ({ id: s.id, on: s.on, params: s.params, picks: s.picks, combo: s.combo, ups: inc.basic && s.useBasic !== false ? s.ups : { dmg: 0, cd: 0 } })),
+  };
+}
+function presetText() {
+  const i = S.inc, off = [];
+  if (!i.basic) off.push('기본 강화 꺼짐');
+  if (!i.passive) off.push('패시브 꺼짐'); else for (const k of ['fs', 'hf', 'ab']) { const q = S.pas[k]; if (q.on && q.useBasic === false) off.push(PASSIVES[k].name.split(' ')[0] + ' 기본 강화 꺼짐'); if (q.on && q.useSpec === false) off.push(PASSIVES[k].name.split(' ')[0] + ' 특수 강화 꺼짐'); }
+  if (!i.item) off.push('아이템 꺼짐');
+  return off.length ? '프리셋: ' + off.join(' · ') : '';
+}
+
+// ═════════ 결과 그리기 ═════════
+let LAST = null;
+function rerender() {
+  if (typeof updateNBar === 'function') updateNBar();
+  if (typeof markEvBtn === 'function') setTimeout(markEvBtn, 0);
+  if (typeof EV !== 'undefined' && EV && !EV.stale) { EV.stale = true; const i = document.getElementById('evInfo'); if (i) i.textContent += ' · ⚠ 설정이 바뀌었습니다 (다시 계산 필요)'; }
+  computeSpec();
+  buildInputs();
+  LAST = runSim(makeCfg(S));
+  renderResult(LAST);
+  renderSpec();
+  renderBal();
+  renderPatch();
+  renderCalc();
+}
+
+// ═════════ 스킬 단독 스펙 ═════════
+let SPEC = {};
+function pickSolo(R, id) {
+  const sk = R.perSkill[id];
+  return {
+    R, sk, casts: sk.casts, total: sk.total, dps: sk.total / R.T, dpsAll: R.dps,
+    perCast: sk.casts ? sk.total / sk.casts : 0, perCastMain: sk.casts ? sk.main / sk.casts : 0,
+    cd: sk.cdEff, pct: sk.pctAvg, fin: sk.finAvg, combo: sk.comboOn,
+  };
+}
+function computeSpec() {
+  const all = makeCfg(S);
+  SPEC = {};
+  for (const sc of S.skills) {
+    const mine = all.skills.find(x => x.id === sc.id);
+    const cur = runSim(Object.assign({}, all, { skills: [Object.assign({}, mine, { on: true })] }));
+    const bas = runSim(Object.assign({}, all, { skills: [{ id: sc.id, on: true, params: sc.params, picks: {}, combo: null, ups: { dmg: 0, cd: 0 } }] }));
+    SPEC[sc.id] = { cur: pickSolo(cur, sc.id), base: pickSolo(bas, sc.id) };
+  }
+}
+function statStrip(id) {
+  const x = SPEC[id] && SPEC[id].cur; if (!x) return '';
+  const b = SPEC[id].base;
+  const cell = (k, v, sub) => `<div class="st"><div class="k">${k}</div><div class="v">${v}</div>${sub ? `<div class="s">${sub}</div>` : ''}</div>`;
+  const ratio = (c, bb) => bb > 0 ? (c / bb >= 1 ? '<span class="up">' : '<span class="down">') + '기본 ×' + (c / bb).toFixed(2) + '</span>' : '';
+  return `<div class="stats">` +
+    cell('적용 피해량 %', '+' + (x.pct * 100).toFixed(0) + '%', '기본 강화 · 특수 · 전역 · 아이템') +
+    cell('적용 최종 피해량', '×' + x.fin.toFixed(2), '스킬 · 패시브 · 아이템 곱') +
+    cell('1회 총 피해량', fmt(x.perCast), `주 대상 ${fmt(x.perCastMain)} · 범위 ${S.G.N}마리`) +
+    cell('유효 쿨타임', x.cd.toFixed(1) + '초', `${x.casts}회 / ${S.G.T}초`) +
+    cell('단독 DPS', fmtD(x.dps), ratio(x.dps, b.dps)) +
+    `</div>`;
+}
+let SORT = { key: 'dps', dir: -1 };
+function renderSpec() {
+  const only = document.getElementById('specOnly').checked;
+  const rows = S.skills.filter(sc => !only || sc.on).map(sc => {
+    const def = SKILLS.find(d => d.id === sc.id), x = SPEC[sc.id].cur, b = SPEC[sc.id].base;
+    const picks = Object.values(sc.picks).map(id => (def.specials.find(q => q.id === id) || {}).name).filter(Boolean);
+    const cm = x.combo ? (def.combos.find(c => c.id === sc.combo) || {}).name : null;
+    return { sc, def, x, b, picks, cm, dps: x.dps, perCast: x.perCast, perCastMain: x.perCastMain, cd: x.cd, pct: x.pct, fin: x.fin, total: x.total, casts: x.casts, ratio: b.dps > 0 ? x.dps / b.dps : 0, name: def.name };
+  });
+  const meanDps = rows.reduce((a, r) => a + r.dps, 0) / (rows.length || 1);   // 지금 표에 있는 스킬들의 평균 DPS
+  rows.forEach(r => r.vsAll = meanDps > 0 ? r.dps / meanDps : 0);
+  rows.sort((a, b) => (typeof a[SORT.key] === 'string' ? a[SORT.key].localeCompare(b[SORT.key]) : a[SORT.key] - b[SORT.key]) * SORT.dir);
+  const maxDps = Math.max(1, ...rows.map(r => r.dps));
+  const H = [['name', '스킬'], ['picks', '선택한 강화'], ['cd', '유효 쿨타임'], ['pct', '피해량 %'], ['fin', '최종 피해량'], ['perCastMain', '1회 주 대상'], ['perCast', '1회 총 피해량'], ['casts', '사용 횟수'], ['total', '총 피해량'], ['dps', '단독 DPS'], ['ratio', '기본 대비'], ['vsAll', '전체 평균 대비']];
+  let h = '<table><tr>' + H.map(([k, l]) => `<th data-k="${k}" style="cursor:pointer">${l}${SORT.key === k ? (SORT.dir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('') + '<th style="width:140px">DPS</th></tr>';
+  for (const r of rows) {
+    const pk = (r.picks.length || r.cm) ? [...r.picks, ...(r.cm ? ['[조합] ' + r.cm] : [])].join(', ') : '<span class="dim">-</span>';
+    h += `<tr data-sk="${r.def.id}" style="cursor:pointer"><td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${colorOf[r.def.id]};margin-right:5px"></span>${r.name} <span class="tag ${r.def.kind}">${{ auto: '자동', manual: '수동', move: '이동' }[r.def.kind]}</span></td>
+      <td style="white-space:normal;max-width:220px;text-align:left;font-size:11px">${pk}</td>
+      <td>${r.cd.toFixed(1)}초</td><td>+${(r.pct * 100).toFixed(0)}%</td><td>×${r.fin.toFixed(2)}</td><td>${fmt(r.perCastMain)}</td><td>${fmt(r.perCast)}</td><td>${r.casts}</td><td>${fmt(r.total)}</td><td><b>${fmtD(r.dps)}</b></td>
+      <td class="${r.ratio >= 1.005 ? 'up' : r.ratio <= 0.995 ? 'down' : 'dim'}">${r.ratio ? '×' + r.ratio.toFixed(2) : '-'}</td>
+      <td class="${r.vsAll >= 1.5 ? 'up' : r.vsAll <= 0.5 ? 'down' : ''}"><b>×${r.vsAll.toFixed(2)}</b></td>
+      <td style="min-width:140px"><div style="background:#2c3142;border-radius:3px;height:10px"><div style="width:${r.dps / maxDps * 100}%;background:${colorOf[r.def.id]};height:10px;border-radius:3px"></div></div></td></tr>`;
+    const labs = r.x.sk.labels;
+    for (const lb in labs) {
+      const l = labs[lb];
+      h += `<tr class="sub" data-parent="${r.def.id}" style="display:none"><td>${lb} <span class="dim">(1회당 ${(l.hits / Math.max(1, r.casts)).toFixed(1)}타)</span></td><td></td><td></td><td></td><td></td><td></td><td>${fmt(l.total / Math.max(1, r.casts))}</td><td></td><td>${fmt(l.total)}</td><td>${fmtD(l.total / S.G.T)}</td><td>${pct(l.total / (r.total || 1))}</td><td></td><td></td></tr>`;
+    }
+  }
+  h += '</table>';
+  document.getElementById('specInfo').textContent = `범위 안 적 ${S.G.N}마리 · ${S.G.T}초 · 표에 있는 스킬 평균 DPS ${fmtD(meanDps)}` + (presetText() ? ' · ' + presetText() : '');
+  const el = document.getElementById('specTable'); el.innerHTML = h;
+  el.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click', () => {
+    const k = th.dataset.k; if (k === 'picks') return;
+    SORT = { key: k, dir: SORT.key === k ? -SORT.dir : -1 }; renderSpec();
+  }));
+  el.querySelectorAll('tr[data-sk]').forEach(tr => tr.addEventListener('click', () => {
+    const subs = el.querySelectorAll(`tr[data-parent="${tr.dataset.sk}"]`);
+    const show = subs.length && subs[0].style.display === 'none';
+    subs.forEach(x => x.style.display = show ? '' : 'none');
+  }));
+}
+document.getElementById('specOnly').addEventListener('change', renderSpec);
+
+/** 보스 체력 프리셋 선택 + 보스 처치 시간 표 */
+function renderBoss(R) {
+  const sel = document.getElementById('bossSel');
+  if (sel.options.length <= 1) {
+    sel.innerHTML = '<option value="">대상 체력 프리셋…</option>' + BOSS_PRESETS.map(b => `<option value="${b.id}">${b.name} (${b.hp.toLocaleString()})</option>`).join('');
+  }
+  const cur = BOSS_PRESETS.find(b => b.hp === S.G.enemyHp);
+  sel.value = cur ? cur.id : '';
+  const dps = R.main / R.T;   // 주 대상 평균 DPS
+  const when = hp => {
+    if (R.ttks[hp] != null) return { t: R.ttks[hp], est: false };
+    return dps > 0 ? { t: hp / dps, est: true } : { t: null, est: true };
+  };
+  const fmtT = x => x.t == null ? '-' : (x.est ? '~' : '') + (x.t >= 120 ? (x.t / 60).toFixed(1) + '분' : x.t.toFixed(1) + '초');
+  const rows = [];
+  for (const b of BOSS_PRESETS) rows.push({ name: b.name, hp: b.hp, w: when(b.hp), group: b.group, phase: b.phase, diff: b.diff });
+  // 노말 1 · 2페이즈 합계
+  for (const g of ['가니악 벤데스트라', '카구츠치']) {
+    const a = BOSS_PRESETS.find(b => b.group === g && b.diff === '노말' && b.phase === 1), c = BOSS_PRESETS.find(b => b.group === g && b.diff === '노말' && b.phase === 2);
+    if (a && c) { const wa = when(a.hp), wc = when(c.hp); rows.push({ name: `${g} · 노말 1 + 2페이즈 합계`, hp: a.hp + c.hp, w: { t: wa.t != null && wc.t != null ? wa.t + wc.t : null, est: wa.est || wc.est }, sum: true }); }
+  }
+  let h = '<table><tr><th>보스</th><th>체력</th><th>처치 시간</th><th>필요 평균 DPS (60초 기준)</th></tr>';
+  for (const r of rows) h += `<tr${r.sum ? ' style="font-weight:600"' : ''}><td>${r.name}</td><td>${r.hp.toLocaleString()}</td><td>${fmtT(r.w)}</td><td class="dim">${fmtD(r.hp / 60)}</td></tr>`;
+  h += '</table>';
+  document.getElementById('bossTable').innerHTML = h;
+  document.getElementById('bossInfo').textContent = `주 대상 평균 DPS ${fmtD(dps)}`;
+}
+document.getElementById('bossSel').addEventListener('change', e => {
+  const b = BOSS_PRESETS.find(x => x.id === e.target.value); if (!b) return;
+  S.G.enemyHp = b.hp; S.G.boss = 1; save(); rerender();
+});
+
+function summarize(R) {
+  const o = { total: R.total, dps: R.dps, ttk: R.ttk, burn: R.burnUptime, stun: R.stunUptime, skills: {}, passive: R.passive.total, passiveParts: {} };
+  for (const id in R.perSkill) o.skills[id] = R.perSkill[id].total;
+  for (const k in R.passive.extra) o.passiveParts[k] = R.passive.extra[k].total;
+  return o;
+}
+
+function renderResult(R) {
+  const base = S.base;
+  const cards = document.getElementById('cards');
+  const ttk = R.ttk != null ? R.ttk.toFixed(1) + '초' : `못 잡음 (${R.T}초 안에)`;
+  const sets = R.items.activeSets.length ? ' · 켜진 세트: ' + R.items.activeSets.join(', ') : '';
+  cards.innerHTML = [
+    ['총 피해', fmt(R.total), deltaHtml(R.total, base && base.total)],
+    ['평균 DPS', fmtD(R.dps), deltaHtml(R.dps, base && base.dps, false, fmtD)],
+    [`주 대상 처치 시간 (체력 ${fmt(S.G.enemyHp)})`, ttk, base && base.ttk != null && R.ttk != null ? deltaHtml(R.ttk, base.ttk, true) : ''],
+    ['화상 유지율', pct(R.burnUptime), base ? deltaHtml(R.burnUptime * 100, base.burn * 100, false).replace(/\(.*?\)/, '') : ''],
+    ['기절 유지율', pct(R.stunUptime), base ? deltaHtml(R.stunUptime * 100, base.stun * 100, false).replace(/\(.*?\)/, '') : ''],
+    ['화상 최대 스택 도달', R.maxBurnStacks + ' / ' + R.burn.max, ''],
+  ].map(([k, v, d]) => `<div class="card"><div class="k">${k}</div><div class="v">${v}</div><div class="dl">${d}</div></div>`).join('');
+  renderBoss(R);
+  document.getElementById('baseInfo').textContent = presetText() + (presetText() ? ' · ' : '') + (base ? '기준과 비교 중 (초록 = 좋아짐 · 빨강 = 나빠짐)' : '기준을 저장하면 값을 바꿨을 때 늘고 줄어든 양이 표에 표시됩니다.') + sets;
+
+  const ids = Object.keys(R.perSkill);
+  const rows = ids.map(id => R.perSkill[id]).sort((a, b) => b.total - a.total);
+  let h = '<table><tr><th>스킬</th><th>사용 횟수</th><th>총 피해</th><th>비중</th><th>DPS</th><th>조건부 보너스</th></tr>';
+  const all = R.total || 1;
+  for (const sk of rows) {
+    const cond = Object.values(sk.labels).reduce((a, b) => a + b.condBonus, 0);
+    const b = base && base.skills[sk.id];
+    const tagCombo = sk.comboOn ? ' <span class="tag" style="color:var(--accent)">조합</span>' : '';
+    h += `<tr data-sk="${sk.id}" style="cursor:pointer"><td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${colorOf[sk.id]};margin-right:5px"></span>▸ ${sk.name}${tagCombo}</td><td>${sk.casts}</td><td>${fmt(sk.total)}${base ? deltaHtml(sk.total, b == null ? 0 : b) : ''}</td><td>${pct(sk.total / all)}</td><td>${fmtD(sk.total / R.T)}</td><td>${cond > 0 ? fmt(cond) : '<span class="dim">-</span>'}</td></tr>`;
+    for (const lb in sk.labels) {
+      const x = sk.labels[lb];
+      const part = x.hits ? ` · 화상 중 ${pct(x.hitsBurn / x.hits)} · 기절 중 ${pct(x.hitsStun / x.hits)}` : '';
+      h += `<tr class="sub" data-parent="${sk.id}" style="display:none"><td>${lb} <span class="dim">(${x.hits}타${part})</span></td><td></td><td>${fmt(x.total)}</td><td>${pct(x.total / (sk.total || 1))}</td><td>${fmtD(x.total / R.T)}</td><td>${x.condBonus > 0 ? fmt(x.condBonus) : ''}</td></tr>`;
+    }
+  }
+  if (R.passive.total > 0 || S.pas.fs.on || S.pas.hf.on) {
+    const b = base && base.passive;
+    h += `<tr data-sk="passive" style="cursor:pointer"><td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${colorOf.passive};margin-right:5px"></span>▸ 패시브 (화상 · 폭발 · 소각 등)</td><td>${R.passive.ticks}틱</td><td>${fmt(R.passive.total)}${base ? deltaHtml(R.passive.total, b || 0) : ''}</td><td>${pct(R.passive.total / all)}</td><td>${fmtD(R.passive.total / R.T)}</td><td></td></tr>`;
+    for (const lb in R.passive.extra) {
+      const x = R.passive.extra[lb]; const bp = base && base.passiveParts && base.passiveParts[lb];
+      h += `<tr class="sub" data-parent="passive" style="display:none"><td>${lb} <span class="dim">(${x.hits}회)</span></td><td></td><td>${fmt(x.total)}${base ? deltaHtml(x.total, bp == null ? 0 : bp) : ''}</td><td>${pct(x.total / (R.passive.total || 1))}</td><td>${fmtD(x.total / R.T)}</td><td></td></tr>`;
+    }
+  }
+  h += '</table>';
+  const tb = document.getElementById('skillTable'); tb.innerHTML = h;
+  tb.querySelectorAll('tr[data-sk]').forEach(tr => tr.addEventListener('click', () => {
+    const subs = tb.querySelectorAll(`tr[data-parent="${tr.dataset.sk}"]`);
+    const show = subs.length && subs[0].style.display === 'none';
+    subs.forEach(x => x.style.display = show ? '' : 'none');
+  }));
+  drawChart(R);
+}
+
+function drawChart(R) {
+  const cv = document.getElementById('chartDps'); const ctx = cv.getContext('2d');
+  const W = cv.width, H = cv.height, padL = 52, padB = 24, padT = 8, padR = 8;
+  ctx.clearRect(0, 0, W, H);
+  const keys = Object.keys(R.perSkill).concat(['passive']);
+  const n = R.buckets.length || Math.ceil(R.T);
+  let max = 1;
+  for (let i = 0; i < n; i++) { const b = R.buckets[i] || {}; max = Math.max(max, keys.reduce((a, k) => a + (b[k] || 0), 0)); }
+  const bw = (W - padL - padR) / n;
+  ctx.fillStyle = '#9aa1b2'; ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+  for (let g = 0; g <= 4; g++) {
+    const y = padT + (H - padT - padB) * (1 - g / 4);
+    ctx.strokeStyle = '#2f3443'; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+    ctx.fillText(fmt(max * g / 4), padL - 5, y + 4);
+  }
+  for (let i = 0; i < n; i++) {
+    let y = H - padB; const b = R.buckets[i] || {};
+    for (const k of keys) {
+      const v = b[k] || 0; if (!v) continue;
+      const h = v / max * (H - padT - padB);
+      ctx.fillStyle = colorOf[k]; ctx.fillRect(padL + i * bw, y - h, Math.max(1, bw - 1), h); y -= h;
+    }
+  }
+  ctx.fillStyle = '#9aa1b2'; ctx.textAlign = 'center';
+  const stepLbl = Math.max(1, Math.round(n / 10));
+  for (let i = 0; i < n; i += stepLbl) ctx.fillText(i + 's', padL + i * bw + bw / 2, H - 8);
+  document.getElementById('legend').innerHTML = keys.map(k => `<span><i style="background:${colorOf[k]}"></i>${k === 'passive' ? '패시브' : SKILLS.find(s => s.id === k).name}</span>`).join('');
+}
+
+// ═════════ 값 훑어보기 ═════════
+function paramList() {
+  const out = [];
+  for (const k in BASE_GLOBAL) out.push({ key: 'G.' + k, label: '전역 · ' + BASE_GLOBAL[k].l });
+  for (const pk of ['fs']) for (const k in PASSIVES[pk].params) out.push({ key: `P.${pk}.${k}`, label: `${PASSIVES[pk].name} · ${PASSIVES[pk].params[k].l}` });
+  for (const d of SKILLS) {
+    out.push({ key: `S.${d.id}.cd`, label: `${d.name} · 기본 쿨타임` });
+    for (const k in d.params) out.push({ key: `S.${d.id}.${k}`, label: `${d.name} · ${d.params[k].l}` });
+  }
+  return out;
+}
+function applyOverride(st, key, v) {
+  const p = key.split('.');
+  if (p[0] === 'G') st.G[p[1]] = v;
+  else if (p[0] === 'P') st.pas[p[1]].params[p[2]] = v;
+  else st.skills.find(s => s.id === p[1]).params[p[2]] = v;
+}
+function buildSweepSelect() {
+  const sel = document.getElementById('swParam'); sel.innerHTML = '';
+  for (const p of paramList()) { const o = document.createElement('option'); o.value = p.key; o.textContent = p.label; sel.appendChild(o); }
+  sel.value = 'P.fs.duration';
+}
+document.getElementById('btnSweep').addEventListener('click', () => {
+  const key = document.getElementById('swParam').value;
+  const from = parseFloat(document.getElementById('swFrom').value), to = parseFloat(document.getElementById('swTo').value);
+  const n = Math.max(2, Math.min(60, parseInt(document.getElementById('swN').value) || 8));
+  const rows = [];
+  for (let i = 0; i < n; i++) {
+    const v = from + (to - from) * i / (n - 1);
+    const st = JSON.parse(JSON.stringify(S)); applyOverride(st, key, v);
+    rows.push({ v, R: runSim(makeCfg(st)) });
+  }
+  const ids = Object.keys(rows[0].R.perSkill);
+  let h = `<table><tr><th>값</th><th>총 피해</th><th>DPS</th><th>처치 시간</th><th>화상 유지</th><th>기절 유지</th>${ids.map(id => `<th>${SKILLS.find(s => s.id === id).name}</th>`).join('')}<th>패시브</th></tr>`;
+  for (const { v, R } of rows) {
+    h += `<tr><td>${+v.toFixed(4)}</td><td>${fmt(R.total)}</td><td>${fmtD(R.dps)}</td><td>${R.ttk != null ? R.ttk.toFixed(1) + '초' : '-'}</td><td>${pct(R.burnUptime)}</td><td>${pct(R.stunUptime)}</td>${ids.map(id => `<td>${fmt(R.perSkill[id].total)}</td>`).join('')}<td>${fmt(R.passive.total)}</td></tr>`;
+  }
+  h += '</table><canvas id="swChart" width="900" height="200" style="margin-top:10px"></canvas>';
+  const out = document.getElementById('swOut'); out.innerHTML = h;
+  const cv = document.getElementById('swChart'), c = cv.getContext('2d');
+  const vals = rows.map(r => r.R.total); const mn = Math.min(...vals), mx = Math.max(...vals);
+  c.strokeStyle = '#ff9a3c'; c.lineWidth = 2; c.beginPath();
+  rows.forEach((r, i) => {
+    const x = 50 + (cv.width - 70) * i / (n - 1), y = 170 - (mx === mn ? 0.5 : (r.R.total - mn) / (mx - mn)) * 140;
+    i ? c.lineTo(x, y) : c.moveTo(x, y);
+  });
+  c.stroke(); c.fillStyle = '#9aa1b2'; c.font = '11px sans-serif';
+  c.fillText('총 피해 ' + fmt(mn) + ' ~ ' + fmt(mx) + ' (값: ' + +from.toFixed(3) + ' → ' + +to.toFixed(3) + ')', 50, 192);
+});
+
+// ═════════ 피해 계산기 ═════════
+function renderCalc() {
+  const C = S.calc, box = document.getElementById('calcBox');
+  const finals = String(C.finals).split(/[ ,]+/).map(parseFloat).filter(x => !isNaN(x));
+  const fmul = finals.reduce((a, b) => a * b, 1);
+  let html = `<div class="row"><label>초기 피해량</label><input type="number" data-k="initial" value="${C.initial}" step="any"></div>
+  <div class="row"><label>피해량 % 합 (0.3 = 30%)</label><input type="number" data-k="pct" value="${C.pct}" step="any"></div>
+  <div class="row"><label>추가 피해량 (고정 수치)</label><input type="number" data-k="flat" value="${C.flat}" step="any"></div>
+  <div class="row"><label>최종 피해량 배율들 (쉼표로 구분, 곱연산)</label><input type="text" data-k="finals" value="${C.finals}" style="width:130px"></div>
+  <div class="row"><label>조건부 배율 · 화상 상태 (없으면 1)</label><input type="number" data-k="burn" value="${C.burn}" step="any"></div>
+  <div class="row"><label>조건부 배율 · 기절 상태 (없으면 1)</label><input type="number" data-k="stun" value="${C.stun}" step="any"></div>
+  <div class="row"><label>받는 최종 피해량 배율</label><input type="number" data-k="recv" value="${C.recv}" step="any"></div>
+  <div class="row"><label>고정 피해</label><input type="checkbox" data-k="fixed" ${C.fixed ? 'checked' : ''}></div>`;
+  let step1 = C.initial, step2 = step1 * (1 + C.pct), step3 = step2 + C.flat, step4 = step3 * fmul;
+  let t1 = step4 * C.burn, t2 = t1 * C.stun, t3 = t2 * C.recv, fin = Math.floor(t3 + 1e-4);
+  if (C.fixed) { step2 = step3 = step4 = t1 = t2 = t3 = C.initial; fin = Math.floor(C.initial + 1e-4); }
+  html += `<table class="calc" style="margin-top:8px">
+    <tr><td class="s">① 초기 피해량</td><td class="f">${fmt1(step1)}</td></tr>
+    <tr><td class="s">× (1 + 피해량 %) = ${C.fixed ? '(고정 피해: 건너뜀)' : (1 + C.pct).toFixed(3)}</td><td class="f">${fmt1(step2)}</td></tr>
+    <tr><td class="s">+ 추가 피해량</td><td class="f">${fmt1(step3)}</td></tr>
+    <tr><td class="s">× 최종 피해량 (${finals.join(' × ') || '1'} = ${fmul.toFixed(3)})</td><td class="f">${fmt1(step4)}</td></tr>
+    <tr><td class="s">② × 화상 상태 보너스</td><td class="f">${fmt1(t1)}</td></tr>
+    <tr><td class="s">× 기절 상태 보너스</td><td class="f">${fmt1(t2)}</td></tr>
+    <tr><td class="s">× 받는 최종 피해량</td><td class="f">${fmt1(t3)}</td></tr>
+    <tr><td><b>내림 → 실제 피해</b></td><td class="f"><b>${fin}</b></td></tr></table>
+  <div class="hint">피해량 % 는 서로 더하고 (합연산), 최종 피해량은 효과마다 곱합니다. 한 효과 안의 +%p 는 먼저 합친 배율 하나로 넣으세요 (예: +50% 와 +25% 가 한 효과면 1.75).</div>`;
+  box.innerHTML = html;
+  box.querySelectorAll('input').forEach(i => i.addEventListener('change', () => {
+    const k = i.dataset.k;
+    S.calc[k] = i.type === 'checkbox' ? i.checked : (i.type === 'text' ? i.value : (parseFloat(i.value) || 0));
+    save(); renderCalc();
+  }));
+}
+
+// ═════════ 기댓값 시트 (모든 특수 강화 조합) ═════════
+let EV = null, EVRUN = false, EVSORT = { key: 'dps', dir: -1 };
+function enumBuilds(def, withNone) {
+  const tiers = [5, 10, 15].map(lv => (withNone ? [null] : []).concat(def.specials.filter(x => x.lv === lv)));
+  const T = tiers.map(t => t.length ? t : [null]);
+  const out = [];
+  for (const a of T[0]) for (const b of T[1]) for (const c of T[2]) {
+    const picks = {}; if (a) picks[5] = a.id; if (b) picks[10] = b.id; if (c) picks[15] = c.id;
+    const names = [a, b, c].filter(Boolean).map(x => x.name);
+    out.push({ picks, names, combo: null });
+    for (const cm of def.combos || [])
+      if (comboAvailable(def, cm, { picks })) out.push({ picks, names, combo: cm.id, comboName: cm.name });
+  }
+  return out;
+}
+function computeEV() {
+  if (EVRUN) return;
+  EVRUN = true;
+  const withNone = document.getElementById('evNone').checked;
+  const all = makeCfg(S);
+  const jobs = [];
+  for (const sc of S.skills) {
+    const def = SKILLS.find(d => d.id === sc.id);
+    for (const b of enumBuilds(def, withNone)) jobs.push({ sc, def, b });
+  }
+  const rows = [];
+  const t0 = performance.now();
+  const st = document.getElementById('evStatus');
+  let i = 0;
+  function chunk() {
+    const end = Math.min(jobs.length, i + 30);
+    for (; i < end; i++) {
+      const { sc, def, b } = jobs[i];
+      const R = runSim(Object.assign({}, all, { skills: [{ id: sc.id, on: true, params: sc.params, picks: b.picks, combo: b.combo, ups: all.skills.find(x => x.id === sc.id).ups }] }));
+      const sk = R.perSkill[sc.id];
+      rows.push({ id: def.id, name: def.name, kind: def.kind, picks: b.picks, names: b.names, combo: b.combo, comboName: b.comboName,
+                  dps: sk.total / R.T, total: sk.total, perCast: sk.casts ? sk.total / sk.casts : 0, cd: sk.cdEff, casts: sk.casts,
+                  isBase: !Object.keys(b.picks).length && !b.combo });
+    }
+    st.textContent = `계산 중… ${i} / ${jobs.length}`;
+    if (i < jobs.length) setTimeout(chunk, 0);
+    else finish();
+  }
+  function finish() {
+    const sum = {};
+    for (const sc of S.skills) {
+      const list = rows.filter(r => r.id === sc.id);
+      const v = list.map(r => r.dps).sort((a, b) => a - b);
+      const avg = v.reduce((a, b) => a + b, 0) / (v.length || 1);
+      const med = v.length ? (v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2) : 0;
+      const best = list.reduce((a, b) => (b.dps > a.dps ? b : a), list[0]);
+      const worst = list.reduce((a, b) => (b.dps < a.dps ? b : a), list[0]);
+      const base = list.find(r => r.isBase);
+      sum[sc.id] = { id: sc.id, def: SKILLS.find(d => d.id === sc.id), n: list.length, min: v[0] || 0, max: v[v.length - 1] || 0, avg, med, best, worst, base: base ? base.dps : 0 };
+    }
+    EV = { rows, sum, stale: false, ms: performance.now() - t0, N: S.G.N, T: S.G.T };
+    EVRUN = false;
+    st.textContent = `${jobs.length}개 빌드 · ${(EV.ms / 1000).toFixed(1)}초`;
+    renderEV();
+    markEvBtn();
+  }
+  chunk();
+}
+/** 기댓값 시트의 빌드 (특수 강화 선택 + 조합) 를 왼쪽 스킬 패널에 그대로 적용하고 그 스킬을 펼쳐 보여줌 */
+function applyBuildToLeft(id, picks, combo) {
+  const sc = S.skills.find(k => k.id === id); if (!sc) return;
+  sc.picks = JSON.parse(JSON.stringify(picks || {}));
+  sc.combo = combo || null;
+  sc.on = true; sc.open = true;
+  if (S.ui && S.ui.fold) S.ui.fold['스킬'] = false;
+  document.querySelectorAll('.layout > div:first-child .panel').forEach(pn => { const h = pn.querySelector(':scope > h2'); if (h && h.firstChild && h.firstChild.textContent.trim() === '스킬') pn.classList.remove('collapsed'); });
+  const wasFresh = EV && !EV.stale;   // 스킬 선택만 바꾸는 것이라 기댓값 시트는 다시 계산할 필요 없음
+  save(); rerender();
+  if (wasFresh && EV) { EV.stale = false; renderEV(); markEvBtn(); }
+  const det = document.querySelector(`#skillBox details[data-sid="${id}"]`);
+  if (det) {
+    det.open = true;
+    const col = document.querySelector('.layout > div:first-child');
+    col.scrollTop += det.getBoundingClientRect().top - col.getBoundingClientRect().top - 12;
+    det.classList.add('flash'); setTimeout(() => det.classList.remove('flash'), 1700);
+  }
+}
+function buildName(r) {
+  const p = r.names.length ? r.names.join(' + ') : '강화 없음';
+  return r.combo ? `${p} ⇒ [조합] ${r.comboName}` : p;
+}
+function renderEV() {
+  if (!EV) return;
+  const ids = S.skills.map(s => s.id);
+  const sumList = ids.map(id => EV.sum[id]);
+  const totalAvg = sumList.reduce((a, x) => a + x.avg, 0) || 1;
+  const totalMax = sumList.reduce((a, x) => a + x.max, 0) || 1;
+  const meanOfAvgs = totalAvg / sumList.length;
+  const gmax = Math.max(1, ...sumList.map(x => x.max));
+  document.getElementById('evInfo').textContent = `범위 안 적 ${EV.N}마리 · ${EV.T}초 · ${EV.rows.length}개 빌드` + (presetText() ? ' · ' + presetText() : '') + (EV.stale ? ' · ⚠ 설정이 바뀌었습니다 (다시 계산 필요)' : '');
+  // 범위 막대: 최소 ~ 최대, 기댓값 · 중앙값 표시, 오른쪽에 기댓값 비중
+  let ch = '<div class="hint" style="margin-top:8px">막대 = 최소 ~ 최대 DPS · 흰 선 = 기댓값 (평균) · 점선 = 중앙값 · 오른쪽 = 모든 스킬 기댓값 합 중 비중</div>';
+  const order = sumList.slice().sort((a, b) => b.avg - a.avg);
+  for (const x of order) {
+    const c = colorOf[x.id], pc = x.avg / totalAvg;
+    ch += `<div style="display:grid;grid-template-columns:150px 1fr 150px;gap:8px;align-items:center;margin:3px 0">
+      <div style="font-size:12px"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${c};margin-right:5px"></span>${x.def.name}</div>
+      <div style="position:relative;height:16px;background:#2c3142;border-radius:3px">
+        <div style="position:absolute;left:${x.min / gmax * 100}%;width:${Math.max(0.5, (x.max - x.min) / gmax * 100)}%;top:0;bottom:0;background:${c};opacity:.45;border-radius:3px"></div>
+        <div style="position:absolute;left:${x.avg / gmax * 100}%;top:-2px;bottom:-2px;width:3px;background:#fff;border-radius:1px" title="기댓값 ${fmtD(x.avg)}"></div>
+        <div style="position:absolute;left:${x.med / gmax * 100}%;top:0;bottom:0;border-left:1px dashed #fff" title="중앙값 ${fmtD(x.med)}"></div>
+      </div>
+      <div style="font-size:12px;text-align:right"><b>${(pc * 100).toFixed(1)}%</b> <span class="dim">기댓값 ${fmtD(x.avg)}</span></div></div>`;
+  }
+  // 전체 비중 누적 막대 (기댓값 · 최대)
+  const stack = (label, key, tot) => `<div class="hint" style="margin:10px 0 2px">${label}</div><div style="display:flex;height:22px;border-radius:4px;overflow:hidden">${order.map(x => `<div title="${x.def.name} ${(x[key] / tot * 100).toFixed(1)}%" style="width:${x[key] / tot * 100}%;background:${colorOf[x.id]}"></div>`).join('')}</div>`;
+  ch += stack('전체 DPS 배분 · 기댓값 기준', 'avg', totalAvg) + stack('전체 DPS 배분 · 최고 빌드 기준', 'max', totalMax);
+  document.getElementById('evChart').innerHTML = ch;
+
+  // 요약 표
+  let h = '<table style="margin-top:10px"><tr><th>스킬</th><th>빌드 수</th><th>기본 (강화 없음)</th><th>최소</th><th>중앙값</th><th>기댓값</th><th>최대</th><th>최대 ÷ 최소</th><th>기댓값 비중</th><th>스킬 평균 대비 (기댓값)</th><th>최고 빌드 대비</th><th style="text-align:left">최고 빌드</th><th style="text-align:left">최저 빌드</th></tr>';
+  for (const x of order) {
+    const rel = x.avg / meanOfAvgs;
+    h += `<tr><td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${colorOf[x.id]};margin-right:5px"></span>${x.def.name} <span class="tag ${x.def.kind}">${{ auto: '자동', manual: '수동', move: '이동' }[x.def.kind]}</span></td><td>${x.n}</td><td>${fmtD(x.base)}</td><td>${fmtD(x.min)}</td><td>${fmtD(x.med)}</td><td><b>${fmtD(x.avg)}</b></td><td>${fmtD(x.max)}</td><td>${x.min > 0 ? '×' + (x.max / x.min).toFixed(1) : '-'}</td><td>${(x.avg / totalAvg * 100).toFixed(1)}%</td><td class="${rel >= 1.2 ? 'up' : rel <= 0.8 ? 'down' : ''}"><b>×${rel.toFixed(2)}</b></td><td class="${x.max / meanOfAvgs >= 2 ? 'up' : ''}">×${(x.max / meanOfAvgs).toFixed(2)}</td><td style="text-align:left;white-space:normal;font-size:11px;max-width:250px">${buildName(x.best)} <span class="dim">(${fmtD(x.best.dps)})</span> <button class="small evapply" data-sid="${x.id}" data-which="best">적용</button></td><td style="text-align:left;white-space:normal;font-size:11px;max-width:250px">${buildName(x.worst)} <span class="dim">(${fmtD(x.worst.dps)})</span> <button class="small evapply" data-sid="${x.id}" data-which="worst">적용</button></td></tr>`;
+  }
+  h += `<tr><td><b>합계</b></td><td>${EV.rows.length}</td><td>${fmtD(sumList.reduce((a, x) => a + x.base, 0))}</td><td>${fmtD(sumList.reduce((a, x) => a + x.min, 0))}</td><td>${fmtD(sumList.reduce((a, x) => a + x.med, 0))}</td><td><b>${fmtD(totalAvg)}</b></td><td>${fmtD(totalMax)}</td><td></td><td>100%</td><td></td><td></td><td></td><td></td></tr></table>`;
+  document.getElementById('evSummary').innerHTML = h;
+  document.querySelectorAll('#evSummary .evapply').forEach(b => b.addEventListener('click', () => { const x = EV.sum[b.dataset.sid][b.dataset.which]; applyBuildToLeft(x.id, x.picks, x.combo); }));
+
+  // 필터 · 모든 빌드 표
+  const sel = document.getElementById('evFilter'); const cur = sel.value || 'all';
+  sel.innerHTML = '<option value="all">전체 스킬</option>' + ids.map(id => `<option value="${id}">${SKILLS.find(d => d.id === id).name}</option>`).join('');
+  sel.value = cur;
+  renderEVBuilds();
+}
+/** 이 빌드에 적용된 효과량의 총합 (특수 강화 · 조합이 더한 값을 효과 종류별로 합침) */
+function effectTotalsHtml(r) {
+  const def = SKILLS.find(d => d.id === r.id);
+  const list = Object.values(r.picks).map(id => def.specials.find(x => x.id === id)).filter(Boolean);
+  const mods = list.map(x => x.mods);
+  const cm = r.combo ? def.combos.find(c => c.id === r.combo) : null;
+  if (cm) mods.push(cm.mods);
+  const m = mergeMods(mods);
+  const chips = [];
+  const add = (label, val, good) => chips.push(`<span class="chip" style="padding:2px 9px"><span class="dim">${label}</span> <b class="${good === true ? 'up' : good === false ? 'down' : ''}">${val}</b></span>`);
+  if (m.dmgPct) add('피해량', (m.dmgPct > 0 ? '+' : '') + (m.dmgPct * 100).toFixed(0) + '%', m.dmgPct > 0);
+  if (m.finalMul !== 1) add('최종 피해량', '×' + m.finalMul.toFixed(2), m.finalMul > 1);
+  if (m.cdMul !== 1) add('쿨타임', '×' + m.cdMul.toFixed(2) + ` (${m.cdMul < 1 ? '-' : '+'}${Math.abs((1 - m.cdMul) * 100).toFixed(0)}%)`, m.cdMul < 1);
+  if (m.vsBurn !== 1) add('화상 상태 적 최종 피해량', '×' + m.vsBurn.toFixed(2), true);
+  if (m.vsStun !== 1) add('기절 상태 적 최종 피해량', '×' + m.vsStun.toFixed(2), true);
+  if (m.stunAdd) add('기절', '+' + m.stunAdd + '초', true);
+  if (m.countAdd) add('공격 횟수', (m.countAdd > 0 ? '+' : '') + m.countAdd, true);
+  if (m.intervalMul !== 1) add('공격 간격', '×' + m.intervalMul.toFixed(2), m.intervalMul < 1);
+  if (m.delayMul !== 1) add('폭발 간격 · 딜레이', '×' + m.delayMul.toFixed(2), m.delayMul < 1);
+  if (m.durAdd) add('지속 시간', '+' + m.durAdd + '초', true);
+  if (m.durPct) add('지속 시간', (m.durPct > 0 ? '+' : '') + (m.durPct * 100).toFixed(0) + '%', m.durPct > 0);
+  if (m.hitCdRed) add('적중 시 남은 쿨타임', '-' + (m.hitCdRed * 100).toFixed(1) + '%', true);
+  if (m.hitCdSec) add('적중 시 남은 쿨타임', '-' + m.hitCdSec + '초', true);
+  if (m.burnAdd) add('적중 시 화상 스택', '+' + m.burnAdd, true);
+  if (m.stacksAdd) add('최대 스택', '+' + m.stacksAdd, true);
+  if (m.extras.length) add('추가 사용', '+' + m.extras.length + '회', true);
+  if (m.nullCd) add('쿨타임 감소 무효화', `최종 +${((m.nullCd.base || 0) * 100).toFixed(0)}%` + (m.nullCd.perPct ? ` · 감소 1%당 +${(m.nullCd.perPct * 100).toFixed(0)}%` : '') + (m.nullCd.perStack ? ` · 스택 1당 +${(m.nullCd.perStack * 100).toFixed(0)}%` : ''), null);
+  if (m.vuln) add('받는 최종 피해량 (적중 시 부여)', `+${(m.vuln.per * 100).toFixed(0)}% × 최대 ${m.vuln.max}스택`, true);
+  if (m.vulnBurning) add('받는 최종 피해량 (화상 적 적중 시)', `+${(m.vulnBurning.per * 100).toFixed(0)}% × 최대 ${m.vulnBurning.max}스택`, true);
+  // 숫자로 합칠 수 없는 효과 (고정 피해 · 구조 변경 · 처치 효과 …) 는 이름만
+  const named = list.concat(cm ? [{ name: '[조합] ' + cm.name }] : []).filter(x => {
+    const mm = x.mods || {};
+    const numeric = ['dmgPct', 'finalMul', 'cdMul', 'vsBurn', 'vsStun', 'stunAdd', 'countAdd', 'intervalMul', 'delayMul', 'durAdd', 'durPct', 'hitCdRed', 'hitCdSec', 'burnAdd', 'stacksAdd', 'extras', 'nullCd', 'vuln', 'vulnBurning'].some(k => mm[k] != null);
+    return !numeric || (mm.flags && Object.keys(mm.flags).length);
+  });
+  const extra = named.length ? `<div style="margin-top:4px" class="dim">그 외 효과 (수치로 합칠 수 없음): ${named.map(x => `<b style="color:var(--text)">${x.name}</b>`).join(', ')}</div>` : '';
+  const none = !chips.length && !named.length ? '<span class="dim">추가된 효과 없음 (강화 없음)</span>' : '';
+  return `<div style="padding:2px 0"><div class="dim" style="margin-bottom:3px">적용된 효과량 합계</div>${chips.join('')}${none}${extra}</div>`;
+}
+
+function renderEVBuilds() {
+  if (!EV) return;
+  const f = document.getElementById('evFilter').value;
+  let rows = EV.rows.filter(r => f === 'all' || r.id === f);
+  const baseOf = id => EV.sum[id].base;
+  const allMean = EV.rows.reduce((a, r) => a + r.dps, 0) / (EV.rows.length || 1);   // 모든 스킬 · 모든 빌드의 평균 DPS
+  rows = rows.map(r => Object.assign({ vsAll: allMean > 0 ? r.dps / allMean : 0, ratio: baseOf(r.id) > 0 ? r.dps / baseOf(r.id) : 0, vsAvg: EV.sum[r.id].avg > 0 ? r.dps / EV.sum[r.id].avg : 0, build: buildName(r) }, r));
+  rows.sort((a, b) => (typeof a[EVSORT.key] === 'string' ? a[EVSORT.key].localeCompare(b[EVSORT.key]) : a[EVSORT.key] - b[EVSORT.key]) * EVSORT.dir);
+  const LIMIT = 400, shown = rows.slice(0, LIMIT);
+  const maxDps = Math.max(1, ...rows.map(r => r.dps));
+  const H = [['name', '스킬'], ['build', '빌드 (특수 강화 · 조합)'], ['cd', '유효 쿨타임'], ['perCast', '1회 총 피해량'], ['dps', 'DPS'], ['ratio', '기본 대비'], ['vsAvg', '스킬 기댓값 대비'], ['vsAll', '전체 평균 대비']];
+  let h = '<table><tr>' + H.map(([k, l]) => `<th data-k="${k}" style="cursor:pointer">${l}${EVSORT.key === k ? (EVSORT.dir < 0 ? ' ▼' : ' ▲') : ''}</th>`).join('') + '<th style="width:120px"></th><th></th></tr>';
+  shown.forEach((r, ri) => {
+    h += `<tr data-ri="${ri}" style="cursor:pointer"><td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${colorOf[r.id]};margin-right:5px"></span>▸ ${r.name}</td><td style="text-align:left;white-space:normal;font-size:11px;max-width:380px">${r.build}</td><td>${r.cd.toFixed(1)}초</td><td>${fmt(r.perCast)}</td><td><b>${fmtD(r.dps)}</b></td><td class="${r.ratio >= 1.005 ? 'up' : r.ratio <= 0.995 ? 'down' : 'dim'}">×${r.ratio.toFixed(2)}</td><td class="${r.vsAvg >= 1.5 ? 'up' : r.vsAvg <= 0.5 ? 'down' : ''}">×${r.vsAvg.toFixed(2)}</td><td class="${r.vsAll >= 2 ? 'up' : r.vsAll <= 0.5 ? 'down' : ''}"><b>×${r.vsAll.toFixed(2)}</b></td><td><div style="background:#2c3142;border-radius:3px;height:8px"><div style="width:${r.dps / maxDps * 100}%;background:${colorOf[r.id]};height:8px;border-radius:3px"></div></div></td><td><button class="small evapply" data-ri="${ri}" title="이 빌드의 특수 강화 · 조합을 왼쪽 스킬 패널에 그대로 적용">왼쪽에 적용</button></td></tr>`;
+  });
+  h += '</table>' + `<div class="hint">전체 평균 대비 = 이 빌드 DPS ÷ 모든 스킬 · 모든 빌드의 평균 DPS (${fmtD(allMean)}). 스킬 기댓값 대비 = 같은 스킬의 모든 빌드 평균과 비교.</div>` + (rows.length > LIMIT ? `<div class="hint">${rows.length}개 중 ${LIMIT}개만 표시 — 스킬을 골라 보거나 정렬을 바꿔 보세요.</div>` : `<div class="hint">${rows.length}개 빌드</div>`);
+  const el = document.getElementById('evBuilds'); el.innerHTML = h;
+  el.querySelectorAll('.evapply').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); const r = shown[+b.dataset.ri]; applyBuildToLeft(r.id, r.picks, r.combo); }));
+  el.querySelectorAll('tr[data-ri]').forEach(tr => tr.addEventListener('click', () => {
+    const nx = tr.nextElementSibling;
+    if (nx && nx.classList.contains('evd')) { nx.remove(); return; }
+    const r = shown[+tr.dataset.ri];
+    const d = document.createElement('tr'); d.className = 'evd';
+    d.innerHTML = `<td colspan="10" style="text-align:left;white-space:normal;background:#1a1d26">${effectTotalsHtml(r)}</td>`;
+    tr.after(d);
+  }));
+  el.querySelectorAll('th[data-k]').forEach(th => th.addEventListener('click', () => {
+    const k = th.dataset.k; EVSORT = { key: k, dir: EVSORT.key === k ? -EVSORT.dir : -1 }; renderEVBuilds();
+  }));
+}
+document.getElementById('btnEv').addEventListener('click', () => { EV = null; computeEV(); });
+document.getElementById('evFilter').addEventListener('change', renderEVBuilds);
+
+// ═════════ 밸패 수정 (모든 조정 수치를 한 곳에서) ═════════
+const BAL = { q: '', only: false };
+function balVisible() { const t = document.getElementById('tab-bal'); return t && t.style.display !== 'none'; }
+function setOv(id, path, def, v) {
+  if (Math.abs(v - def) < 1e-9) { if (S.ov[id]) { delete S.ov[id][path]; if (!Object.keys(S.ov[id]).length) delete S.ov[id]; } }
+  else (S.ov[id] = S.ov[id] || {})[path] = v;
+}
+// 확정된 기본값 (밸패 확정): 있으면 "기본" 은 확정값, 없으면 게임 원본
+const LK = () => S.lock || { ov: {}, params: {}, fs: {} };
+const refOv = (id, path, orig) => (LK().ov[id] && LK().ov[id][path] != null) ? LK().ov[id][path] : orig;
+const refParam = (sid, k, orig) => (LK().params[sid] && LK().params[sid][k] != null) ? LK().params[sid][k] : orig;
+const refFs = (k, orig) => (LK().fs && LK().fs[k] != null) ? LK().fs[k] : orig;
+const clone = o => JSON.parse(JSON.stringify(o));
+// ── 기본 강화 1회당 증가량 (스킬 · 패시브별)
+const bvKey = (kind, id) => (kind === 'skill' ? 's:' : 'p:') + id;
+const bvDef = (kind, k) => BASIC_DEF[kind][k];
+const bvCur = (kind, id, k) => { const o = S.bv[bvKey(kind, id)]; return o && o[k] != null ? o[k] : bvDef(kind === 'skill' ? 'skill' : id, k); };
+const bvRef = (kind, id, k) => { const o = (LK().bv || {})[bvKey(kind, id)]; return o && o[k] != null ? o[k] : bvDef(kind === 'skill' ? 'skill' : id, k); };
+function setBv(kind, id, k, v) {
+  const key = bvKey(kind, id), def = bvDef(kind === 'skill' ? 'skill' : id, k);
+  if (Math.abs(v - def) < 1e-9) { if (S.bv[key]) { delete S.bv[key][k]; if (!Object.keys(S.bv[key]).length) delete S.bv[key]; } }
+  else (S.bv[key] = S.bv[key] || {})[k] = v;
+}
+function snapshotNow() {
+  const params = {};
+  for (const sc of S.skills) if (Object.keys(sc.params).length) params[sc.id] = clone(sc.params);
+  return { ov: clone(S.ov), params, fs: clone(S.pas.fs.params), bv: clone(S.bv) };
+}
+function applySnapshot(sn) {
+  S.ov = clone(sn.ov || {});
+  for (const sc of S.skills) sc.params = sn.params && sn.params[sc.id] ? clone(sn.params[sc.id]) : {};
+  S.pas.fs.params = clone(sn.fs || {});
+  S.bv = clone(sn.bv || {});
+}
+function pendingCount() {
+  let n = 0;
+  const lk = LK();
+  const ids = new Set([...Object.keys(S.ov), ...Object.keys(lk.ov)]);
+  for (const id of ids) { const a = S.ov[id] || {}, b = lk.ov[id] || {}; for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) if (a[k] !== b[k]) n++; }
+  for (const sc of S.skills) { const a = sc.params, b = lk.params[sc.id] || {}; for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) if (a[k] !== b[k]) n++; }
+  { const a = S.pas.fs.params, b = lk.fs || {}; for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) if (a[k] !== b[k]) n++; }
+  { const a = S.bv, b = lk.bv || {}; for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) { const x = a[key] || {}, y = b[key] || {}; for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) if (x[k] !== y[k]) n++; } }
+  return n;
+}
+function renderLockBar() {
+  const lk = S.lock;
+  document.getElementById('lockInfo').innerHTML = lk
+    ? `확정 기준: <b style="color:var(--accent)">${lk.name}</b> <span class="dim">(${lk.at})</span> · 확정 이후 바꾼 수치 <b>${pendingCount()}</b>개`
+    : `확정한 기본값 없음 — 지금 "기본"은 게임 원본 값입니다 · 바꾼 수치 <b>${pendingCount()}</b>개`;
+  const sel = document.getElementById('lockHist'); const cur = sel.value;
+  sel.innerHTML = '<option value="">확정 이력…</option>' + S.locks.map((l, i) => `<option value="${i}">${l.name} (${l.at})</option>`).join('');
+  sel.value = cur;
+}
+function renderBal() {
+  renderLockBar();
+  if (!balVisible()) return;
+  const el = document.getElementById('balTable');
+  const q = BAL.q.trim().toLowerCase(), only = BAL.only;
+  const all = makeCfg(S);
+  const match = (...t) => !q || t.join(' ').toLowerCase().includes(q);
+  S.ui.bal = S.ui.bal || {};
+  let changedTotal = 0, fromOrig = 0;
+  const frag = document.createElement('div');
+
+  const addGroup = (id, title, color, headRight, rowsBuilder) => {
+    const body = document.createElement('div'); body.className = 'body';
+    const n = rowsBuilder(body);
+    if (!n && (q || only)) return;
+    const det = document.createElement('details'); det.open = q || only ? true : !!S.ui.bal[id];
+    det.addEventListener('toggle', () => { if (!(q || only)) { S.ui.bal[id] = det.open; save(); } });
+    const sum = document.createElement('summary');
+    sum.innerHTML = `<span style="width:9px;height:9px;border-radius:2px;background:${color};display:inline-block"></span><b>${title}</b><span style="flex:1"></span>${headRight}`;
+    det.appendChild(sum); det.appendChild(body); frag.appendChild(det);
+  };
+
+  // 한 줄: 항목 | 원본 | 기본 (확정) | 현재 (입력) | 변화 (기본 대비)
+  const fieldRow = (table, label, unit, orig, ref, cur, onchange) => {
+    const tr = document.createElement('tr');
+    const changed = Math.abs(cur - ref) > 1e-9; if (changed) changedTotal++;
+    if (Math.abs(cur - orig) > 1e-9) fromOrig++;
+    const td = (c, a) => { const x = document.createElement('td'); if (a) x.style.textAlign = a; x.append(c); return x; };
+    tr.appendChild(td(document.createTextNode(label), 'left'));
+    tr.appendChild(td(document.createTextNode(+(+orig).toFixed(4)), 'right'));
+    const refSpan = document.createElement('span'); refSpan.textContent = +(+ref).toFixed(4);
+    if (Math.abs(ref - orig) > 1e-9) { refSpan.style.color = 'var(--accent)'; refSpan.style.fontWeight = '600'; }
+    tr.appendChild(td(refSpan, 'right'));
+    tr.appendChild(td(numInput(cur, ref, 'any', onchange), 'right'));
+    const u = document.createElement('span'); u.className = 'dim'; u.textContent = unit || ''; u.style.fontSize = '11px';
+    tr.appendChild(td(u, 'left'));
+    if (changed) { const d = cur - ref; const sp = document.createElement('span'); sp.className = d > 0 ? 'up' : 'down'; sp.textContent = (d > 0 ? '+' : '') + +d.toFixed(4) + (ref ? ` (${d > 0 ? '+' : ''}${(d / Math.abs(ref) * 100).toFixed(0)}%)` : ''); tr.appendChild(td(sp, 'right')); }
+    else tr.appendChild(td(document.createTextNode(''), 'right'));
+    table.appendChild(tr);
+  };
+  const newTable = body => {
+    const t = document.createElement('table'); t.className = 'baltbl';
+    t.innerHTML = '<tr><th style="text-align:left">항목</th><th>원본</th><th>기본</th><th>현재</th><th style="text-align:left"></th><th>변화 (기본 대비)</th></tr>';
+    body.appendChild(t); return t;
+  };
+  const isChanged = (cur, ref) => Math.abs(cur - ref) > 1e-9;
+
+  // ── 스킬
+  for (const sc of S.skills) {
+    const def = SKILLS.find(d => d.id === sc.id);
+    const spec = SPEC[sc.id];
+    const head = `<span class="dim" style="font-size:11px">기본 ${fmtD(spec.base.dps)} → 현재 선택 ${fmtD(spec.cur.dps)} DPS</span><span class="tag ${def.kind}">${{ auto: '자동', manual: '수동', move: '이동' }[def.kind]}</span>`;
+    addGroup('s:' + def.id, def.name, colorOf[def.id], head, body => {
+      let rows = 0;
+      // 기본 강화 횟수 · 포함 (스킬별)
+      if (match(def.name, '기본 강화', '횟수', '포함') && (!only || sc.ups.dmg > 0 || sc.ups.cd > 0 || sc.useBasic === false)) {
+        const h0 = document.createElement('div'); h0.className = 'tier'; h0.textContent = '기본 강화 횟수 (이 스킬)'; body.appendChild(h0);
+        const sw = document.createElement('label'); sw.className = 'switch'; sw.style.margin = '2px 0';
+        const ck = document.createElement('input'); ck.type = 'checkbox'; ck.checked = sc.useBasic !== false;
+        ck.addEventListener('change', () => { sc.useBasic = ck.checked; save(); rerender(); });
+        sw.append(ck, document.createTextNode('기본 강화 계산에 포함' + (S.inc.basic ? '' : ' (프리셋으로 전체 꺼짐)'))); body.appendChild(sw);
+        body.appendChild(row('피해량 강화 횟수', numInput(sc.ups.dmg, 0, 1, v => { sc.ups.dmg = Math.max(0, Math.round(v)); }), '회'));
+        body.appendChild(row('쿨타임 강화 횟수', numInput(sc.ups.cd, 0, 1, v => { sc.ups.cd = Math.max(0, Math.round(v)); }), '회'));
+        rows++;
+      }
+      // 기본 강화 1회당 증가량
+      const bvRows = ['dmg', 'cd'].filter(k => match(def.name, '기본 강화', BASIC_LBL.skill[k][0]) && (!only || isChanged(bvCur('skill', def.id, k), bvRef('skill', def.id, k))));
+      if (bvRows.length) {
+        const h = document.createElement('div'); h.className = 'tier'; h.textContent = '기본 강화 (1회당 증가량)'; body.appendChild(h);
+        const t = newTable(body);
+        for (const k of bvRows) { fieldRow(t, BASIC_LBL.skill[k][0], BASIC_LBL.skill[k][1], bvDef('skill', k), bvRef('skill', def.id, k), bvCur('skill', def.id, k), v => setBv('skill', def.id, k, v)); rows++; }
+      }
+      const params = [['cd', '기본 쿨타임' + (def.stacks ? ' (스택당)' : ''), def.cd, '초']].concat(Object.keys(def.params).map(k => [k, def.params[k].l, def.params[k].v, def.params[k].u || '']));
+      const pr = params.filter(([k, l, d]) => match(def.name, '스킬 수치', l) && (!only || isChanged(sc.params[k] != null ? sc.params[k] : d, refParam(sc.id, k, d))));
+      if (pr.length) {
+        const h = document.createElement('div'); h.className = 'tier'; h.textContent = '스킬 수치'; body.appendChild(h);
+        const t = newTable(body);
+        for (const [k, l, d, u] of pr) {
+          fieldRow(t, l, u, d, refParam(sc.id, k, d), sc.params[k] != null ? sc.params[k] : d, v => { if (Math.abs(v - d) < 1e-9) delete sc.params[k]; else sc.params[k] = v; });
+          rows++;
+        }
+      }
+      const list = def.specials.map(sp => ({ sp, kind: sp.lv + 'Lv' })).concat((def.combos || []).map(sp => ({ sp, kind: '조합' })));
+      for (const { sp, kind } of list) {
+        const fields = editFields(sp).filter(f => {
+          const cur = S.ov[sp.id] && S.ov[sp.id][f.path] != null ? S.ov[sp.id][f.path] : f.def;
+          return match(def.name, sp.name, sp.desc, f.label, kind) && (!only || isChanged(cur, refOv(sp.id, f.path, f.def)));
+        });
+        if (!fields.length) continue;
+        let eff = '';
+        if (!sp.requires && !sp.requiresAny && spec.base.dps > 0) {
+          const R = runSim(Object.assign({}, all, { skills: [{ id: sc.id, on: true, params: sc.params, picks: { [sp.lv]: sp.id }, combo: null, ups: { dmg: 0, cd: 0 } }] }));
+          const r = R.perSkill[sc.id].total / R.T / spec.base.dps;
+          eff = `<span class="${r >= 1.005 ? 'up' : r <= 0.995 ? 'down' : 'dim'}">단독 효과 ×${r.toFixed(2)}</span>`;
+        }
+        const h = document.createElement('div'); h.className = 'tier'; h.style.display = 'flex'; h.style.gap = '8px';
+        h.innerHTML = `<b style="color:var(--text)">${kind === '조합' ? '[조합] ' : kind + ' · '}${sp.name}</b><span class="dim">${sp.desc}</span><span style="flex:1"></span>${eff}`;
+        body.appendChild(h);
+        const t = newTable(body);
+        for (const f of fields) {
+          const cur = S.ov[sp.id] && S.ov[sp.id][f.path] != null ? S.ov[sp.id][f.path] : f.def;
+          fieldRow(t, f.label, f.unit, f.def, refOv(sp.id, f.path, f.def), cur, v => setOv(sp.id, f.path, f.def, v));
+          rows++;
+        }
+      }
+      if (!rows) body.innerHTML = '<div class="hint">검색 · 필터에 맞는 항목이 없습니다.</div>';
+      return rows;
+    });
+  }
+  // ── 패시브
+  for (const k of ['fs', 'hf', 'ab']) {
+    const P = PASSIVES[k];
+    addGroup('p:' + k, P.name, colorOf.passive, '<span class="tag pas">패시브</span>', body => {
+      let rows = 0;
+      const bvRows = Object.keys(BASIC_DEF[k]).filter(bk => match(P.name, '기본 강화', BASIC_LBL[k][bk][0]) && (!only || isChanged(bvCur('pas', k, bk), bvRef('pas', k, bk))));
+      if (bvRows.length) {
+        const h = document.createElement('div'); h.className = 'tier'; h.textContent = '기본 강화 (1회당 증가량)'; body.appendChild(h);
+        const t = newTable(body);
+        for (const bk of bvRows) { fieldRow(t, BASIC_LBL[k][bk][0], BASIC_LBL[k][bk][1], BASIC_DEF[k][bk], bvRef('pas', k, bk), bvCur('pas', k, bk), v => setBv('pas', k, bk, v)); rows++; }
+      }
+      const pr = Object.keys(P.params).filter(pk => { const d = P.params[pk]; const cur = S.pas[k].params[pk] != null ? S.pas[k].params[pk] : d.v; return match(P.name, '패시브 수치', d.l) && (!only || isChanged(cur, k === 'fs' ? refFs(pk, d.v) : d.v)); });
+      if (pr.length) {
+        const h = document.createElement('div'); h.className = 'tier'; h.textContent = '패시브 수치'; body.appendChild(h);
+        const t = newTable(body);
+        for (const pk of pr) {
+          const d = P.params[pk];
+          fieldRow(t, d.l, d.u || '', d.v, k === 'fs' ? refFs(pk, d.v) : d.v, S.pas[k].params[pk] != null ? S.pas[k].params[pk] : d.v, v => { if (Math.abs(v - d.v) < 1e-9) delete S.pas[k].params[pk]; else S.pas[k].params[pk] = v; });
+          rows++;
+        }
+      }
+      for (const sp of P.specials) {
+        const fields = editFields(sp).filter(f => {
+          const cur = S.ov[sp.id] && S.ov[sp.id][f.path] != null ? S.ov[sp.id][f.path] : f.def;
+          return match(P.name, sp.name, sp.desc, f.label) && (!only || isChanged(cur, refOv(sp.id, f.path, f.def)));
+        });
+        if (!fields.length) continue;
+        const h = document.createElement('div'); h.className = 'tier'; h.style.display = 'flex'; h.style.gap = '8px';
+        h.innerHTML = `<b style="color:var(--text)">${sp.lv}Lv · ${sp.name}</b><span class="dim">${sp.desc}</span>`;
+        body.appendChild(h);
+        const t = newTable(body);
+        for (const f of fields) {
+          const cur = S.ov[sp.id] && S.ov[sp.id][f.path] != null ? S.ov[sp.id][f.path] : f.def;
+          fieldRow(t, f.label, f.unit, f.def, refOv(sp.id, f.path, f.def), cur, v => setOv(sp.id, f.path, f.def, v));
+          rows++;
+        }
+      }
+      if (!rows) body.innerHTML = '<div class="hint">검색 · 필터에 맞는 항목이 없습니다.</div>';
+      return rows;
+    });
+  }
+  el.innerHTML = ''; el.appendChild(frag);
+  document.getElementById('balInfo').textContent = `확정 기준 대비 ${changedTotal}개 변경 · 원본 대비 ${fromOrig}개`;
+}
+// 밸패 확정: 지금 수치를 새 "기본" 으로 저장 (이력에 남기고, 이후의 변화는 이 기준으로 비교)
+document.getElementById('lockBtn').addEventListener('click', () => {
+  const n = pendingCount();
+  const def = '확정 ' + (S.locks.length + 1);
+  const name = prompt(`지금 수치를 기본값으로 확정합니다.\n(확정 이후 바꾼 수치 ${n}개 포함 · 이력에 저장되고 언제든 되돌릴 수 있습니다)\n\n이름:`, def);
+  if (name == null) return;
+  const d = new Date(), pad = x => String(x).padStart(2, '0');
+  const entry = Object.assign({ name: name.trim() || def, at: `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}` }, snapshotNow());
+  S.locks.push(entry); if (S.locks.length > 30) S.locks.shift();
+  S.lock = entry;
+  save(); rerender();
+});
+document.getElementById('lockRevert').addEventListener('click', () => {
+  if (!confirm(S.lock ? '확정한 기본값으로 되돌릴까요? (확정 이후 바꾼 수치는 사라집니다)' : '확정한 기본값이 없어 게임 원본으로 되돌립니다. 계속할까요?')) return;
+  applySnapshot(S.lock || { ov: {}, params: {}, fs: {} });
+  save(); rerender();
+});
+document.getElementById('lockOrig').addEventListener('click', () => {
+  if (!confirm('확정 기준과 바꾼 수치를 모두 지우고 게임 원본 값으로 되돌릴까요? (확정 이력은 남습니다)')) return;
+  S.lock = null; applySnapshot({ ov: {}, params: {}, fs: {} });
+  save(); rerender();
+});
+document.getElementById('lockHist').addEventListener('change', e => {
+  const i = e.target.value; if (i === '') return;
+  const l = S.locks[+i]; e.target.value = '';
+  if (!l || !confirm(`"${l.name}" 확정값을 불러올까요? (지금 수치가 이 확정값으로 바뀌고 확정 기준도 이것이 됩니다)`)) return;
+  S.lock = l; applySnapshot(l); save(); rerender();
+});
+document.getElementById('balQ').addEventListener('input', e => { BAL.q = e.target.value; renderBal(); });
+document.getElementById('balOnly').addEventListener('change', e => { BAL.only = e.target.checked; renderBal(); });
+document.getElementById('balOpenAll').addEventListener('click', () => { S.ui.bal = S.ui.bal || {}; document.querySelectorAll('#balTable details').forEach(d => { d.open = true; }); });
+document.getElementById('balCloseAll').addEventListener('click', () => { document.querySelectorAll('#balTable details').forEach(d => { d.open = false; }); });
+
+// ═════════ 패치 변경 목록 ═════════
+function findSpecialOwner(id) {
+  for (const d of SKILLS) {
+    const sp = d.specials.find(x => x.id === id) || (d.combos || []).find(x => x.id === id);
+    if (sp) return { group: d.name, kind: '특수 강화', sp, isCombo: !d.specials.includes(sp) };
+  }
+  for (const k in PASSIVES) { const sp = PASSIVES[k].specials.find(x => x.id === id); if (sp) return { group: PASSIVES[k].name, kind: '패시브 특수 강화', sp, isCombo: false }; }
+  return null;
+}
+function patchRows() {
+  const rows = [];
+  const add = (group, kind, name, field, from, to, unit, pending) => rows.push({ group, kind, name, field, from, to, unit: unit || '', pending: !!pending });
+  for (const sc of S.skills) {
+    const def = SKILLS.find(d => d.id === sc.id);
+    for (const k in sc.params) {
+      const base = k === 'cd' ? def.cd : (def.params[k] ? def.params[k].v : null);
+      if (base == null || Math.abs(sc.params[k] - base) < 1e-9) continue;
+      add(def.name, '스킬 수치', '-', k === 'cd' ? '기본 쿨타임' : def.params[k].l, base, sc.params[k], k === 'cd' ? '초' : (def.params[k].u || ''), Math.abs(sc.params[k] - refParam(sc.id, k, base)) > 1e-9);
+    }
+  }
+  for (const k of ['fs']) for (const pk in S.pas[k].params) {
+    const d = PASSIVES[k].params[pk];
+    if (d && Math.abs(S.pas[k].params[pk] - d.v) > 1e-9) add(PASSIVES[k].name, '패시브 수치', '-', d.l, d.v, S.pas[k].params[pk], d.u || '', Math.abs(S.pas[k].params[pk] - refFs(pk, d.v)) > 1e-9);
+  }
+  for (const key in S.bv) {
+    const isSkill = key.startsWith('s:'), id = key.slice(2);
+    const kind = isSkill ? 'skill' : id;
+    const group = isSkill ? (SKILLS.find(d => d.id === id) || {}).name : (PASSIVES[id] || {}).name;
+    for (const k in S.bv[key]) {
+      const ref = (((LK().bv || {})[key] || {})[k]);
+      add(group, '기본 강화', '-', BASIC_LBL[kind][k][0], BASIC_DEF[kind][k], S.bv[key][k], BASIC_LBL[kind][k][1].indexOf('=') < 0 ? BASIC_LBL[kind][k][1] : '', Math.abs(S.bv[key][k] - (ref != null ? ref : BASIC_DEF[kind][k])) > 1e-9);
+    }
+  }
+  for (const id in S.ov) {
+    const o = findSpecialOwner(id); if (!o) continue;
+    const fields = editFields(o.sp);
+    for (const path in S.ov[id]) {
+      const f = fields.find(x => x.path === path);
+      add(o.group, o.isCombo ? '특수 조합' : o.kind, o.sp.name, f ? f.label : path, f ? f.def : null, S.ov[id][path], f && f.unit && f.unit.indexOf('=') < 0 ? f.unit : '', f ? Math.abs(S.ov[id][path] - refOv(id, path, f.def)) > 1e-9 : true);   // '0.5 = +50%' 같은 설명 문구는 단위로 쓰지 않음
+    }
+  }
+  return rows;
+}
+function patchDelta(r) {
+  if (r.from == null) return '';
+  const d = r.to - r.from;
+  const rel = r.from !== 0 ? ` / ${d >= 0 ? '+' : ''}${(d / Math.abs(r.from) * 100).toFixed(0)}%` : '';
+  return `${d >= 0 ? '+' : ''}${+d.toFixed(4)}${rel}`;
+}
+function renderPatch() {
+  const rows = patchRows();
+  document.getElementById('patchInfo').textContent = rows.length ? `바꾼 수치 ${rows.length}개` : '바꾼 수치 없음';
+  let h = '<table><tr><th>스킬 · 패시브</th><th>구분</th><th>특수 강화 · 조합</th><th>항목</th><th>기존</th><th></th><th>변경</th><th>증감</th><th>상태</th></tr>';
+  for (const r of rows)
+    h += `<tr><td>${r.group}</td><td class="dim">${r.kind}</td><td>${r.name}</td><td style="text-align:left;white-space:normal;max-width:260px">${r.field}${r.unit ? ` <span class="dim">(${r.unit})</span>` : ''}</td><td>${r.from == null ? '-' : +(+r.from).toFixed(4)}</td><td class="dim">→</td><td><b>${+(+r.to).toFixed(4)}</b></td><td class="${r.from != null && r.to > r.from ? 'up' : r.from != null && r.to < r.from ? 'down' : ''}">${patchDelta(r)}</td><td class="${r.pending ? 'dim' : ''}">${r.pending ? '미확정' : (S.lock ? '확정됨' : '')}</td></tr>`;
+  h += '</table>' + (rows.length ? '' : '<div class="hint">왼쪽 스킬 · 패시브의 ⚙ 로 특수 강화 수치를 바꾸거나 스킬 수치 칸을 바꾸면 여기에 모입니다.</div>');
+  document.getElementById('patchTable').innerHTML = h;
+}
+const patchText = () => patchRows().map(r => `[${r.group}] ${r.name !== '-' ? r.name + ' · ' : ''}${r.field}: ${r.from == null ? '?' : +(+r.from).toFixed(4)} → ${+(+r.to).toFixed(4)}${r.unit ? ' ' + r.unit : ''}${r.from != null ? ' [' + patchDelta(r) + ']' : ''}${r.pending && S.lock ? ' (미확정)' : ''}`).join('\n');
+const patchCsv = () => ['스킬/패시브,구분,특수 강화/조합,항목,기존,변경,증감'].concat(patchRows().map(r => [r.group, r.kind, r.name, r.field, r.from == null ? '' : +(+r.from).toFixed(4), +(+r.to).toFixed(4), patchDelta(r)].map(x => '"' + String(x).replace(/"/g, '""') + '"').join(','))).join('\n');
+const copyText = t => { navigator.clipboard ? navigator.clipboard.writeText(t).then(() => alert('복사했습니다.')) : prompt('복사하세요', t); };
+document.getElementById('btnPatchCopy').addEventListener('click', () => copyText(patchText() || '(바꾼 수치 없음)'));
+document.getElementById('btnPatchCsv').addEventListener('click', () => copyText(patchCsv()));
+document.getElementById('btnPatchReset').addEventListener('click', () => {
+  if (!confirm('특수 강화 수치와 스킬 수치를 모두 기본값으로 되돌릴까요? (전역 설정과 아이템은 그대로)')) return;
+  S.ov = {};
+  for (const sc of S.skills) sc.params = {};
+  S.pas.fs.params = {};
+  save(); rerender();
+});
+
+// ═════════ 버튼 · 탭 ═════════
+document.getElementById('btnBase').addEventListener('click', () => { S.base = summarize(LAST); save(); renderResult(LAST); });
+document.getElementById('btnBaseClear').addEventListener('click', () => { S.base = null; save(); renderResult(LAST); });
+/** 모든 세팅 초기화: 저장된 상태 · 수치 조정 · 확정 · 기준 · 계산 캐시까지 전부 처음으로 */
+function resetAll() {
+  if (!confirm('모든 세팅을 처음 상태로 되돌릴까요?\n(수치 조정 · 확정 · 아이템 · 프리셋 · 적 수 · 보스 체력 · 접힘 상태가 전부 지워집니다)')) return;
+  try { localStorage.removeItem(STORE); } catch (e) {}
+  S = defaultState();
+  EV = null; EVSORT = { key: 'dps', dir: -1 }; SORT = { key: 'dps', dir: -1 };
+  save(); rerender();
+}
+document.getElementById('btnReset').addEventListener('click', resetAll);
+document.getElementById('btnResetAll').addEventListener('click', resetAll);
+document.getElementById('btnExport').addEventListener('click', () => {
+  const t = JSON.stringify({ G: S.G, pas: S.pas, skills: S.skills, items: S.items, sets: S.sets, ov: S.ov, bv: S.bv, inc: S.inc, lock: S.lock, locks: S.locks });
+  navigator.clipboard ? navigator.clipboard.writeText(t).then(() => alert('설정을 복사했습니다.')) : prompt('복사하세요', t);
+});
+document.getElementById('btnImport').addEventListener('click', () => {
+  const t = prompt('복사한 설정을 붙여넣으세요'); if (!t) return;
+  try { S = mergeState(defaultState(), JSON.parse(t)); save(); rerender(); } catch (e) { alert('읽을 수 없는 설정입니다.'); }
+});
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
+  for (const t of ['result', 'sweep', 'spec', 'ev', 'bal', 'patch', 'calc']) document.getElementById('tab-' + t).style.display = t === b.dataset.tab ? '' : 'none';
+  if (b.dataset.tab === 'ev' && (!EV || EV.stale) && !EVRUN) computeEV();
+  if (b.dataset.tab === 'bal') renderBal();
+}));
+
+// 모든 패널 (왼쪽 조정 메뉴 · 오른쪽 시트): 제목을 누르면 접고 펼침 (상태는 저장됨)
+document.querySelectorAll('.layout .panel').forEach((panel, i) => {
+  const h = panel.querySelector(':scope > h2'); if (!h) return;
+  const key = h.firstChild && h.firstChild.textContent ? h.firstChild.textContent.trim() : 'p' + i;
+  if (S.ui && S.ui.fold && S.ui.fold[key]) panel.classList.add('collapsed');
+  h.title = '눌러서 접기 / 펼치기';
+  h.addEventListener('click', e => {
+    if (e.target.closest('button, input, select, label')) return;   // 제목 안의 버튼은 그대로 동작
+    const c = panel.classList.toggle('collapsed');
+    if (!S.ui) S.ui = { fold: {} };
+    S.ui.fold[key] = c; save();
+  });
+});
+
+function markEvBtn() {
+  const b = document.getElementById('btnEv'); if (!b) return;
+  const need = !EV || EV.stale;
+  b.classList.toggle('primary', !!need);
+  b.textContent = need ? '기댓값 다시 계산 ⚠' : '기댓값 다시 계산';
+}
+function updateNBar() {
+  const N = S.G.N;
+  document.querySelectorAll('.nbar button[data-n]').forEach(b => b.classList.toggle('on', +b.dataset.n === N));
+  document.getElementById('nInfo').textContent = [1, 5, 10].includes(N) ? '' : `현재 ${N}마리 (전역 설정에서 직접 입력한 값)`;
+}
+document.querySelectorAll('.nbar button[data-n]').forEach(b => b.addEventListener('click', () => { S.G.N = +b.dataset.n; save(); rerender(); }));   // 적 수 버튼만 (기댓값 버튼은 제외)
+
+buildSweepSelect();
+rerender();
+</script>
+</body>
+</html>

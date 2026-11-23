@@ -129,6 +129,8 @@ public static class DamageMath
 {
     /// <summary>부동소수 오차 보정 (10 × 1.3 = 12.999… → 13)</summary>
     const float Eps = 1e-4f;
+    /// <summary>피해 1회의 최소 피해 (0 보다 큰 피해가 내림으로 0 이 되지 않게, 사용자 2026-11-23)</summary>
+    const int MinDamage = 1;
 
     /// <summary>
     /// ① 공격자 단계. initial = 초기 피해량, pct = 피해량 % 합 (출처 스킬 몫), flat = 추가 피해량 합, finalMul = 출처 스킬 몫 최종 배율.
@@ -152,6 +154,8 @@ public static class DamageMath
             if (d.perTarget != null) v *= d.perTarget(e);
             v *= CombatMods.ReceivedMul(e, d);
         }
-        return Mathf.Max(0, Mathf.FloorToInt(v + Eps));
+        // 최소 피해 1 보장 (사용자 2026-11-23): 내림 때문에 피해가 0 이 되지 않음. 피해량 자체가 0 이면 (효과만 주는 호출) 그대로 0
+        int floored = Mathf.FloorToInt(v + Eps);
+        return d.amount > 0f ? Mathf.Max(MinDamage, floored) : Mathf.Max(0, floored);
     }
 }
