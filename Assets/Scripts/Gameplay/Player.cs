@@ -23,6 +23,13 @@ public class Player : MonoBehaviour
     /// <summary>유물 상자 드랍 확률 배율 (불씨 수확, 일반 몹만 — 중간보스는 확정)</summary>
     public float relicChanceMul = 1f;
 
+    /// <summary>상황에 따라 달라지는 받는 피해 배율 (잿불 갑주: 불굴 · 타오르는 장갑 · 화염 진지 …). 피격 순간에 계산</summary>
+    public System.Func<float> DynamicTakenMul;
+    /// <summary>피해를 받을 때 호출 (받는 피해 배율 적용 후 · 보호막 흡수 전의 양) — 잿불 비축 누적용</summary>
+    public System.Action<float> DamageReceived;
+    /// <summary>체력이 1 이하가 되면 호출. true 를 돌려주면 부활 처리가 끝난 것 (불사의 화톳불) → 게임 오버 없음</summary>
+    public System.Func<bool> ReviveHook;
+
     /// <summary>체력 회복 (회복량 배율 적용, 최대 체력까지)</summary>
     public void Heal(float amount)
     {
@@ -698,7 +705,8 @@ public class Player : MonoBehaviour
     {
         if (DebugCheats.God || (invuln > 0 && !ignoreHitInvuln) || IsInvulnerable || GameManager.I.State != GameState.Playing) return;
         if (CounterHit()) return;
-        dmg *= damageTakenMul;
+        dmg *= damageTakenMul * (DynamicTakenMul != null ? DynamicTakenMul() : 1f);
+        DamageReceived?.Invoke(dmg);
         if (shield > 0f)   // 보호막이 먼저 받아 냄
         {
             float absorbed = Mathf.Min(shield, dmg);
@@ -708,6 +716,7 @@ public class Player : MonoBehaviour
         hp -= dmg;
         invuln = 0.35f;
         CameraFollow.Shake(0.12f, 0.15f);
+        if (hp <= 1f && ReviveHook != null && ReviveHook()) return;   // 불사의 화톳불: 체력 1 이하 → 부활
         if (hp <= 0)
         {
             hp = 0;

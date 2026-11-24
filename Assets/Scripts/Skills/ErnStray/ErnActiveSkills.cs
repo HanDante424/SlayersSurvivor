@@ -287,6 +287,9 @@ public class FireCharge : ActiveSkill
         }
     }
 
+    /// <summary>돌진 중이면 시전 중 (플레이어 돌진 · 이동 불가 상태로 판정)</summary>
+    public override bool IsCastingNow => base.IsCastingNow || (P != null && P.IsBusy);
+
     protected override void Activate()
     {
         hit.Clear();
@@ -515,7 +518,7 @@ public class OverFlameSlash : ActiveSkill
     /// <summary>사용 1회가 모으는 값 (빠른 준비의 적중 수)</summary>
     class UseState { public int hits; }
 
-    protected override void Activate() => StartCoroutine(Run());
+    protected override void Activate() => StartCast(Run());
 
     IEnumerator Run()
     {
@@ -941,7 +944,7 @@ public class FireBreaker : ActiveSkill
         stacks.Clear();
     }
 
-    protected override void Activate() => StartCoroutine(Run());
+    protected override void Activate() => StartCast(Run());
 
     IEnumerator Run()
     {
@@ -1205,7 +1208,7 @@ public class FireExecution : ActiveSkill
         EndSlow();
     }
 
-    protected override void Activate() => StartCoroutine(Run());
+    protected override void Activate() => StartCast(Run());
 
     IEnumerator Run()
     {

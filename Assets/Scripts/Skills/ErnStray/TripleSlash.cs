@@ -181,7 +181,7 @@ public class TripleSlash : ActiveSkill
     };
 
     // ---------- 발동 ----------
-    protected override void Activate() => StartCoroutine(Run());
+    protected override void Activate() => StartCast(Run());
 
     struct Strike { public Vector2 from, dir; }
 

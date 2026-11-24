@@ -1,31 +1,85 @@
 using UnityEngine;
 
 // 에른 스트레이 새 패시브 3종 — 방어 · 피해 대비 · 자원 획득 (2026-11-24 사용자)
-// 기본 성능 + 고유 기본 강화 3종까지 구현. Lv.5/10/15 특수 강화는 미설계 (선택 화면에 "미설계" 확인 버튼만).
+// 기본 성능 + 고유 기본 강화 3종. 특수 강화: 잿불 갑주는 구현됨, 불씨 수확 · 화염 보호막은 미설계 (선택 화면에 "미설계" 확인 버튼만).
 
 /// <summary>
 /// P04 잿불 갑주: 최대 체력 +25% · 받는 피해량 -20% · 모든 회복량 +10%
 /// 고유 기본 강화: 최대 체력 +5% / 받는 피해 -1% / 모든 회복량 +2%
+/// 특수 강화 (2026-11-24 사용자):
+///   Lv.5  다시 타오르는 불씨 (초당 체력 1 회복) · 두꺼운 장벽 (최대 체력 +25%) · 흘리기 (받는 피해 -5%)
+///   Lv.10 연소 흡수 (화상 적 처치 시 체력 1 회복, 쿨타임 1초) · 불굴 (체력 30% 이하 받는 피해 -10%) · 타오르는 장갑 (수동 스킬 시전 중 받는 피해 -15%)
+///   Lv.15 잿불 비축 · 불사의 화톳불 · 화염 진지 (체력 90% 이상 받는 피해 -15%)
+///   조합 영원의 화로 = 불굴 + 불사의 화톳불
 /// [해석] 설명의 "모든 회복량 +10%" 는 기존 기본 성능(체력 +25% · 받는 피해 -20%)에 추가한 것으로 처리.
-/// [해석] 최대 체력 · 회복량 증가는 자기 안에서 합연산, 받는 피해 감소는 기본 -20% 에 곱연산 (강화 1회당 ×0.99).
+/// [해석] 최대 체력 · 회복량 증가는 자기 안에서 합연산, 받는 피해 감소는 모두 서로 곱연산.
+/// [해석] "수동 스킬" = 수동 슬롯 스킬(트리플 슬래시 · 파이어 차지 · 오버 드라이브 플레임 슬래시 · 파이어 브레이커 · 파이어 엑스큐션). 이동 스킬(파이어 스트림) · 궁극기는 제외.
+/// [해석] 잿불 비축의 "받는 피해" = 받는 피해 배율 적용 후, 보호막 흡수 전 양. 쿨타임 중에는 누적하지 않음. 누적이 차면 0 으로 되돌림.
+/// [임시] 잿불 비축 넉백 반경 5 · 거리 4, 시각 효과 없음.
 /// </summary>
 public class EmberArmor : Skill
 {
     const float BaseMaxHp = 0.25f, BaseTakenCut = 0.20f, BaseHeal = 0.10f;
     const float UpMaxHp = 0.05f, UpTakenCut = 0.01f, UpHeal = 0.02f;
 
+    // 특수 강화 id
+    public const string Rekindle = "AR5A", Thick = "AR5B", Deflect = "AR5C";
+    public const string Absorb = "AR10A", Resolute = "AR10B", Plating = "AR10C";
+    public const string Hoard = "AR15A", Phoenix = "AR15B", Fortress = "AR15C";
+    public const string ComboHearth = "ARC1";   // 영원의 화로
+
+    // 특수 강화 수치
+    const float RekindleHeal = 1f;                  // 초당 체력 1
+    const float ThickHp = 0.25f;                    // 최대 체력 +25%
+    const float DeflectCut = 0.05f;                 // 받는 피해 -5%
+    const float AbsorbHeal = 1f, AbsorbCooldown = 1f;
+    const float ResoluteHpRatio = 0.30f, ResoluteCut = 0.10f;
+    const float PlatingCut = 0.15f;
+    const float HoardRatio = 0.50f, HoardHeal = 0.25f, HoardCooldown = 20f;
+    const float HoardRadius = 5f, HoardKnock = 4f;  // [임시] 넉백 반경 · 거리
+    const float PhoenixHpRatio = 0.30f, PhoenixInvuln = 3f, PhoenixCooldown = 90f;
+    const float FortressHpRatio = 0.90f, FortressCut = 0.15f;
+    // 영원의 화로
+    const float HearthRegen = 2f, HearthStillRegen = 3f, HearthStillCut = 0.10f, HearthStillTime = 3f;
+
+    const float StillEpsilon = 0.001f;   // 한 프레임에 이만큼 넘게 움직이면 이동 중
+
     int hpUps, takenUps, healUps;
     float appliedHpMul = 1f, appliedTakenMul = 1f, appliedHealMul = 1f;
+    float absorbReadyAt, hoardReadyAt, reviveReadyAt;
+    float hoardStored;          // 잿불 비축: 누적 피해
+    float stillTime;            // 가만히 있은 시간 (영원의 화로)
+    Vector2 lastPos;
 
-    void OnEnable() => Apply();
+    bool Hearth => HasCombo(ComboHearth);
+
+    void OnEnable()
+    {
+        Apply();
+        var p = P;
+        if (p != null)
+        {
+            p.DynamicTakenMul = DynamicTaken;
+            p.DamageReceived = OnDamageReceived;
+            p.ReviveHook = TryRevive;
+            lastPos = p.transform.position;
+        }
+        Enemy.Killed += OnKilled;
+    }
 
     void OnDisable()
     {
+        Enemy.Killed -= OnKilled;
+        var p = P;
+        if (p != null)
+        {
+            p.DynamicTakenMul = null; p.DamageReceived = null; p.ReviveHook = null;
+        }
         Remove();
     }
 
-    float HpMul => 1f + BaseMaxHp + UpMaxHp * hpUps;
-    float TakenMul => (1f - BaseTakenCut) * Mathf.Pow(1f - UpTakenCut, takenUps);
+    float HpMul => 1f + BaseMaxHp + UpMaxHp * hpUps + (HasSpecial(Thick) ? ThickHp : 0f);
+    float TakenMul => (1f - BaseTakenCut) * Mathf.Pow(1f - UpTakenCut, takenUps) * (HasSpecial(Deflect) ? 1f - DeflectCut : 1f);
     float HealMul => 1f + BaseHeal + UpHeal * healUps;
 
     /// <summary>현재 강화 상태로 플레이어 수치를 갱신 (이전 몫을 나누고 새 몫을 곱함)</summary>
@@ -52,6 +106,104 @@ public class EmberArmor : Skill
         appliedHpMul = appliedTakenMul = appliedHealMul = 1f;
     }
 
+    protected override void OnSpecialUpgrade(int lv, string id) => Apply();
+
+    /// <summary>수동 스킬을 시전 중인지 (타오르는 장갑)</summary>
+    bool ManualCasting()
+    {
+        var p = P;
+        if (p == null) return false;
+        foreach (var s in p.skills)
+            if (s.Entry.kind == SkillKind.Manual && s is ActiveSkill a && a.IsCastingNow) return true;
+        return false;
+    }
+
+    /// <summary>상황별 받는 피해 배율 (피격 순간 계산)</summary>
+    float DynamicTaken()
+    {
+        var p = P;
+        if (p == null) return 1f;
+        float m = 1f;
+        float ratio = p.maxHp > 0f ? p.hp / p.maxHp : 1f;
+        if (HasSpecial(Resolute) && ratio <= ResoluteHpRatio) m *= 1f - ResoluteCut;
+        if (HasSpecial(Plating) && ManualCasting()) m *= 1f - PlatingCut;
+        if (HasSpecial(Fortress) && ratio >= FortressHpRatio) m *= 1f - FortressCut;
+        if (Hearth && stillTime >= HearthStillTime) m *= 1f - HearthStillCut;
+        return m;
+    }
+
+    /// <summary>연소 흡수: 화상 상태 적 처치 시 체력 회복 (쿨타임 1초)</summary>
+    void OnKilled(Enemy e)
+    {
+        if (!HasSpecial(Absorb) || P == null || Time.time < absorbReadyAt) return;
+        if (!FlameSword.DiedBurning(e)) return;
+        absorbReadyAt = Time.time + AbsorbCooldown;
+        P.Heal(AbsorbHeal);
+    }
+
+    /// <summary>잿불 비축: 받는 피해 누적 → 최대 체력의 50% 에 닿으면 주변 넉백 + 체력 25% 회복 (쿨타임 20초)</summary>
+    void OnDamageReceived(float dmg)
+    {
+        var p = P;
+        if (p == null || !HasSpecial(Hoard) || Time.time < hoardReadyAt) return;
+        hoardStored += dmg;
+        if (hoardStored < p.maxHp * HoardRatio) return;
+        hoardStored = 0f;
+        hoardReadyAt = Time.time + HoardCooldown;
+        p.Heal(p.maxHp * HoardHeal);
+        Vector2 c = p.transform.position;
+        foreach (var e in Enemy.All)
+        {
+            if (e == null || e.hp <= 0f || e.IsWall) continue;
+            Vector2 to = (Vector2)e.transform.position - c;
+            if (to.magnitude > HoardRadius + e.radius) continue;
+            e.Push(to.sqrMagnitude > 0.0001f ? to : Random.insideUnitCircle, Enemy.KnockSpeed(HoardKnock));
+        }
+    }
+
+    /// <summary>불사의 화톳불: 체력 1 이하 → 최대 체력의 30% 로 부활 + 3초 무적 (쿨타임 90초)</summary>
+    bool TryRevive()
+    {
+        var p = P;
+        if (p == null || !HasSpecial(Phoenix) || Time.time < reviveReadyAt) return false;
+        reviveReadyAt = Time.time + PhoenixCooldown;
+        p.hp = p.maxHp * PhoenixHpRatio;
+        p.SetInvulnerable(PhoenixInvuln);
+        return true;
+    }
+
+    public override void Tick(float dt)
+    {
+        var p = P;
+        if (p == null) return;
+        // 가만히 있은 시간 (영원의 화로)
+        Vector2 pos = p.transform.position;
+        if ((pos - lastPos).sqrMagnitude > StillEpsilon * StillEpsilon) stillTime = 0f; else stillTime += dt;
+        lastPos = pos;
+
+        float regen = 0f;
+        if (HasSpecial(Rekindle)) regen += RekindleHeal;
+        if (Hearth)
+        {
+            regen += HearthRegen;
+            if (stillTime >= HearthStillTime) regen += HearthStillRegen;   // [해석] 기본 2 에 더해 총 5
+        }
+        if (regen > 0f) p.Heal(regen * dt);
+    }
+
+    public override string Badge
+    {
+        get
+        {
+            var p = P;
+            if (p == null) return null;
+            if (HasSpecial(Phoenix) && Time.time < reviveReadyAt) return $"부활 {Mathf.CeilToInt(reviveReadyAt - Time.time)}";
+            if (HasSpecial(Hoard)) return Time.time < hoardReadyAt ? $"비축 {Mathf.CeilToInt(hoardReadyAt - Time.time)}" : $"{Mathf.RoundToInt(hoardStored / Mathf.Max(1f, p.maxHp * HoardRatio) * 100f)}%";
+            return null;
+        }
+    }
+
+    // ---------- 강화 목록 ----------
     public override PassiveUpgradeOption[] PassiveBasicOptions() => new[]
     {
         new PassiveUpgradeOption
@@ -62,7 +214,7 @@ public class EmberArmor : Skill
         new PassiveUpgradeOption
         {
             title = $"방어 강화  <size=16>받는 피해 -{UpTakenCut * 100:0}%</size>",
-            desc = $"받는 피해 -{(1f - TakenMul) * 100:0.#}% → -{(1f - (1f - BaseTakenCut) * Mathf.Pow(1f - UpTakenCut, takenUps + 1)) * 100:0.#}%",
+            desc = $"받는 피해 -{(1f - TakenMul) * 100:0.#}% → -{(1f - TakenMul * (1f - UpTakenCut)) * 100:0.#}%",
         },
         new PassiveUpgradeOption
         {
@@ -84,6 +236,42 @@ public class EmberArmor : Skill
 
     public override string BasicSummary =>
         $"체력 +{(HpMul - 1f) * 100:0}% · 받는 피해 -{(1f - TakenMul) * 100:0.#}% · 회복 +{(HealMul - 1f) * 100:0}%";
+
+    public override SpecialUpgradeOption[] SpecialOptions(int lv)
+    {
+        switch (lv)
+        {
+            case 5: return new[]
+            {
+                new SpecialUpgradeOption { id = Rekindle, title = "다시 타오르는 불씨", desc = "초당 체력 1 회복" },
+                new SpecialUpgradeOption { id = Thick, title = "두꺼운 장벽", desc = "최대 체력 +25%" },
+                new SpecialUpgradeOption { id = Deflect, title = "흘리기", desc = "받는 피해 -5%" },
+            };
+            case 10: return new[]
+            {
+                new SpecialUpgradeOption { id = Absorb, title = "연소 흡수", desc = "화상 상태의 적을 처치하면 체력 1 회복 (쿨타임 1초)" },
+                new SpecialUpgradeOption { id = Resolute, title = "불굴", desc = "체력이 30% 이하일 때 받는 피해 -10%" },
+                new SpecialUpgradeOption { id = Plating, title = "타오르는 장갑", desc = "수동 스킬 시전 중 받는 피해 -15%" },
+            };
+            case 15: return new[]
+            {
+                new SpecialUpgradeOption { id = Hoard, title = "잿불 비축", desc = "받는 피해가 누적됩니다. 최대 체력의 50%만큼 누적되면 주변 적을 넉백하고 최대 체력의 25% 회복 (쿨타임 20초)" },
+                new SpecialUpgradeOption { id = Phoenix, title = "불사의 화톳불", desc = "체력이 1 이하가 되면 최대 체력의 30%로 부활하고 3초간 무적 (쿨타임 90초)" },
+                new SpecialUpgradeOption { id = Fortress, title = "화염 진지", desc = "체력이 90% 이상일 때 받는 피해 -15%" },
+            };
+        }
+        return base.SpecialOptions(lv);
+    }
+
+    public override SpecialComboOption[] SpecialCombos() => new[]
+    {
+        new SpecialComboOption
+        {
+            id = ComboHearth, title = "영원의 화로", recipe = "불굴 + 불사의 화톳불", requires = new[] { Resolute, Phoenix },
+            desc = "꺼지지 않는 화로처럼 계속 체력을 회복합니다.\n가만히 있으면 더 크게 회복하고 더 단단해집니다.",
+            specs = new[] { "매 초 체력 2 회복", "3초 이상 이동하지 않을 때 매 초 체력 3 회복", "3초 이상 이동하지 않을 때 받는 피해 -10%" },
+        },
+    };
 }
 
 /// <summary>

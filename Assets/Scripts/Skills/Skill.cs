@@ -426,9 +426,25 @@ public abstract class ActiveSkill : Skill
     }
     bool casting;
 
-    protected virtual void OnDisable() => casting = false;
+    protected virtual void OnDisable() { casting = false; castRoutines = 0; }
 
-    public override void DebugResetForCast() { casting = false; cdLeft = 0f; }
+    // ---------- 시전 중 판정 (잿불 갑주 '타오르는 장갑' 등): 시전 코루틴이 도는 동안 true ----------
+    int castRoutines;
+
+    /// <summary>시전 코루틴을 시작하고 끝날 때까지 "시전 중" 으로 표시 (Activate 에서 StartCoroutine 대신 사용)</summary>
+    protected Coroutine StartCast(System.Collections.IEnumerator routine) => StartCoroutine(CastWrap(routine));
+
+    System.Collections.IEnumerator CastWrap(System.Collections.IEnumerator routine)
+    {
+        castRoutines++;
+        yield return StartCoroutine(routine);
+        castRoutines = Mathf.Max(0, castRoutines - 1);
+    }
+
+    /// <summary>지금 시전 중인가 (StartCast 로 시작한 시전이 진행 중). 돌진형 스킬은 override</summary>
+    public virtual bool IsCastingNow => castRoutines > 0;
+
+    public override void DebugResetForCast() { casting = false; cdLeft = 0f; castRoutines = 0; }
 
     public override float CooldownRemaining => casting ? Mathf.Max(0f, CooldownSeconds) : Mathf.Max(0f, cdLeft);
 
