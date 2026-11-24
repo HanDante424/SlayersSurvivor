@@ -1,0 +1,320 @@
+{
+  "G": {
+    "T": 90,
+    "N": 1,
+    "enemyHp": 1000000,
+    "boss": 1,
+    "dmgMul": 1,
+    "dmgPct": 0,
+    "cdMul": 1,
+    "burnPct": 0,
+    "reuseDelay": 0.3,
+    "killRate": 0,
+    "blastTargets": 3,
+    "extraRatio": 1,
+    "burnShare": 1,
+    "projHit": 0.5,
+    "minDmg": 1,
+    "useCap": 0,
+    "melt": 0
+  },
+  "pas": {
+    "fs": {
+      "on": true,
+      "useBasic": true,
+      "useSpec": true,
+      "params": {},
+      "ups": {
+        "dps": 0,
+        "stk": 0,
+        "dur": 0
+      },
+      "picks": {
+        "5": "B5A",
+        "10": "B10A",
+        "15": "B15A"
+      },
+      "open": false
+    },
+    "hf": {
+      "on": true,
+      "useBasic": true,
+      "useSpec": true,
+      "params": {},
+      "ups": {
+        "fin": 0,
+        "mob": 0,
+        "dot": 0
+      },
+      "picks": {
+        "5": "Y5B",
+        "10": "Y10B",
+        "15": "Y15B"
+      },
+      "open": false
+    },
+    "ab": {
+      "on": true,
+      "useBasic": true,
+      "useSpec": true,
+      "params": {},
+      "ups": {
+        "fin": 0,
+        "cd": 0,
+        "stk": 0
+      },
+      "picks": {
+        "5": "H5A",
+        "10": "H10A",
+        "15": "H15A"
+      },
+      "open": true
+    }
+  },
+  "skills": [
+    {
+      "id": "fireslash",
+      "on": true,
+      "params": {},
+      "picks": {
+        "5": "FSL5B",
+        "10": "FSL10C",
+        "15": "FSL15B"
+      },
+      "combo": null,
+      "ups": {
+        "dmg": 0,
+        "cd": 0
+      },
+      "useBasic": true,
+      "open": true
+    },
+    {
+      "id": "solarslash",
+      "on": true,
+      "params": {},
+      "picks": {},
+      "combo": null,
+      "ups": {
+        "dmg": 0,
+        "cd": 0
+      },
+      "useBasic": true,
+      "open": true
+    },
+    {
+      "id": "fireball",
+      "on": true,
+      "params": {},
+      "picks": {},
+      "combo": null,
+      "ups": {
+        "dmg": 0,
+        "cd": 0
+      },
+      "useBasic": true,
+      "open": false
+    },
+    {
+      "id": "firebuster",
+      "on": true,
+      "params": {},
+      "picks": {},
+      "combo": null,
+      "ups": {
+        "dmg": 0,
+        "cd": 0
+      },
+      "useBasic": true,
+      "open": false
+    },
+    {
+      "id": "fireblade",
+      "on": true,
+      "params": {},
+      "picks": {},
+      "combo": null,
+      "ups": {
+        "dmg": 0,
+        "cd": 0
+      },
+      "useBasic": true,
+      "open": false
+    },
+    {
+      "id": "firestorm",
+      "on": true,
+      "params": {},
+      "picks": {},
+      "combo": null,
+      "ups": {
+        "dmg": 0,
+        "cd": 0
+      },
+      "useBasic": true,
+      "open": false
+    },
+    {
+      "id": "tripleslash",
+      "on": true,
+      "params": {},
+      "picks": {},
+      "combo": null,
+      "ups": {
+        "dmg": 0,
+        "cd": 0
+      },
+      "useBasic": true,
+      "open": false
+    },
+    {
+      "id": "firecharge",
+      "on": false,
+      "params": {},
+      "picks": {},
+      "combo": null,
+      "ups": {
+        "dmg": 0,
+        "cd": 0
+      },
+      "useBasic": true,
+      "open": false
+    },
+    {
+      "id": "overslash",
+      "on": false,
+      "params": {},
+      "picks": {},
+      "combo": null,
+      "ups": {
+        "dmg": 0,
+        "cd": 0
+      },
+      "useBasic": true,
+      "open": false
+    },
+    {
+      "id": "firebreaker",
+      "on": false,
+      "params": {},
+      "picks": {},
+      "combo": null,
+      "ups": {
+        "dmg": 0,
+        "cd": 0
+      },
+      "useBasic": true,
+      "open": false
+    },
+    {
+      "id": "fireexec",
+      "on": true,
+      "params": {},
+      "picks": {
+        "5": "FE5A"
+      },
+      "combo": null,
+      "ups": {
+        "dmg": 0,
+        "cd": 0
+      },
+      "useBasic": true,
+      "open": true
+    },
+    {
+      "id": "firestream",
+      "on": true,
+      "params": {},
+      "picks": {},
+      "combo": null,
+      "ups": {
+        "dmg": 0,
+        "cd": 0
+      },
+      "useBasic": true,
+      "open": false
+    }
+  ],
+  "items": [],
+  "sets": [],
+  "ov": {
+    "FE5A": {
+      "mods.countAdd": 10
+    },
+    "FE15A": {
+      "mods.countAdd": 15
+    },
+    "FEC": {
+      "mods.countAdd": 15,
+      "nums.every": 7
+    }
+  },
+  "bv": {
+    "s:fireslash": {
+      "dmg": 0.2,
+      "cd": 0.05
+    },
+    "p:fs": {
+      "dps": 1
+    }
+  },
+  "inc": {
+    "basic": true,
+    "passive": true,
+    "item": false
+  },
+  "lock": {
+    "name": "1",
+    "at": "11/23 22:50",
+    "ov": {
+      "FE5A": {
+        "mods.countAdd": 10
+      },
+      "FE15A": {
+        "mods.countAdd": 15
+      },
+      "FEC": {
+        "mods.countAdd": 15
+      }
+    },
+    "params": {},
+    "fs": {},
+    "bv": {
+      "s:fireslash": {
+        "dmg": 0.2,
+        "cd": 0.05
+      },
+      "p:fs": {
+        "dps": 1
+      }
+    }
+  },
+  "locks": [
+    {
+      "name": "1",
+      "at": "11/23 22:50",
+      "ov": {
+        "FE5A": {
+          "mods.countAdd": 10
+        },
+        "FE15A": {
+          "mods.countAdd": 15
+        },
+        "FEC": {
+          "mods.countAdd": 15
+        }
+      },
+      "params": {},
+      "fs": {},
+      "bv": {
+        "s:fireslash": {
+          "dmg": 0.2,
+          "cd": 0.05
+        },
+        "p:fs": {
+          "dps": 1
+        }
+      }
+    }
+  ]
+}
