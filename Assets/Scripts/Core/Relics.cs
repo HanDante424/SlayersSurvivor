@@ -31,6 +31,9 @@ public static class Relics
 
     static readonly Dictionary<string, int> owned = new Dictionary<string, int>();
 
+    /// <summary>유물을 얻을 때마다 (불씨 수확 특수 조합: 확률로 추가 획득)</summary>
+    public static event Action Obtained;
+
     public static void Clear() => owned.Clear();
     public static int Count(string id) => owned.TryGetValue(id, out var n) ? n : 0;
 
@@ -40,6 +43,7 @@ public static class Relics
         if (p == null) return;
         r.apply(p);
         owned[r.id] = Count(r.id) + 1;
+        Obtained?.Invoke();
     }
 
     /// <summary>선택지: 유물 중 무작위로 ChoiceCount 개 (겹치지 않게)</summary>

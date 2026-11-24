@@ -1,7 +1,7 @@
 using UnityEngine;
 
 // 에른 스트레이 새 패시브 3종 — 방어 · 피해 대비 · 자원 획득 (2026-11-24 사용자)
-// 기본 성능 + 고유 기본 강화 3종. 특수 강화: 잿불 갑주는 구현됨, 불씨 수확 · 화염 보호막은 미설계 (선택 화면에 "미설계" 확인 버튼만).
+// 기본 성능 + 고유 기본 강화 3종. 특수 강화: 잿불 갑주 · 불씨 수확은 구현됨, 화염 보호막은 미설계 (선택 화면에 "미설계" 확인 버튼만).
 
 /// <summary>
 /// P04 잿불 갑주: 최대 체력 +25% · 받는 피해량 -20% · 모든 회복량 +10%
@@ -275,34 +275,79 @@ public class EmberArmor : Skill
 }
 
 /// <summary>
-/// P05 불씨 수확: 경험치 획득 +20% · 경험치 획득 범위 +30%
+/// P05 불씨 수확: 경험치 획득 +20% · 획득 범위 +30%
 /// 고유 기본 강화: 경험치 획득 +5% / 획득 범위 +8% / 유물 획득 확률 +10%
-/// [해석] 유물 획득 확률 +10% = 일반 몹 상자 드랍 확률(0.4%)의 상대 증가 (0.4% → 0.44%). 의도적으로 낮은 체감 (사용자).
-///        기본 성능에는 유물 확률이 없고 강화를 고를 때만 오름. 효과는 자기 안에서 합연산.
+/// 특수 강화 (2026-11-24 사용자):
+///   Lv.5  불씨 모으기 (획득 범위 +50%) · 커지는 불씨 (경험치 획득 +25%) · 잿빛 행운 (유물 획득 확률 +50%)
+///   Lv.10 공급되는 연료 (경험치 획득 시 이동속도 +5%, 최대 4스택, 5초) · 들이치는 폭풍 (30초마다 화면의 모든 경험치 획득) · 탐욕의 불씨 (처치 시 50% 확률로 경험치 2배)
+///   Lv.15 풍요의 불씨 (경험치 획득 시 1 획득, 200 도달 시 유물 생성) · 더욱 타오르는 불씨 (경험치 획득량 +50%) · 타오르는 보물 (매초 경험치 1% 획득)
+///   조합 풍요로운 탐욕 [임시 이름] = 탐욕의 불씨 + 풍요의 불씨: 유물 획득 시 50% 확률로 추가 획득
+/// [해석] 경험치 · 획득 범위 · 유물 확률 증가는 자기 안에서 합연산 (기본 + 기본 강화 + 특수 강화).
+/// [해석] 유물 획득 확률 = 일반 몹 상자 드랍 확률(0.4%)의 상대 증가. 중간보스 상자는 확정이라 영향 없음.
+/// [해석] 공급되는 연료: 영혼 조각 1개를 얻을 때마다 스택 +1, 그때마다 5초로 갱신 (모든 스택 같이 유지).
+/// [해석] 들이치는 폭풍: 화면 안의 영혼 조각을 즉시 끌어당김 (그 영혼은 정상적으로 경험치 · 연료 · 풍요의 불씨 계산).
+/// [해석] 탐욕의 불씨: 모든 적(보스 포함)의 경험치 드랍에 적용. 영혼 조각 1개의 가치가 2배.
+/// [해석] 풍요의 불씨: 영혼 조각을 1개 얻을 때마다 1 (경험치 양과 무관). 200 에 닿으면 플레이어 위치에 유물 상자 생성.
+/// [해석] 타오르는 보물: 매초 현재 레벨 필요 경험치의 1% (경험치 획득 배율 미적용, 영혼 조각이 아니라 연료 · 풍요의 불씨에 안 셈).
+/// [해석] 조합의 추가 획득: 유물을 얻을 때 50% 확률로 유물 상자 1개를 더 생성. 추가로 얻은 유물은 다시 굴리지 않음 (무한 연쇄 방지).
 /// </summary>
 public class EmberHarvest : Skill
 {
     const float BaseXp = 0.20f, BasePickup = 0.30f;
     const float UpXp = 0.05f, UpPickup = 0.08f, UpRelic = 0.10f;
 
+    // 특수 강화 id
+    public const string Gather = "EH5A", Bloom = "EH5B", Luck = "EH5C";
+    public const string Fuel = "EH10A", Storm = "EH10B", Greed = "EH10C";
+    public const string Abundance = "EH15A", Blaze = "EH15B", Treasure = "EH15C";
+    public const string ComboFeast = "EHC1";   // 풍요로운 탐욕 [임시 이름]
+
+    // 특수 강화 수치
+    const float GatherPickup = 0.50f, BloomXp = 0.25f, LuckRelic = 0.50f;
+    const float FuelMove = 0.05f, FuelSeconds = 5f; const int FuelMaxStacks = 4;
+    const float StormInterval = 30f;
+    const float GreedChance = 0.5f, GreedMul = 2f;
+    const int AbundanceNeed = 200;
+    const float BlazeXp = 0.50f;
+    const float TreasurePerSecond = 0.01f;   // 매초 필요 경험치의 1%
+    const float FeastChance = 0.5f;
+
     int xpUps, pickupUps, relicUps;
     float appliedXp = 1f, appliedPickup = 1f, appliedRelic = 1f;
 
-    void OnEnable() => Apply();
+    int fuelStacks;
+    float fuelLeft, appliedMove = 1f;
+    float stormTimer;
+    int abundance;
+    int skipFeastRolls;   // 조합이 만든 추가 상자에서 나온 유물은 다시 굴리지 않음
+
+    bool Feast => HasCombo(ComboFeast);
+
+    float XpMul => 1f + BaseXp + UpXp * xpUps + (HasSpecial(Bloom) ? BloomXp : 0f) + (HasSpecial(Blaze) ? BlazeXp : 0f);
+    float PickupMul => 1f + BasePickup + UpPickup * pickupUps + (HasSpecial(Gather) ? GatherPickup : 0f);
+    float RelicMul => 1f + UpRelic * relicUps + (HasSpecial(Luck) ? LuckRelic : 0f);
+
+    void OnEnable()
+    {
+        Apply();
+        Gem.Collected += OnGemCollected;
+        Relics.Obtained += OnRelicObtained;
+        if (P != null) P.XpDropMul = GreedRoll;
+    }
 
     void OnDisable()
     {
+        Gem.Collected -= OnGemCollected;
+        Relics.Obtained -= OnRelicObtained;
         var p = P;
         if (p == null) return;
+        p.XpDropMul = null;
         p.xpGainMul /= appliedXp;
         p.pickupMul /= appliedPickup;
         p.relicChanceMul /= appliedRelic;
-        appliedXp = appliedPickup = appliedRelic = 1f;
+        p.moveSpeedMul /= appliedMove;
+        appliedXp = appliedPickup = appliedRelic = appliedMove = 1f;
     }
-
-    float XpMul => 1f + BaseXp + UpXp * xpUps;
-    float PickupMul => 1f + BasePickup + UpPickup * pickupUps;
-    float RelicMul => 1f + UpRelic * relicUps;
 
     void Apply()
     {
@@ -314,22 +359,118 @@ public class EmberHarvest : Skill
         appliedXp = XpMul; appliedPickup = PickupMul; appliedRelic = RelicMul;
     }
 
+    protected override void OnSpecialUpgrade(int lv, string id) => Apply();
+
+    /// <summary>탐욕의 불씨: 적 처치 시 경험치 드랍 배율</summary>
+    float GreedRoll() => HasSpecial(Greed) && Random.value < GreedChance ? GreedMul : 1f;
+
+    void OnGemCollected(int value)
+    {
+        if (HasSpecial(Fuel))
+        {
+            fuelStacks = Mathf.Min(FuelMaxStacks, fuelStacks + 1);
+            fuelLeft = FuelSeconds;
+            ApplyFuel();
+        }
+        if (HasSpecial(Abundance) && P != null)
+        {
+            abundance++;
+            if (abundance >= AbundanceNeed)
+            {
+                abundance -= AbundanceNeed;
+                Chest.Spawn(P.transform.position);   // 유물 생성: 상자를 플레이어 위치에 (바로 획득)
+            }
+        }
+    }
+
+    /// <summary>특수 조합 풍요로운 탐욕: 유물을 얻을 때 50% 확률로 한 번 더</summary>
+    void OnRelicObtained()
+    {
+        if (!Feast || P == null) return;
+        if (skipFeastRolls > 0) { skipFeastRolls--; return; }
+        if (Random.value < FeastChance)
+        {
+            skipFeastRolls++;
+            Chest.Spawn(P.transform.position);
+        }
+    }
+
+    void ApplyFuel()
+    {
+        var p = P;
+        if (p == null) return;
+        float move = 1f + FuelMove * fuelStacks;
+        p.moveSpeedMul = p.moveSpeedMul / appliedMove * move;
+        appliedMove = move;
+    }
+
+    public override void Tick(float dt)
+    {
+        var p = P;
+        if (p == null) return;
+
+        // 공급되는 연료: 5초 지나면 모든 스택 해제
+        if (fuelStacks > 0)
+        {
+            fuelLeft -= dt;
+            if (fuelLeft <= 0f) { fuelStacks = 0; ApplyFuel(); }
+        }
+
+        // 들이치는 폭풍: 30초마다 화면 안의 영혼 조각을 모두 끌어당김
+        if (HasSpecial(Storm))
+        {
+            stormTimer += dt;
+            if (stormTimer >= StormInterval)
+            {
+                stormTimer = 0f;
+                PullVisibleGems();
+            }
+        }
+
+        // 타오르는 보물: 매초 필요 경험치의 1%
+        if (HasSpecial(Treasure) && GameManager.I != null)
+            GameManager.I.AddXpRaw(GameManager.I.XpToNext * TreasurePerSecond * dt);
+    }
+
+    static void PullVisibleGems()
+    {
+        var cam = Camera.main;
+        if (cam == null) return;
+        foreach (var g in Gem.All)
+        {
+            if (g == null) continue;
+            Vector3 v = cam.WorldToViewportPoint(g.transform.position);
+            if (v.x >= 0f && v.x <= 1f && v.y >= 0f && v.y <= 1f) g.Attract();
+        }
+    }
+
+    public override string Badge
+    {
+        get
+        {
+            if (HasSpecial(Abundance)) return $"{abundance}/{AbundanceNeed}";
+            if (fuelStacks > 0) return $"{fuelStacks}";
+            return null;
+        }
+    }
+
+    // ---------- 강화 목록 ----------
     public override PassiveUpgradeOption[] PassiveBasicOptions() => new[]
     {
         new PassiveUpgradeOption
         {
             title = $"경험치 강화  <size=16>경험치 획득 +{UpXp * 100:0}%</size>",
-            desc = $"경험치 획득 +{(BaseXp + UpXp * xpUps) * 100:0}% → +{(BaseXp + UpXp * (xpUps + 1)) * 100:0}%",
+            desc = $"경험치 획득 +{(XpMul - 1f) * 100:0}% → +{(XpMul - 1f + UpXp) * 100:0}%",
         },
         new PassiveUpgradeOption
         {
             title = $"범위 강화  <size=16>획득 범위 +{UpPickup * 100:0}%</size>",
-            desc = $"획득 범위 +{(BasePickup + UpPickup * pickupUps) * 100:0}% → +{(BasePickup + UpPickup * (pickupUps + 1)) * 100:0}%",
+            desc = $"획득 범위 +{(PickupMul - 1f) * 100:0}% → +{(PickupMul - 1f + UpPickup) * 100:0}%",
         },
         new PassiveUpgradeOption
         {
             title = $"유물 강화  <size=16>유물 획득 확률 +{UpRelic * 100:0}%</size>",
-            desc = $"유물 획득 확률 +{UpRelic * relicUps * 100:0}% → +{UpRelic * (relicUps + 1) * 100:0}%",
+            desc = $"유물 획득 확률 +{(RelicMul - 1f) * 100:0}% → +{(RelicMul - 1f + UpRelic) * 100:0}%",
         },
     };
 
@@ -346,6 +487,42 @@ public class EmberHarvest : Skill
 
     public override string BasicSummary =>
         $"경험치 +{(XpMul - 1f) * 100:0}% · 범위 +{(PickupMul - 1f) * 100:0}% · 유물 +{(RelicMul - 1f) * 100:0}%";
+
+    public override SpecialUpgradeOption[] SpecialOptions(int lv)
+    {
+        switch (lv)
+        {
+            case 5: return new[]
+            {
+                new SpecialUpgradeOption { id = Gather, title = "불씨 모으기", desc = "획득 범위 +50%" },
+                new SpecialUpgradeOption { id = Bloom, title = "커지는 불씨", desc = "경험치 획득 +25%" },
+                new SpecialUpgradeOption { id = Luck, title = "잿빛 행운", desc = "유물 획득 확률 +50%" },
+            };
+            case 10: return new[]
+            {
+                new SpecialUpgradeOption { id = Fuel, title = "공급되는 연료", desc = "경험치를 획득할 때마다 이동 속도 +5% (최대 4스택, 지속 5초)" },
+                new SpecialUpgradeOption { id = Storm, title = "들이치는 폭풍", desc = "30초마다 화면의 모든 경험치를 획득합니다" },
+                new SpecialUpgradeOption { id = Greed, title = "탐욕의 불씨", desc = "적을 처치할 때 50% 확률로 떨어뜨리는 경험치가 2배가 됩니다" },
+            };
+            case 15: return new[]
+            {
+                new SpecialUpgradeOption { id = Abundance, title = "풍요의 불씨", desc = "경험치를 획득할 때마다 풍요의 불씨를 1 얻습니다. 풍요의 불씨가 200에 도달하면 유물이 생성됩니다" },
+                new SpecialUpgradeOption { id = Blaze, title = "더욱 타오르는 불씨", desc = "경험치 획득량 +50%" },
+                new SpecialUpgradeOption { id = Treasure, title = "타오르는 보물", desc = "매초 경험치 1%를 획득합니다 (현재 레벨의 필요 경험치 기준)" },
+            };
+        }
+        return base.SpecialOptions(lv);
+    }
+
+    public override SpecialComboOption[] SpecialCombos() => new[]
+    {
+        new SpecialComboOption
+        {
+            id = ComboFeast, title = "풍요로운 탐욕", recipe = "탐욕의 불씨 + 풍요의 불씨", requires = new[] { Greed, Abundance },
+            desc = "탐욕이 풍요를 불러, 유물이 겹쳐서 찾아옵니다.",
+            specs = new[] { "유물 획득 시 50% 확률로 추가 획득" },
+        },
+    };
 }
 
 /// <summary>

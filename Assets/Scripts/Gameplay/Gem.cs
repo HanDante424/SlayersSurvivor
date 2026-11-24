@@ -9,6 +9,8 @@ using UnityEngine;
 public class Gem : MonoBehaviour
 {
     public static readonly List<Gem> All = new List<Gem>();
+    /// <summary>플레이어가 영혼 조각을 얻을 때마다 (불씨 수확: 공급되는 연료 · 풍요의 불씨)</summary>
+    public static event System.Action<int> Collected;
     public int value;
     bool attracted;
     float speed;
@@ -70,6 +72,7 @@ public class Gem : MonoBehaviour
             if (d < 0.3f)
             {
                 GameManager.I.AddXp(value);
+                Collected?.Invoke(value);
                 Destroy(gameObject);
             }
         }

@@ -498,7 +498,13 @@ public partial class Enemy : MonoBehaviour
         dead = true;
         GameManager.I.OnEnemyKilled(this);
         Killed?.Invoke(this);
-        if (xp > 0 && !DebugCheats.NoXpDrop) Gem.Spawn(transform.position, xp);   // 치트 F9 · 경험치 0 (가니악의 검) 은 드랍 없음
+        if (xp > 0 && !DebugCheats.NoXpDrop)   // 치트 F9 · 경험치 0 (가니악의 검) 은 드랍 없음
+        {
+            int dropXp = xp;
+            var dropMul = Player.I != null ? Player.I.XpDropMul : null;   // 탐욕의 불씨: 확률로 경험치 2배
+            if (dropMul != null) dropXp = Mathf.Max(1, Mathf.RoundToInt(xp * dropMul()));
+            Gem.Spawn(transform.position, dropXp);
+        }
         if (!IsWall && kind != EnemyKind.GaniacSword)   // 유물 상자: 일반 몹 확률 · 중간보스 확정 (레이드 · 디버그 맵은 Chest 안에서 제외)
             Chest.TryDrop(transform.position, kind == EnemyKind.GoblinElder || kind == EnemyKind.HobgoblinKnight);
         Destroy(gameObject);

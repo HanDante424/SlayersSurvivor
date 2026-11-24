@@ -27,6 +27,8 @@ public class Player : MonoBehaviour
     public System.Func<float> DynamicTakenMul;
     /// <summary>피해를 받을 때 호출 (받는 피해 배율 적용 후 · 보호막 흡수 전의 양) — 잿불 비축 누적용</summary>
     public System.Action<float> DamageReceived;
+    /// <summary>적이 죽을 때 경험치 드랍 배율을 정함 (탐욕의 불씨: 50% 확률 2배). null = 그대로</summary>
+    public System.Func<float> XpDropMul;
     /// <summary>체력이 1 이하가 되면 호출. true 를 돌려주면 부활 처리가 끝난 것 (불사의 화톳불) → 게임 오버 없음</summary>
     public System.Func<bool> ReviveHook;
 

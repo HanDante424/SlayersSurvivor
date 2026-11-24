@@ -101,7 +101,7 @@ public static class SkillCatalog
         E("P05", "불씨 수확", "Ember Harvest", SkillKind.Passive, typeof(EmberHarvest), new SkillText(
             new[] { "패시브" },
             "더 많은 경험치를 더 멀리서 거둡니다.",
-            "'경험치 획득' +20%", "'경험치 획득 범위' +30%")),
+            "'경험치 획득' +20%", "'획득 범위' +30%")),
         E("P06", "화염 보호막", "Flame Barrier", SkillKind.Passive, typeof(FlameBarrier), new SkillText(
             new[] { "패시브", "보호막" },
             "'화상' 피해를 입힐 때마다 보호막을 얻습니다.\n보호막은 시간이 지나며 줄어듭니다.",

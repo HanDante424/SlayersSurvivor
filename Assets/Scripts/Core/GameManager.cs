@@ -198,10 +198,13 @@ public class GameManager : MonoBehaviour
 
     float xpCarry;   // 경험치 배율 소수점 이월 (작은 영혼 1 × 1.2 가 버려지지 않게)
 
-    public void AddXp(int amount)
+    /// <summary>영혼 조각 등으로 얻는 경험치 (경험치 획득 배율 적용)</summary>
+    public void AddXp(int amount) => AddXpRaw(amount * (Player.I != null ? Player.I.xpGainMul : 1f));
+
+    /// <summary>배율 없이 그대로 더하는 경험치 (타오르는 보물처럼 효과가 직접 정한 양). 소수점은 이월</summary>
+    public void AddXpRaw(float amount)
     {
-        float mul = Player.I != null ? Player.I.xpGainMul : 1f;
-        xpCarry += amount * mul;
+        xpCarry += amount;
         int gain = Mathf.FloorToInt(xpCarry + 0.0001f);
         xpCarry -= gain;
         Xp += gain;
