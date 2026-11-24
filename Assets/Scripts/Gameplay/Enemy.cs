@@ -307,10 +307,10 @@ public partial class Enemy : MonoBehaviour
         {
             // [임시] 수치 — 기획 대기. scale = 그림 긴 변(유닛), 플레이어 키 약 1.62
             default:
-            case EnemyKind.Goblin:       maxHp = 10;  speed = 2.2f; damage = 8;  xp = 1;  scale = 0.8f; col = new Color(0.45f, 0.75f, 0.3f); break;
-            case EnemyKind.GoblinArcher: maxHp = 8;   speed = 2.0f; damage = 5;  xp = 2;  scale = 0.8f; col = new Color(0.85f, 0.8f, 0.3f); shape = SpriteFactory.Shape.Diamond; break;
-            case EnemyKind.Hobgoblin:    maxHp = 60;  speed = 1.4f; damage = 15; xp = 5;  scale = 1.3f; col = new Color(0.3f, 0.5f, 0.25f); shape = SpriteFactory.Shape.Square; break;
-            case EnemyKind.GoblinRider:  maxHp = 16;  speed = 2.6f; damage = 10; xp = 3;  scale = 1.2f; col = new Color(0.75f, 0.45f, 0.25f); shape = SpriteFactory.Shape.Diamond; break;
+            case EnemyKind.Goblin:       maxHp = 15;  speed = 2.2f; damage = 8; xp = 1;  scale = 0.8f; col = new Color(0.45f, 0.75f, 0.3f); break;
+            case EnemyKind.GoblinArcher: maxHp = 10;  speed = 2.0f; damage = 5;  xp = 2;  scale = 0.8f; col = new Color(0.85f, 0.8f, 0.3f); shape = SpriteFactory.Shape.Diamond; break;
+            case EnemyKind.Hobgoblin:    maxHp = 50;  speed = 1.4f; damage = 15; xp = 5;  scale = 1.3f; col = new Color(0.3f, 0.5f, 0.25f); shape = SpriteFactory.Shape.Square; break;
+            case EnemyKind.GoblinRider:  maxHp = 20;  speed = 2.6f; damage = 10; xp = 3;  scale = 1.2f; col = new Color(0.75f, 0.45f, 0.25f); shape = SpriteFactory.Shape.Diamond; break;
             case EnemyKind.GoblinElder:  maxHp = 500; speed = 1.0f; damage = 15; xp = 40; scale = 1.4f; col = new Color(0.6f, 0.35f, 0.85f); break;
             case EnemyKind.HobgoblinKnight: maxHp = 900; speed = 0.9f; damage = 20; xp = 60; scale = 1.8f; col = new Color(0.35f, 0.45f, 0.55f); shape = SpriteFactory.Shape.Square; break;
             case EnemyKind.Boss:         maxHp = 900; speed = 1.8f; damage = 25; xp = 60; scale = 2.2f; col = new Color(0.9f, 0.1f, 0.15f); break;

@@ -1,0 +1,724 @@
+{
+  "baselineSpecs": {
+    "fireslash": [
+      "FSL5A",
+      "FSL10C",
+      "FSL15B"
+    ],
+    "solarslash": [
+      "SO5A",
+      "SO10C",
+      "SO15A"
+    ],
+    "tripleslash": [
+      "T5A",
+      "T10B",
+      "T15A"
+    ],
+    "fs": [
+      "B5A",
+      "B10A",
+      "B15A"
+    ],
+    "hf": [
+      "Y5B",
+      "Y10B",
+      "Y15B"
+    ],
+    "ab": [
+      "H5A",
+      "H10A",
+      "H15A"
+    ]
+  },
+  "normal": [
+    {
+      "id": "slash",
+      "onboard": [
+        "fs",
+        "solarslash"
+      ],
+      "priority": [
+        "fireslash",
+        "hf",
+        "solarslash",
+        "fs",
+        "tripleslash",
+        "ab"
+      ],
+      "upgrades": {
+        "fireslash": [
+          "dmg"
+        ]
+      }
+    },
+    {
+      "id": "area",
+      "onboard": [
+        "solarslash",
+        "fs"
+      ],
+      "priority": [
+        "solarslash",
+        "fs",
+        "hf",
+        "fireslash",
+        "ab",
+        "tripleslash"
+      ],
+      "upgrades": {
+        "solarslash": [
+          "dmg",
+          "dmg",
+          "range",
+          "dmg"
+        ]
+      }
+    },
+    {
+      "id": "boss",
+      "onboard": [
+        "tripleslash",
+        "hf"
+      ],
+      "priority": [
+        "tripleslash",
+        "hf",
+        "fs",
+        "solarslash",
+        "fireslash",
+        "ab"
+      ],
+      "upgrades": {
+        "tripleslash": [
+          "cd"
+        ]
+      }
+    },
+    {
+      "id": "burn",
+      "onboard": [
+        "fs",
+        "solarslash"
+      ],
+      "priority": [
+        "fs",
+        "hf",
+        "solarslash",
+        "ab",
+        "fireslash",
+        "tripleslash"
+      ],
+      "specials": {
+        "fs": [
+          "B5B",
+          "B10B",
+          "B15A"
+        ],
+        "hf": [
+          "Y5A",
+          "Y10A",
+          "Y15B"
+        ]
+      },
+      "upgrades": {
+        "fs": [
+          "dur",
+          "dps"
+        ],
+        "hf": [
+          "dot",
+          "fin"
+        ],
+        "solarslash": [
+          "dmg",
+          "range",
+          "dmg"
+        ]
+      }
+    }
+  ],
+  "fallbackUpgrades": {
+    "fireslash": [
+      "dmg"
+    ],
+    "solarslash": [
+      "dmg"
+    ],
+    "tripleslash": [
+      "dmg",
+      "cd"
+    ],
+    "fs": [
+      "dps",
+      "dur"
+    ],
+    "hf": [
+      "fin"
+    ],
+    "ab": [
+      "fin",
+      "cd",
+      "stk"
+    ]
+  },
+  "commonCombos": {
+    "tripleslash": "TC1"
+  },
+  "sourceCommit": "591dd75",
+  "checkpointLevels": [
+    10,
+    28,
+    60
+  ],
+  "expandedPoolStress": {
+    "levels": {
+      "fireslash": 1,
+      "firestorm": 15,
+      "fireexec": 15,
+      "firestream": 15,
+      "fs": 10,
+      "hf": 4
+    },
+    "specials": {
+      "firestorm": [
+        "FS5B",
+        "FS10A",
+        "FS15B"
+      ],
+      "fireexec": [
+        "FE5A",
+        "FE10B",
+        "FE15B"
+      ],
+      "firestream": [
+        "FST5B",
+        "FST10C",
+        "FST15A"
+      ],
+      "fs": [
+        "B5A",
+        "B10B"
+      ]
+    },
+    "combos": {
+      "firestorm": "FSC",
+      "fireexec": "FEC",
+      "firestream": "FTC"
+    },
+    "basicUpgradePriority": {
+      "firestorm": [
+        "dmg"
+      ],
+      "fireexec": [
+        "dmg"
+      ],
+      "firestream": [
+        "dmg"
+      ],
+      "fs": [
+        "dps"
+      ],
+      "hf": [
+        "fin"
+      ]
+    }
+  },
+  "clearLevelBand": [
+    55,
+    65
+  ],
+  "roleGroups": {
+    "movement": [
+      "firecharge",
+      "firestream"
+    ],
+    "damage": [
+      "tripleslash",
+      "fireexec"
+    ],
+    "crowdControl": [
+      "overslash",
+      "firebreaker"
+    ]
+  },
+  "expansionComparisons": {
+    "checkpoints": {
+      "balanced": {
+        "characterLevel": 60,
+        "fixed": {
+          "fireslash": 1,
+          "solarslash": 9,
+          "fs": 10,
+          "hf": 10
+        },
+        "perRoleLevel": 10
+      },
+      "concentrated": {
+        "characterLevel": 60,
+        "fixed": {
+          "fireslash": 1,
+          "fs": 10,
+          "hf": 4
+        },
+        "perRoleLevel": 15
+      }
+    },
+    "skillRules": {
+      "firecharge": {
+        "specials": [
+          "FC5C",
+          "FC10C",
+          "FC15A"
+        ],
+        "combo": null,
+        "upgrades": [
+          "dmg",
+          "cd"
+        ]
+      },
+      "firestream": {
+        "specials": [
+          "FST5B",
+          "FST10C",
+          "FST15A"
+        ],
+        "combo": "FTC",
+        "upgrades": [
+          "dmg"
+        ]
+      },
+      "tripleslash": {
+        "specials": [
+          "T5A",
+          "T10B",
+          "T15A"
+        ],
+        "combo": "TC1",
+        "upgrades": [
+          "cd"
+        ]
+      },
+      "fireexec": {
+        "specials": [
+          "FE5A",
+          "FE10B",
+          "FE15B"
+        ],
+        "combo": "FEC",
+        "upgrades": [
+          "dmg"
+        ]
+      },
+      "overslash": {
+        "specials": [
+          "OS5B",
+          "OS10C",
+          "OS15C"
+        ],
+        "combo": null,
+        "upgrades": [
+          "cd",
+          "dmg"
+        ]
+      },
+      "firebreaker": {
+        "specials": [
+          "FBK5A",
+          "FBK10B",
+          "FBK15C"
+        ],
+        "combo": null,
+        "upgrades": [
+          "cd",
+          "dmg"
+        ]
+      }
+    },
+    "supportRules": {
+      "fireslash": {
+        "specials": [
+          "FSL5A",
+          "FSL10C",
+          "FSL15B"
+        ],
+        "upgrades": [
+          "dmg"
+        ]
+      },
+      "solarslash": {
+        "specials": [
+          "SO5A",
+          "SO10C",
+          "SO15A"
+        ],
+        "upgrades": [
+          "dmg",
+          "dmg",
+          "range",
+          "dmg"
+        ]
+      },
+      "fs": {
+        "specials": [
+          "B5A",
+          "B10A",
+          "B15A"
+        ],
+        "upgrades": [
+          "dps",
+          "dur"
+        ]
+      },
+      "hf": {
+        "specials": [
+          "Y5B",
+          "Y10B",
+          "Y15B"
+        ],
+        "upgrades": [
+          "fin"
+        ]
+      }
+    },
+    "sample": {
+      "seconds": 90,
+      "bossTargets": 1,
+      "bossHp": 4050,
+      "crowdTargets": 5,
+      "crowdHp": 100,
+      "killRate": 0,
+      "items": false,
+      "fireSlashCooldownAdjusted": true
+    },
+    "results": [
+      {
+        "layout": "balanced",
+        "movement": "firecharge",
+        "damage": "tripleslash",
+        "crowdControl": "overslash",
+        "bossDps": 669.44,
+        "crowdDps": 3347.22,
+        "stunUptime": 0.6501
+      },
+      {
+        "layout": "balanced",
+        "movement": "firecharge",
+        "damage": "tripleslash",
+        "crowdControl": "firebreaker",
+        "bossDps": 618.66,
+        "crowdDps": 3093.28,
+        "stunUptime": 0.4
+      },
+      {
+        "layout": "balanced",
+        "movement": "firecharge",
+        "damage": "fireexec",
+        "crowdControl": "overslash",
+        "bossDps": 702.98,
+        "crowdDps": 3455.16,
+        "stunUptime": 0.6501
+      },
+      {
+        "layout": "balanced",
+        "movement": "firecharge",
+        "damage": "fireexec",
+        "crowdControl": "firebreaker",
+        "bossDps": 656.34,
+        "crowdDps": 3221.99,
+        "stunUptime": 0.4
+      },
+      {
+        "layout": "balanced",
+        "movement": "firestream",
+        "damage": "tripleslash",
+        "crowdControl": "overslash",
+        "bossDps": 494.22,
+        "crowdDps": 2471.11,
+        "stunUptime": 0.6501
+      },
+      {
+        "layout": "balanced",
+        "movement": "firestream",
+        "damage": "tripleslash",
+        "crowdControl": "firebreaker",
+        "bossDps": 433.7,
+        "crowdDps": 2168.5,
+        "stunUptime": 0.4
+      },
+      {
+        "layout": "balanced",
+        "movement": "firestream",
+        "damage": "fireexec",
+        "crowdControl": "overslash",
+        "bossDps": 525.36,
+        "crowdDps": 2567.04,
+        "stunUptime": 0.6501
+      },
+      {
+        "layout": "balanced",
+        "movement": "firestream",
+        "damage": "fireexec",
+        "crowdControl": "firebreaker",
+        "bossDps": 474.46,
+        "crowdDps": 2312.54,
+        "stunUptime": 0.4
+      },
+      {
+        "layout": "concentrated",
+        "movement": "firecharge",
+        "damage": "tripleslash",
+        "crowdControl": "overslash",
+        "bossDps": 982.9,
+        "crowdDps": 9295.06,
+        "stunUptime": 0.7093
+      },
+      {
+        "layout": "concentrated",
+        "movement": "firecharge",
+        "damage": "tripleslash",
+        "crowdControl": "firebreaker",
+        "bossDps": 883.72,
+        "crowdDps": 8885.11,
+        "stunUptime": 0.451
+      },
+      {
+        "layout": "concentrated",
+        "movement": "firecharge",
+        "damage": "fireexec",
+        "crowdControl": "overslash",
+        "bossDps": 799.98,
+        "crowdDps": 7544.09,
+        "stunUptime": 0.7093
+      },
+      {
+        "layout": "concentrated",
+        "movement": "firecharge",
+        "damage": "fireexec",
+        "crowdControl": "firebreaker",
+        "bossDps": 706.54,
+        "crowdDps": 7110.64,
+        "stunUptime": 0.451
+      },
+      {
+        "layout": "concentrated",
+        "movement": "firestream",
+        "damage": "tripleslash",
+        "crowdControl": "overslash",
+        "bossDps": 1118.74,
+        "crowdDps": 5593.72,
+        "stunUptime": 0.7093
+      },
+      {
+        "layout": "concentrated",
+        "movement": "firestream",
+        "damage": "tripleslash",
+        "crowdControl": "firebreaker",
+        "bossDps": 1034.84,
+        "crowdDps": 5174.22,
+        "stunUptime": 0.451
+      },
+      {
+        "layout": "concentrated",
+        "movement": "firestream",
+        "damage": "fireexec",
+        "crowdControl": "overslash",
+        "bossDps": 936.69,
+        "crowdDps": 3859.98,
+        "stunUptime": 0.7093
+      },
+      {
+        "layout": "concentrated",
+        "movement": "firestream",
+        "damage": "fireexec",
+        "crowdControl": "firebreaker",
+        "bossDps": 844.56,
+        "crowdDps": 3399.31,
+        "stunUptime": 0.451
+      }
+    ]
+  },
+  "automaticInvestmentComparison": {
+    "fixedLevels": {
+      "firecharge": 10,
+      "fireexec": 10,
+      "overslash": 10,
+      "fs": 10,
+      "hf": 10
+    },
+    "automaticLevelBudget": 10,
+    "sample": {
+      "seconds": 90,
+      "bossTargets": 1,
+      "bossHp": 4050,
+      "crowdTargets": 5,
+      "crowdHp": 100,
+      "killRate": 0,
+      "items": false,
+      "fireSlashCooldownAdjusted": true
+    },
+    "results": [
+      {
+        "id": "fireSlash10",
+        "levels": {
+          "fireslash": 10
+        },
+        "boss": {
+          "total": 757.24,
+          "autos": 99.22,
+          "passive": 238.33
+        },
+        "crowd": {
+          "total": 3726.49,
+          "autos": 496.11,
+          "passive": 1191.67
+        }
+      },
+      {
+        "id": "solar9",
+        "levels": {
+          "fireslash": 1,
+          "solarslash": 9
+        },
+        "boss": {
+          "total": 702.98,
+          "autos": 50.4,
+          "passive": 236.92
+        },
+        "crowd": {
+          "total": 3455.16,
+          "autos": 252,
+          "passive": 1184.61
+        }
+      },
+      {
+        "id": "fireSolar5",
+        "levels": {
+          "fireslash": 5,
+          "solarslash": 5
+        },
+        "boss": {
+          "total": 714.9,
+          "autos": 62.32,
+          "passive": 236.92
+        },
+        "crowd": {
+          "total": 3514.77,
+          "autos": 311.61,
+          "passive": 1184.61
+        }
+      },
+      {
+        "id": "fireball9",
+        "levels": {
+          "fireslash": 1,
+          "fireball": 9
+        },
+        "picks": {
+          "fireball": [
+            "FB5B"
+          ]
+        },
+        "boss": {
+          "total": 836.91,
+          "autos": 87.99,
+          "passive": 310.9
+        },
+        "crowd": {
+          "total": 3992.51,
+          "autos": 307.63,
+          "passive": 1554.5
+        }
+      },
+      {
+        "id": "firebuster9",
+        "levels": {
+          "fireslash": 1,
+          "firebuster": 9
+        },
+        "picks": {
+          "firebuster": [
+            "FU5C"
+          ]
+        },
+        "boss": {
+          "total": 729.57,
+          "autos": 126.36,
+          "passive": 185.96
+        },
+        "crowd": {
+          "total": 3588.1,
+          "autos": 631.78,
+          "passive": 929.78
+        }
+      },
+      {
+        "id": "fireblade9",
+        "levels": {
+          "fireslash": 1,
+          "fireblade": 9
+        },
+        "picks": {
+          "fireblade": [
+            "FBL5A"
+          ]
+        },
+        "boss": {
+          "total": 762.6,
+          "autos": 123.12,
+          "passive": 214.88
+        },
+        "crowd": {
+          "total": 3753.27,
+          "autos": 615.61,
+          "passive": 1074.39
+        }
+      },
+      {
+        "id": "firestorm9",
+        "levels": {
+          "fireslash": 1,
+          "firestorm": 9
+        },
+        "picks": {
+          "firestorm": [
+            "FS5B"
+          ]
+        },
+        "boss": {
+          "total": 664.88,
+          "autos": 53.36,
+          "passive": 192.24
+        },
+        "crowd": {
+          "total": 3264.66,
+          "autos": 266.78,
+          "passive": 961.22
+        }
+      },
+      {
+        "id": "wideSpread",
+        "levels": {
+          "fireslash": 1,
+          "solarslash": 5,
+          "fireblade": 4
+        },
+        "picks": {
+          "fireblade": [
+            "FBL5A"
+          ]
+        },
+        "boss": {
+          "total": 742.97,
+          "autos": 84.16,
+          "passive": 242.37
+        },
+        "crowd": {
+          "total": 3655.1,
+          "autos": 420.78,
+          "passive": 1211.83
+        }
+      }
+    ]
+  }
+}

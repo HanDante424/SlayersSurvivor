@@ -26,7 +26,7 @@ public class FlameSword : Skill
     const float BaseInterval = 1f;      // 지속 피해 기본 피해 간격
 
     // 고유 기본 강화
-    const float UpDps = 2f;             // 화상 피해: 초기 피해량 +2
+    const float UpDps = 1f;             // 화상 피해: 초기 피해량 +1 (+2 → +1, 밸런스 확정 2026-11-24)
     const int UpStacks = 1;             // 화상 최대 스택 +1
     const float UpDuration = 1f;        // 화상 지속시간 +1초
 

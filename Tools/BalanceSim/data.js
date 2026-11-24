@@ -63,10 +63,15 @@ const BOSS_PRESETS = [
 // 기본 강화 1회당 증가량 (스킬마다 따로 조정 가능: S.bv['s:스킬id'] · 패시브는 S.bv['p:fs|hf|ab'])
 const BASIC_DEF = {
   skill: { dmg: 0.1, cd: 0.025 },                       // 피해량 강화 +10% · 쿨타임 강화 -2.5% (범위 강화 +10% 는 시뮬레이터에 영향 없음)
-  fs: { dps: 2, stk: 1, dur: 1 },                       // 화염의 검: 화상 초기 피해량 +2 · 최대 스택 +1 · 지속시간 +1초
+  fs: { dps: 1, stk: 1, dur: 1 },                       // 화염의 검: 화상 초기 피해량 +2 · 최대 스택 +1 · 지속시간 +1초
   hf: { fin: 0.02, mob: 0.02, dot: 0.1 },               // 옥염: 최종 피해량 +2%p · 쿨타임 감소 +2% · 지속 피해 피해량 +10%
   ab: { fin: 0.01, cd: 0.002, stk: 1 },                 // 흡수 가열: 스택당 최종 +1%p · 스택당 쿨감 +0.2%p · 최대 스택 +1
 };
+/** 스킬별 기본 강화 1회 증가량 기본값 = 게임 값 (스킬 정의의 basic, 없으면 공통값). 시뮬레이터가 따로 두는 기본값 없음 */
+function basicDefOf(id, k) {
+  const d = (typeof SKILLS !== 'undefined' ? SKILLS : []).find(x => x.id === id);
+  return d && d.basic && d.basic[k] != null ? d.basic[k] : BASIC_DEF.skill[k];
+}
 const BASIC_LBL = {
   skill: { dmg: ['피해량 강화 1회당 증가', '0.1 = +10%'], cd: ['쿨타임 강화 1회당 감소', '0.025 = 2.5%'] },
   fs: { dps: ['화상 피해 강화 1회당 초기 피해량', ''], stk: ['최대 스택 강화 1회당 스택', ''], dur: ['지속시간 강화 1회당', '초'] },
@@ -142,7 +147,7 @@ const PASSIVES = {
 // ───────────────── 스킬 ─────────────────
 const SKILLS = [
   // ═════════ 자동 ═════════
-  { id: 'fireslash', name: '파이어 슬래시', kind: 'auto', cd: 2,
+  { id: 'fireslash', basic: { dmg: 0.2, cd: 0.05 }, name: '파이어 슬래시', kind: 'auto', cd: 2,
     params: { dmg: { l: '초기 피해량', v: 10 }, delay: { l: '적중까지', v: 0.1, u: '초' } },
     cast(c, p, m, u) {
       c.at(p.delay, () => {
@@ -166,8 +171,8 @@ const SKILLS = [
       sp('FSL15C', 15, '죽음의 메아리', '처치 시 120도 간격 참격 3개 (총 피해량 100% 고정)', { flags: { echo: 1 } }, '처치 빈도 = "초당 처치 수"', { ratio: n_('참격당 총 피해량 비율', 1), count: n_('참격 수', 3) }),
     ] },
 
-  { id: 'solarslash', name: '솔라 슬래시', kind: 'auto', cd: 5,
-    params: { slash: { l: '베기 초기 피해량', v: 5 }, expl: { l: '폭발 초기 피해량', v: 12 }, explDelay: { l: '폭발까지', v: 0.45, u: '초' }, burnTime: { l: '타오름 지속 시간', v: 5, u: '초' } },
+  { id: 'solarslash', basic: { dmg: 0.2 }, name: '솔라 슬래시', kind: 'auto', cd: 5,
+    params: { slash: { l: '베기 초기 피해량', v: 7 }, expl: { l: '폭발 초기 피해량', v: 15 }, explDelay: { l: '폭발까지', v: 0.45, u: '초' }, burnTime: { l: '타오름 지속 시간', v: 5, u: '초' } },
     cast(c, p, m) {
       const tot = c.A(p.slash) + c.A(p.expl);
       c.at(0, () => c.hit(p.slash, { label: '베기' }));
@@ -194,8 +199,8 @@ const SKILLS = [
       sp('SO15C', 15, '플레어', '최종 피해량 +100%, 쿨타임 감소 +10%', { finalMul: 2, cdMul: 0.9 }),
     ] },
 
-  { id: 'fireball', name: '파이어 볼', kind: 'auto', cd: 3,
-    params: { direct: { l: '직격 초기 피해량', v: 3 }, expl: { l: '폭발 초기 피해량', v: 4 }, travel: { l: '날아가는 시간', v: 0.3, u: '초' }, hitGap: { l: '관통 · 도탄 적중 사이', v: 0.1, u: '초' } },
+  { id: 'fireball', basic: { dmg: 0.15, cd: 0.03 }, name: '파이어 볼', kind: 'auto', cd: 3,
+    params: { direct: { l: '직격 초기 피해량', v: 5 }, expl: { l: '폭발 초기 피해량', v: 6 }, travel: { l: '날아가는 시간', v: 0.3, u: '초' }, hitGap: { l: '관통 · 도탄 적중 사이', v: 0.1, u: '초' } },
     cast(c, p, m) {
       const fw = !!m.flags.fireworks;
       const hits = 1 + (m.flags.pierce && !fw ? 2 : 0) + (m.flags.ricochet && !fw ? 2 : 0);
@@ -230,8 +235,8 @@ const SKILLS = [
       sp('FB15C', 15, '초거대', '최종 피해량 +50%, 범위 +50%', { finalMul: 1.5 }),
     ] },
 
-  { id: 'firebuster', name: '파이어 버스터', kind: 'auto', cd: 10,
-    params: { dmg: { l: '초기 피해량', v: 20 }, delay: { l: '폭발까지', v: 0.2, u: '초' } },
+  { id: 'firebuster', basic: { dmg: 0.3, cd: 0.05 }, name: '파이어 버스터', kind: 'auto', cd: 10,
+    params: { dmg: { l: '초기 피해량', v: 60 }, delay: { l: '폭발까지', v: 0.2, u: '초' } },
     cast(c, p, m) {
       const tot = c.A(p.dmg);
       c.at(p.delay, () => {
@@ -258,11 +263,11 @@ const SKILLS = [
       sp('FU15C', 15, '연속 폭발', '종료 시 0.25초 간격 폭발 3회 (총 피해량 40% 고정)', { flags: { series: 1 } }, null, { count: n_('폭발 횟수', 3), gap: n_('폭발 간격', 0.25, '초'), ratio: n_('폭발당 총 피해량 비율', 0.4) }),
     ] },
 
-  { id: 'fireblade', name: '파이어 블레이드', kind: 'auto', cd: 15, cdAfterCast: true,
+  { id: 'fireblade', basic: { dmg: 0.2, cd: 0.035 }, name: '파이어 블레이드', kind: 'auto', cd: 15, cdAfterCast: true,
     params: {
-      first: { l: '첫 베기 초기 피해량', v: 5 }, firstDelay: { l: '첫 베기까지', v: 0.24, u: '초' },
-      chain: { l: '연속 베기 초기 피해량', v: 3 }, count: { l: '연속 베기 횟수', v: 5 }, interval: { l: '연속 베기 간격', v: 0.12, u: '초' },
-      expl: { l: '폭발 초기 피해량', v: 20 }, explDelay: { l: '마지막 베기 뒤 폭발까지', v: 0.2, u: '초' },
+      first: { l: '첫 베기 초기 피해량', v: 10 }, firstDelay: { l: '첫 베기까지', v: 0.24, u: '초' },
+      chain: { l: '연속 베기 초기 피해량', v: 15 }, count: { l: '연속 베기 횟수', v: 5 }, interval: { l: '연속 베기 간격', v: 0.12, u: '초' },
+      expl: { l: '폭발 초기 피해량', v: 40 }, explDelay: { l: '마지막 베기 뒤 폭발까지', v: 0.2, u: '초' },
     },
     cast(c, p, m) {
       const n = p.count + m.countAdd;
@@ -296,8 +301,8 @@ const SKILLS = [
       sp('FBL15C', 15, '타오르는 참격', '화상 상태 적 적중 시 최종 피해량 +100%', { vsBurn: 2 }),
     ] },
 
-  { id: 'firestorm', name: '파이어 스톰', kind: 'auto', cd: 14,
-    params: { dot: { l: '소용돌이 초기 피해량 (틱당)', v: 2 }, dur: { l: '소용돌이 지속시간', v: 3, u: '초' }, interval: { l: '피해 간격', v: 1, u: '초' }, expl: { l: '폭발 초기 피해량', v: 15 } },
+  { id: 'firestorm', basic: { dmg: 0.2, cd: 0.035 }, name: '파이어 스톰', kind: 'auto', cd: 14,
+    params: { dot: { l: '소용돌이 초기 피해량 (틱당)', v: 8 }, dur: { l: '소용돌이 지속시간', v: 3, u: '초' }, interval: { l: '피해 간격', v: 1, u: '초' }, expl: { l: '폭발 초기 피해량', v: 15 } },
     cast(c, p, m) {
       const dur = Math.max(0.3, (p.dur + m.durAdd) * (1 + m.durPct));
       const iv = Math.max(0.1, c.dotIv(p.interval * m.intervalMul));
@@ -324,8 +329,8 @@ const SKILLS = [
     ] },
 
   // ═════════ 수동 ═════════
-  { id: 'tripleslash', name: '트리플 슬래시', kind: 'manual', cd: 8,
-    params: { dmg: { l: '베기 1회 초기 피해량', v: 8 }, count: { l: '내부 공격 횟수', v: 3 }, interval: { l: '베기 간격', v: 0.05, u: '초' }, embersTime: { l: '잔화의 검흔 지속', v: 3, u: '초' } },
+  { id: 'tripleslash', basic: { dmg: 0.2, cd: 0.05 }, name: '트리플 슬래시', kind: 'manual', cd: 8,
+    params: { dmg: { l: '베기 1회 초기 피해량', v: 10 }, count: { l: '내부 공격 횟수', v: 3 }, interval: { l: '베기 간격', v: 0.05, u: '초' }, embersTime: { l: '잔화의 검흔 지속', v: 3, u: '초' } },
     cast(c, p, m) {
       let n = p.count * (m.flags.frenzy ? NV(m, 'T5A', 'mult') : 1) + m.countAdd;
       let extraPct = 0;
@@ -342,23 +347,23 @@ const SKILLS = [
     },
     combos: [
       { id: 'TC1', name: '츠바메가에시', requires: ['T10B', 'T15A'],
-        desc: '최종 피해량 +500%, 쿨타임 감소 무효화 (1%당 최종 +10%), 쿨타임 +200%',
-        mods: { nullCd: { base: 5, perPct: 0.1 }, cdMul: 3 } },
+        desc: '최종 피해량 +1000%, 쿨타임 감소 무효화 (1%당 최종 +30%), 쿨타임 +200%',
+        mods: { nullCd: { base: 10, perPct: 0.3 }, cdMul: 3 } },
     ],
     specials: [
-      sp('T5A', 5, '난도질', '내부 공격 횟수 3배', { flags: { frenzy: 1 } }, null, { mult: n_('내부 공격 횟수 배수', 3) }),
+      sp('T5A', 5, '난도질', '내부 공격 횟수 2배', { flags: { frenzy: 1 } }, null, { mult: n_('내부 공격 횟수 배수', 2) }),
       sp('T5B', 5, '난개', '120도 간격으로 추가 사용 +2', { extras: [{ spread: 1 }, { spread: 1 }] }),
       sp('T5C', 5, '빠른 준비', '적중 시 남은 쿨타임 2.5% 감소', { hitCdRed: 0.025 }),
       sp('T10A', 10, '과부화', '범위 +50%, 피해량 +100%, 쿨타임 +25%', { dmgPct: 1, cdMul: 1.25 }),
       sp('T10B', 10, '일섬', '내부 공격 횟수 무효화, 무효화 1당 피해량 +125%', { flags: { ilseom: 1 } }, null, { perCount: n_('무효화 1당 피해량', 1.25, '1.25 = +125%') }),
-      sp('T10C', 10, '고열 절삭', '대상 화상 스택당 최종 피해량 +5% (상한 75%)', { flags: { searing: 1 } }, null, { per: n_('스택당 최종 피해량', 0.05, '0.05 = +5%'), cap: n_('효과 상한', 0.75, '0.75 = 75%') }),
+      sp('T10C', 10, '고열 절삭', '대상 화상 스택당 최종 피해량 +5% (상한 50%)', { flags: { searing: 1 } }, null, { per: n_('스택당 최종 피해량', 0.05, '0.05 = +5%'), cap: n_('효과 상한', 0.5, '0.5 = 50%') }),
       sp('T15A', 15, '삼연발', '발동 횟수 +2', { extras: [{}, {}] }),
       sp('T15B', 15, '강제 발화', '적중 시 부여된 모든 화상 일괄 적용', { flags: { forceBurn: 1 } }),
       sp('T15C', 15, '잔화의 검흔', '종료 시 지속 피해 참격 3개 (총 피해량 40% 고정, 3초)', { flags: { embers: 1 } }, null, { ratio: n_('총 피해량 비율', 0.4), count: n_('참격 수', 3) }),
     ] },
 
-  { id: 'firecharge', name: '파이어 차지', kind: 'move', cd: 10, stacks: 1,
-    params: { dmg: { l: '초기 피해량', v: 4 }, stun: { l: '기본 기절', v: 0, u: '초' }, dash: { l: '돌진 시간', v: 0.25, u: '초' }, fieldTime: { l: '장판 · 오오라 지속', v: 3, u: '초' } },
+  { id: 'firecharge', basic: { dmg: 0.3 }, name: '파이어 차지', kind: 'move', cd: 10, stacks: 1,
+    params: { dmg: { l: '초기 피해량', v: 30 }, stun: { l: '기본 기절', v: 0, u: '초' }, dash: { l: '돌진 시간', v: 0.25, u: '초' }, fieldTime: { l: '장판 · 오오라 지속', v: 3, u: '초' } },
     cast(c, p, m) {
       const tot = c.A(p.dmg);
       c.at(p.dash * 0.5, () => c.hit(p.dmg, { label: '돌진', stun: p.stun + m.stunAdd }));
@@ -385,10 +390,10 @@ const SKILLS = [
       sp('FC15C', 15, '충격파', '종료 시 충격파 (총 피해량 200% 고정, 화상 상태 적 +100%)', { flags: { shock: 1 } }, null, { ratio: n_('총 피해량 비율', 2, '2 = 200%'), burn: n_('화상 상태 적 추가 배율', 1, '1 = +100%') }),
     ] },
 
-  { id: 'overslash', name: '오버 드라이브 플레임 슬래시', kind: 'manual', cd: 20,
+  { id: 'overslash', basic: { dmg: 0.15, cd: 0.035 }, name: '오버 드라이브 플레임 슬래시', kind: 'manual', cd: 15,
     params: {
-      blade: { l: '화염의 검 초기 피해량', v: 20 }, stun: { l: '기절 지속 시간', v: 2, u: '초' },
-      expl: { l: '폭발 초기 피해량', v: 50 }, explDelay: { l: '폭발 딜레이 (내려친 뒤)', v: 1, u: '초' },
+      blade: { l: '화염의 검 초기 피해량', v: 60 }, stun: { l: '기절 지속 시간', v: 2, u: '초' },
+      expl: { l: '폭발 초기 피해량', v: 100 }, explDelay: { l: '폭발 딜레이 (내려친 뒤)', v: 1, u: '초' },
       windup: { l: '준비 시간', v: 0.35, u: '초' }, swing: { l: '내려치는 시간', v: 0.08, u: '초' },
     },
     cast(c, p, m) {
@@ -409,23 +414,24 @@ const SKILLS = [
     },
     combos: [
       { id: 'OSC', name: '오버 드라이브 블레이징 슬래시', requires: ['OS10B', 'OS15B'],
-        desc: '추가 사용 무효화, 범위 +25%, 최종 피해량 +50% + 무효화한 추가 사용 1당 +25%',
-        mods: { flags: { noExtras: 1 }, finalMul: 2 } },
+        desc: '추가 사용 무효화, 범위 +25%, 최종 피해량 +50% + 무효화한 추가 사용 1당 +50%',
+        mods: { flags: { noExtras: 1 } },
+        nums: { base: n_('기본 최종 피해량', 0.5, '0.5 = +50%'), per: n_('무효화한 추가 사용 1당 최종 피해량', 0.5, '0.5 = +50% (삼연발 2회 무효화 = +100%)') } },
     ],
     specials: [
-      sp('OS5A', 5, '거대한 검', '범위 +50%, 피해량 +25%', { dmgPct: 0.25 }),
+      sp('OS5A', 5, '거대한 검', '범위 +50%, 최종 피해량 +75%', { finalMul: 1.75 }),
       sp('OS5B', 5, '옭아매는 화염', '기절 +2초, 피해량 +25%', { stunAdd: 2, dmgPct: 0.25 }),
       sp('OS5C', 5, '빠른 준비', '적중 시 남은 쿨타임 2.5% 감소', { hitCdRed: 0.025 }),
       sp('OS10A', 10, '불타는 잔흔', '종료 시 잔흔 3초 (총 피해량 60% 고정 지속 피해)', { flags: { trace: 1 } }, null, { ratio: n_('총 피해량 비율', 0.6), time: n_('지속 시간', 3, '초') }),
       sp('OS10B', 10, '붕괴의 일격', '기절 상태 적 적중 시 최종 피해량 +75%', { vsStun: 1.75 }),
       sp('OS10C', 10, '충격 집중', '기절 +2.5초, 쿨타임 감소 +20%, 피해량 +50%', { stunAdd: 2.5, cdMul: 0.8, dmgPct: 0.5 }),
       sp('OS15A', 15, '화염 집중', '폭발 삭제, 기절 무효화, 최종 +100% + 무효화한 기절 1초당 +25%', { flags: { focus: 1 } }, null, { base: n_('기본 최종 피해량', 1, '1 = +100%'), perSec: n_('무효화 1초당 최종 피해량', 0.25, '0.25 = +25%') }),
-      sp('OS15B', 15, '삼연발', '양쪽 60도 간격으로 1회씩 추가 사용', { extras: [{ delay: 0, spread: 1 }, { delay: 0, spread: 1 }] }),
+      sp('OS15B', 15, '삼연발', '양쪽 60도 간격으로 1회씩 추가 사용, 피해량 +25%', { extras: [{ delay: 0, spread: 1 }, { delay: 0, spread: 1 }], dmgPct: 0.25 }),
       sp('OS15C', 15, '후폭풍', '폭발 적중 시 적들을 중심으로 모음, 범위 +50%, 최종 +50%', { finalMul: 1.5 }),
     ] },
 
-  { id: 'firebreaker', name: '파이어 브레이커', kind: 'manual', cd: 10,
-    params: { dmg: { l: '폭발 초기 피해량', v: 10 }, count: { l: '폭발 횟수', v: 2 }, delay: { l: '폭발 사이 간격', v: 2, u: '초' }, stun: { l: '폭발당 기절', v: 1, u: '초' }, hotTime: { l: '불타는 대지 지속', v: 3, u: '초' } },
+  { id: 'firebreaker', basic: { dmg: 0.2, cd: 0.05 }, name: '파이어 브레이커', kind: 'manual', cd: 10,
+    params: { dmg: { l: '폭발 초기 피해량', v: 40 }, count: { l: '폭발 횟수', v: 2 }, delay: { l: '폭발 사이 간격', v: 2, u: '초' }, stun: { l: '폭발당 기절', v: 1, u: '초' }, hotTime: { l: '불타는 대지 지속', v: 3, u: '초' } },
     cast(c, p, m) {
       let n = p.count + m.countAdd, nullified = 0;
       if (m.flags.gravity) { nullified = n - 1; n = 1; }   // 중력 붕괴: 공격 횟수 무효화 → 폭발 1회, 무효화 1당 기절 +2초
@@ -447,24 +453,24 @@ const SKILLS = [
     },
     combos: [
       { id: 'FKC', name: '오버 드라이브 플레임 브레이커', requires: ['FBK10A', 'FBK15B'],
-        desc: '기본 폭발 제거, 공격 횟수 +5, 최종 피해량 -60%, 공격 횟수의 2배만큼 무작위 적 위치에 추가 폭발',
-        mods: { flags: { rnd: 1 }, countAdd: 5, finalMul: 0.4 },
+        desc: '기본 폭발 제거, 공격 횟수 +1, 최종 피해량 -80%, 공격 횟수의 2배만큼 무작위 적 위치에 추가 폭발',
+        mods: { flags: { rnd: 1 }, countAdd: 1, finalMul: 0.2 },
         nums: { mult: n_('공격 횟수당 추가 폭발 수 (배수)', 2, '공격 횟수 × 이 값') } },
     ],
     specials: [
       sp('FBK5A', 5, '균열 확장', '폭발마다 범위 +50%, 기절 +1초', { flags: { fissure: 1 } }, null, { stunPer: n_('폭발마다 기절 증가', 1, '초') }),
       sp('FBK5B', 5, '불타는 대지', '종료 시 장판, 매 초 화상 스택 +1 · 이동 속도 -50%', { flags: { hot: 1 } }, null, { stacks: n_('매 초 화상 스택', 1) }),
       sp('FBK5C', 5, '빠른 폭발', '간격 -50%, 최종 피해량 +50%', { delayMul: 0.5, finalMul: 1.5 }),
-      sp('FBK10A', 10, '연쇄 분출', '공격 횟수 +2', { countAdd: 2 }),
+      sp('FBK10A', 10, '연쇄 분출', '공격 횟수 +1', { countAdd: 1 }),
       sp('FBK10B', 10, '방출', '적중 시 넉백', null, NONE),
       sp('FBK10C', 10, '충격 흡수', '마지막 폭발 적중 시 적 하나당 최대 체력 5% 회복', null, NONE + ' (플레이어 체력은 없음)'),
       sp('FBK15A', 15, '중첩 붕괴', '적중 시 받는 최종 피해량 +20% (최대 5스택)', { vuln: { per: 0.2, max: 5, key: 'stack' } }),
-      sp('FBK15B', 15, '지각 붕괴', '공격 횟수 +2, 간격 -50%', { countAdd: 2, delayMul: 0.5 }),
+      sp('FBK15B', 15, '지각 붕괴', '공격 횟수 +1, 간격 -50%', { countAdd: 1, delayMul: 0.5 }),
       sp('FBK15C', 15, '중력 붕괴', '공격 횟수 무효화 (폭발 1회), 무효화 1당 범위 +50% · 기절 +2초', { flags: { gravity: 1 } }, null, { stunPerNull: n_('무효화 1당 기절', 2, '초') }),
     ] },
 
   { id: 'fireexec', name: '파이어 엑스큐션', kind: 'manual', cd: 30,
-    params: { dmg: { l: '베기 1회 초기 피해량', v: 5 }, count: { l: '공격 횟수', v: 30 }, interval: { l: '베기 간격', v: 0.025, u: '초' } },
+    params: { dmg: { l: '베기 1회 초기 피해량', v: 12 }, count: { l: '공격 횟수', v: 30 }, interval: { l: '베기 간격', v: 0.025, u: '초' } },
     cast(c, p, m) {
       const dim = !!m.flags.dim;   // 플레임 디멘션 블레이드: 연속 베기 삭제, 검기만
       const n = p.count + m.countAdd;
@@ -500,23 +506,23 @@ const SKILLS = [
     },
     combos: [
       { id: 'FEC', name: '플레임 디멘션 블레이드', requires: ['FE10B', 'FE15B'],
-        desc: '연속 베기 삭제, 공격 횟수 +30, 공격 횟수 3당 유도 검기 1개 (유도 = 전부 적중), 검기가 적중한 위치에서 연속 베기가 공격 횟수만큼 (+30 포함) 일어남 → 검기 하나당 총 피해량의 40% + 100% = 140%',
-        mods: { flags: { dim: 1 }, countAdd: 30 },
-        nums: { every: n_('공격 횟수당 검기 1개', 3), waveRatio: n_('검기 총 피해량 비율', 0.4), slashRatio: n_('검기 적중 연속 베기 총 피해량 비율', 1), ticks: n_('연속 베기 타수 (0 = 공격 횟수와 같음)', 0) } },
+        desc: '연속 베기 삭제, 공격 횟수 +5, 공격 횟수 5당 유도 검기 1개 (유도 = 전부 적중), 검기가 적중한 위치에서 연속 베기가 공격 횟수만큼 (+5 포함) 일어남 → 검기 하나당 총 피해량의 20% + 60% = 80%',
+        mods: { flags: { dim: 1 }, countAdd: 5 },
+        nums: { every: n_('공격 횟수당 검기 1개', 5), waveRatio: n_('검기 총 피해량 비율', 0.2), slashRatio: n_('검기 적중 연속 베기 총 피해량 비율', 0.6), ticks: n_('연속 베기 타수 (0 = 공격 횟수와 같음)', 0) } },
     ],
     specials: [
-      sp('FE5A', 5, '난도질', '공격 횟수 +15', { countAdd: 15 }),
+      sp('FE5A', 5, '난도질', '공격 횟수 +5', { countAdd: 5 }),
       sp('FE5B', 5, '유동 검무', '이동 불가 삭제, 시전 중 이동 속도 -50%', null, NONE),
       sp('FE5C', 5, '집중 절삭', '범위 -50%, 피해량 +50%', { dmgPct: 0.5 }),
       sp('FE10A', 10, '고속 절단', '공격 시간 -75%, 쿨타임 감소 +25%', { intervalMul: 0.25, cdMul: 0.75 }),
       sp('FE10B', 10, '검풍', '베기 5회마다 검기 8개 (총 피해량 40% 고정)', { flags: { wind: 1 } }, '유도 없음: 명중률 = 전역 설정', { every: n_('베기 횟수마다', 5), count: n_('검기 수', 8), ratio: n_('총 피해량 비율', 0.4) }),
       sp('FE10C', 10, '작열 절삭', '화상 상태 적 적중 시 최종 피해량 +50%', { vsBurn: 1.5 }),
-      sp('FE15A', 15, '무진참', '공격 횟수 +30, 쿨타임 +25%', { countAdd: 30, cdMul: 1.25 }),
+      sp('FE15A', 15, '무진참', '공격 횟수 +10, 쿨타임 +25%', { countAdd: 10, cdMul: 1.25 }),
       sp('FE15B', 15, '잔영', '종료 시 소형 연속 베기 6개 (총 피해량 60% 고정)', { flags: { afterimage: 1 } }, null, { count: n_('소형 연속 베기 수', 6), ticks: n_('연속 베기 타수', 8), ratio: n_('총 피해량 비율', 0.6) }),
       sp('FE15C', 15, '타오르는 검', '화상 상태 적 5회 적중 시 폭발 (화상 총 피해량 = 1틱 × 스택 의 100% 고정)', { flags: { burnBlast: 1 } }, null, { every: n_('적중 횟수마다', 5), ratio: n_('화상 총 피해량 비율', 1) }),
     ] },
 
-  { id: 'firestream', name: '파이어 스트림', kind: 'move', cd: 8, stacks: 3,
+  { id: 'firestream', basic: { dmg: 0.15, cd: 0.035 }, name: '파이어 스트림', kind: 'move', cd: 8, stacks: 3,
     params: { dmg: { l: '초기 피해량', v: 3 }, dash: { l: '돌진 시간', v: 0.12, u: '초' }, fieldTime: { l: '장판 지속', v: 3, u: '초' }, lanceHit: { l: '화염의 창: 대기 중 피격 비율', v: 0.5, u: '0~1 (기대값으로 계산)' } },
     cast(c, p, m, u) {
       const lance = m.flags.lance ? p.lanceHit : 0;
@@ -532,8 +538,8 @@ const SKILLS = [
     },
     combos: [
       { id: 'FTC', name: '화염 일섬', requires: ['FST10C', 'FST15A'],
-        desc: '최종 피해량 +1000%, 쿨타임 감소 무효화 (1%당 +5%), 최대 스택 능력치 무효화 (1당 +150%)',
-        mods: { nullCd: { base: 10, perPct: 0.05, perStack: 1.5 }, flags: { nullStacks: 1 } } },
+        desc: '최종 피해량 +500%, 쿨타임 감소 무효화 (1%당 +25%), 최대 스택 능력치 무효화 (1당 +400%)',
+        mods: { nullCd: { base: 5, perPct: 0.25, perStack: 4 }, flags: { nullStacks: 1 } } },
     ],
     specials: [
       sp('FST5A', 5, '연속 돌진', '최대 스택 +1, 쿨타임 +20%', { stacksAdd: 1, cdMul: 1.2 }),

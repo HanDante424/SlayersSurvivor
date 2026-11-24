@@ -110,7 +110,7 @@ public class GameManager : MonoBehaviour
     {
         float minutes = Elapsed / 60f;
         float interval = Mathf.Max(0.08f, 0.9f - minutes * 0.12f);
-        int maxEnemies = 60 + (int)(minutes * 40);
+        int maxEnemies = Mathf.Min(LateAliveCap, 60 + (int)(minutes * 40));   // [임시] 후반 동시 생존 상한 (몹 시험안 2026-11-24)
         float hpMul = 1f + minutes * 0.35f;
 
         spawnTimer -= Time.deltaTime;
@@ -129,14 +129,19 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    const int LateAliveCap = 340;          // [임시] 일반 몹 동시 생존 상한 (이 수 이상이면 새 배치 대기, 배치 때문에 실제 최대 약 347)
+    const float LateRangedShift = 0.05f;   // [임시] 2분부터 궁수 · 라이더 각 +5%p, 고블린 -10%p
+
     /// <summary>
-    /// [임시] 등장 비율: 처음엔 고블린만 → 45초부터 궁수 · 1분 30초부터 라이더 · 2분부터 홉 고블린, 시간이 갈수록 각 비율이 올라감 (각 최대 20%)
+    /// [임시] 등장 비율: 처음엔 고블린만 → 45초부터 궁수 · 1분 30초부터 라이더 · 2분부터 홉 고블린, 시간이 갈수록 각 비율이 올라감 (각 최대 20%).
+    /// 2분부터 궁수 · 라이더는 +5%p (후반 고블린 30 · 궁수 25 · 라이더 25 · 홉 20%), 고블린이 그만큼 줄어듦.
     /// </summary>
     EnemyKind PickKind(float minutes)
     {
         float hob = minutes > 2f ? Mathf.Min(0.2f, 0.05f + (minutes - 2f) * 0.03f) : 0f;
         float rider = minutes > 1.5f ? Mathf.Min(0.2f, 0.08f + (minutes - 1.5f) * 0.03f) : 0f;
         float archer = minutes > 0.75f ? Mathf.Min(0.2f, 0.1f + (minutes - 0.75f) * 0.03f) : 0f;
+        if (minutes >= 2f) { rider += LateRangedShift; archer += LateRangedShift; }
         float r = Random.value;
         if (r < hob) return EnemyKind.Hobgoblin;
         if (r < hob + rider) return EnemyKind.GoblinRider;
@@ -257,7 +262,8 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        float cdNow = s.CooldownReduction, cdNext = Mathf.Min(T.upgradeCooldown * (s.CooldownUps + 1), T.cooldownReductionCap);
+        float dmgStep = s.BasicDamageStep, cdStep = s.BasicCooldownStep;   // 스킬마다 다를 수 있음
+        float cdNow = s.CooldownReduction, cdNext = Mathf.Min(cdStep * (s.CooldownUps + 1), T.cooldownReductionCap);
         string cdCap = cdNext <= cdNow ? "  <color=#FF8080>(최대 90% 도달 — 더 줄지 않음)</color>" : "";
         var list = new List<Upgrade>
         {
@@ -265,8 +271,8 @@ public class GameManager : MonoBehaviour
             new Upgrade
             {
                 title = SkillCatalog.BasicUpgrades[0].title,
-                desc = SkillText.Highlight($"'피해량' +{Pct(T.upgradeDamage)}")
-                     + $"\n<size=15><color=#AAAAAA>누적 +{Pct(s.DamageBonus)} → +{Pct(s.DamageBonus + T.upgradeDamage)}</color></size>",
+                desc = SkillText.Highlight($"'피해량' +{Pct(dmgStep)}")
+                     + $"\n<size=15><color=#AAAAAA>누적 +{Pct(s.DamageBonus)} → +{Pct(s.DamageBonus + dmgStep)}</color></size>",
                 apply = () => FinishBasic(s, BasicUpgrade.Damage),
             },
             new Upgrade
@@ -279,7 +285,7 @@ public class GameManager : MonoBehaviour
             new Upgrade
             {
                 title = SkillCatalog.BasicUpgrades[2].title,
-                desc = SkillText.Highlight($"'쿨타임 감소' +{Pct(T.upgradeCooldown)}")
+                desc = SkillText.Highlight($"'쿨타임 감소' +{Pct(cdStep)}")
                      + $"\n<size=15><color=#AAAAAA>누적 -{Pct(cdNow)} → -{Pct(cdNext)}</color>{cdCap}</size>",
                 apply = () => FinishBasic(s, BasicUpgrade.Cooldown),
             },

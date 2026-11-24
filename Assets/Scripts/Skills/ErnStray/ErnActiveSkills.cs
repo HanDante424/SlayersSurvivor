@@ -9,7 +9,9 @@ using UnityEngine;
 /// <summary>M02 파이어 차지: 주변 적을 밀치며 돌진 · 사용 중 무적 · 초기 피해량 4 · 쿨타임 10초 (노션 2026-11-20)</summary>
 public class FireCharge : ActiveSkill
 {
-    const float BaseDamage = 4f, BaseCooldown = 10f;
+    const float BaseDamage = 30f, BaseCooldown = 10f;   // 초기 피해량 4 → 30 (밸런스 확정 2026-11-24)
+    // 기본 강화 1회 (밸런스 확정 2026-11-24): 피해량 +30% (쿨타임은 공통값)
+    public override float BasicDamageStep => 0.3f;
     const float Distance = 2.67f * 2.5f;   // [임시] 돌진 거리 (기획 미정). 카메라 시야 7 복귀에 맞춰 4 × 2/3, 사용자 2026-11-22: 2.5배
     const float DashTime = 0.25f;       // [임시]
     const float Knock = 16f;            // [임시] 사용자 2026-11-22: 넉백 거리 증가 (8 → 16)
@@ -341,9 +343,12 @@ public class FireCharge : ActiveSkill
 /// </summary>
 public class OverFlameSlash : ActiveSkill
 {
-    const float BladeDamage = 20f, BaseStun = 2f;
-    const float ExplosionDelay = 1f, ExplosionDamage = 50f;
-    const float BaseCooldown = 20f;
+    const float BladeDamage = 60f, BaseStun = 2f;               // 화염의 검 20 → 60 (밸런스 확정 2026-11-24)
+    const float ExplosionDelay = 1f, ExplosionDamage = 100f;    // 폭발 50 → 100
+    const float BaseCooldown = 15f;                             // 쿨타임 20 → 15초
+    // 기본 강화 1회 (밸런스 확정 2026-11-24): 피해량 +15% · 쿨타임 -3.5%
+    public override float BasicDamageStep => 0.15f;
+    public override float BasicCooldownStep => 0.035f;
     const float WidthRatio = 0.5f;      // [임시] 검 판정 폭 = 범위 좁음 × 비율
     const float ExplosionWidthMul = 2.2f;   // [임시] 폭발 판정 폭 = 검 판정 폭 × 이 값 (같은 길이)
 
@@ -406,16 +411,17 @@ public class OverFlameSlash : ActiveSkill
     public const string ComboBlazing = "OSC1";
 
     // 특수 강화 확정 수치 (노션 2026-11-22)
-    const float GiantRange = 0.5f, GiantDamage = 0.25f;     // 거대한 검: 범위 +50% · 피해량 +25%
-    const float BindStun = 2f;                              // 옭아매는 화염: 기절 +2초
+    const float GiantRange = 0.5f, GiantFinal = 0.75f;      // 거대한 검: 범위 +50% · 최종 피해량 +75% (2026-11-24 피해량 +25% → 최종 피해량 +75%, 사용자 확정 설정 ×1.75)
+    const float BindStun = 2f, BindDamage = 0.25f;          // 옭아매는 화염: 기절 +2초 · 피해량 +25% (2026-11-24)
+    const float TripleDamage = 0.25f;                       // 삼연발: 피해량 +25% (2026-11-24)
     const float QuickPrepPerHit = 0.025f;                   // 빠른 준비: 적중 시 남은 쿨타임 감소 2.5%
     const float TraceRatio = 0.6f, TraceTime = 3f, TraceSlow = 0.3f;   // 불타는 잔흔: 총 피해량 60% 고정 피해 · 3초 · 이동 속도 70% 감소 (×0.3)
     const float CollapseFinal = 0.75f;                      // 붕괴의 일격: 기절 상태 적 최종 피해량 +75%
-    const float ImpactStun = 2.5f, ImpactCooldownMul = 0.8f;   // 충격 집중: 기절 +2.5초 · 쿨타임 감소 +20%
+    const float ImpactStun = 2.5f, ImpactCooldownMul = 0.8f, ImpactDamage = 0.5f;   // 충격 집중: 기절 +2.5초 · 쿨타임 감소 +20% · 피해량 +50% (2026-11-24)
     const float FocusFinal = 1f, FocusPerStunSec = 0.25f;   // 화염 집중: 최종 피해량 +100% · 무효화한 기절 1초당 +25%
     const float TripleAngle = 60f;                          // 삼연발: 양쪽 60도 간격으로 1회씩 추가 사용
     const float AftermathRange = 0.5f, AftermathFinal = 0.5f;   // 후폭풍: 범위 +50% · 최종 피해량 +50%
-    const float ComboRange = 0.25f, ComboFinal = 0.5f, ComboPerExtra = 0.25f;   // 오버 드라이브 블레이징 슬래시: 범위 +25% · 최종 +50% · 무효화한 추가 사용 1당 +25%
+    const float ComboRange = 0.25f, ComboFinal = 0.5f, ComboPerExtra = 0.5f;   // 오버 드라이브 블레이징 슬래시: 범위 +25% · 최종 +50% · 무효화한 추가 사용 1당 +50% (2026-11-24 +25% → +50%)
     const int ExtraUses = 2;                                // 삼연발의 추가 사용 수 (조합이 무효화하는 수)
     // [임시] 노션에 없는 수치
     const float TraceTick = 0.5f;                           // 잔흔 지속 피해 간격
@@ -434,8 +440,8 @@ public class OverFlameSlash : ActiveSkill
         {
             case 5: return new[]
             {
-                new SpecialUpgradeOption { id = Giant, title = "거대한 검", desc = "범위 +50%, 피해량 +25%" },
-                new SpecialUpgradeOption { id = Bind, title = "옭아매는 화염", desc = "기절 +2초" },
+                new SpecialUpgradeOption { id = Giant, title = "거대한 검", desc = "범위 +50%, 최종 피해량 +75%" },
+                new SpecialUpgradeOption { id = Bind, title = "옭아매는 화염", desc = "기절 +2초, 피해량 +25%" },
                 new SpecialUpgradeOption { id = QuickPrep, title = "빠른 준비", desc = "적중 시 남은 쿨타임 감소 2.5%" },
             };
             case 10: return new[]
@@ -444,13 +450,13 @@ public class OverFlameSlash : ActiveSkill
                     desc = "종료 시 잔흔이 남아 지속 피해를 줍니다. 잔흔은 이동 속도 감소를 부여합니다.",
                     specs = new[] { "'오버 드라이브 플레임 슬래시' '총 피해량'의 60% '고정 피해'", "'지속 시간' 3초", "'이동 속도 감소' 70% 부여" } },
                 new SpecialUpgradeOption { id = Collapse, title = "붕괴의 일격", desc = "화염의 검 기절 상태 적 적중 시 최종 피해량 +75%" },
-                new SpecialUpgradeOption { id = Impact, title = "충격 집중", desc = "기절 +2.5초, 쿨타임 감소 +20%" },
+                new SpecialUpgradeOption { id = Impact, title = "충격 집중", desc = "기절 +2.5초, 쿨타임 감소 +20%, 피해량 +50%" },
             };
             case 15: return new[]
             {
                 new SpecialUpgradeOption { id = Focus, title = "화염 집중", desc = "폭발이 사라지고 기절 능력치가 무효화됩니다. 무효화 비율에 따라 최종 피해량이 증가합니다.",
                     specs = new[] { "'최종 피해량' +100%", "기절 능력치 무효화 1초당 '최종 피해량' +25%" } },
-                new SpecialUpgradeOption { id = Triple, title = "삼연발", desc = "양쪽 60도 간격으로 1회씩 추가 사용합니다." },
+                new SpecialUpgradeOption { id = Triple, title = "삼연발", desc = "양쪽 60도 간격으로 1회씩 추가 사용합니다. 피해량 +25%" },
                 new SpecialUpgradeOption { id = Aftermath, title = "후폭풍", desc = "폭발 적중 시 적들을 폭발 중심으로 모읍니다.", specs = new[] { "'범위' +50%", "'최종 피해량' +50%" } },
             };
         }
@@ -463,7 +469,7 @@ public class OverFlameSlash : ActiveSkill
         {
             id = ComboBlazing, title = "오버 드라이브 블레이징 슬래시", recipe = "붕괴의 일격 + 삼연발", requires = new[] { Collapse, Triple },
             desc = "추가 사용이 사라집니다. 두 개의 검으로 전방향의 적을 한곳으로 모은 뒤, 강화된 검을 내려칩니다.",
-            specs = new[] { "추가 사용 능력치 무효화", "'범위' +25%", "'최종 피해량' +50%", "추가 사용 능력치 무효화 1당 '최종 피해량' +25%" },
+            specs = new[] { "추가 사용 능력치 무효화", "'범위' +25%", "'최종 피해량' +50%", "추가 사용 능력치 무효화 1당 '최종 피해량' +50%" },
         },
     };
 
@@ -471,7 +477,8 @@ public class OverFlameSlash : ActiveSkill
     float StunSeconds => BaseStun + (HasSpecial(Bind) ? BindStun : 0f) + (HasSpecial(Impact) ? ImpactStun : 0f);
     float ActualStun => HasSpecial(Focus) ? 0f : StunSeconds;   // 화염 집중: 기절 무효화
 
-    protected override float SpecialDamageBonus => HasSpecial(Giant) ? GiantDamage : 0f;
+    protected override float SpecialDamageBonus =>
+        (HasSpecial(Bind) ? BindDamage : 0f) + (HasSpecial(Impact) ? ImpactDamage : 0f) + (HasSpecial(Triple) ? TripleDamage : 0f);
     protected override float SpecialRangeBonus =>
         (HasSpecial(Giant) ? GiantRange : 0f) + (HasSpecial(Aftermath) ? AftermathRange : 0f) + (Blazing ? ComboRange : 0f);
     protected override float SpecialCooldownMul => HasSpecial(Impact) ? ImpactCooldownMul : 1f;
@@ -480,6 +487,7 @@ public class OverFlameSlash : ActiveSkill
         get
         {
             float m = 1f;
+            if (HasSpecial(Giant)) m *= 1f + GiantFinal;
             if (HasSpecial(Focus)) m *= 1f + FocusFinal + FocusPerStunSec * StunSeconds;   // 무효화한 기절 시간만큼
             if (HasSpecial(Aftermath)) m *= 1f + AftermathFinal;
             if (Blazing) m *= 1f + ComboFinal + ComboPerExtra * ExtraUses;
@@ -834,15 +842,15 @@ public class FireBreaker : ActiveSkill
     const float FissureRange = 0.5f, FissureStun = 1f;      // 균열 확장: 폭발마다 범위 +50% · 기절 +1초
     const float HotSlow = 0.5f;                             // 불타는 대지: 이동 속도 감소 50% (×0.5)
     const float FastInterval = 0.5f, FastFinal = 0.5f;      // 빠른 폭발: 공격 간격 -50% · 최종 피해량 +50%
-    const int ChainBonus = 2;                               // 연쇄 분출: 공격 횟수 +2
+    const int ChainBonus = 1;                               // 연쇄 분출: 공격 횟수 +1 (+2 → +1, 밸런스 확정 2026-11-24)
     const float AbsorbHeal = 0.05f;                         // 충격 흡수: 마지막 폭발 적 하나당 최대 체력 5% 회복
     const float StackFinal = 0.2f;                          // 중첩 붕괴: 받는 최종 피해량 +20% (적중 시 부여)
     const int StackMax = 5;                                 // 최대 스택 5
-    const int CrustBonus = 2;                               // 지각 붕괴: 공격 횟수 +2
+    const int CrustBonus = 1;                               // 지각 붕괴: 공격 횟수 +1 (+2 → +1, 2026-11-24)
     const float CrustInterval = 0.5f;                       // 지각 붕괴: 공격 간격 -50%
     const float GravityRange = 0.5f, GravityStun = 2f;      // 중력 붕괴: 공격 횟수 능력치 무효화 1당 범위 +50% · 기절 +2초
-    const float ComboFinal = 0.4f;                          // 오버 드라이브 플레임 브레이커: 최종 피해량 -60% (×0.4)
-    const int ComboBonus = 5;                               // 공격 횟수 +5
+    const float ComboFinal = 0.2f;                          // 오버 드라이브 플레임 브레이커: 최종 피해량 -80% (×0.2, 2026-11-24 ×0.4 → ×0.2)
+    const int ComboBonus = 1;                               // 공격 횟수 +1 (+5 → +1, 2026-11-24)
     const int ComboExtraMul = 2;                            // 오버 드라이브 플레임 브레이커: 폭발마다 공격 횟수 × 2 만큼 추가 폭발
     // [임시] 노션에 없는 수치
     const float ReleaseKnock = 8f;                          // 방출: 적중 시 넉백 (기본 1)
@@ -854,7 +862,10 @@ public class FireBreaker : ActiveSkill
     const float MarkSrcPx = 1254f;                       // 원본 가로 (좌표 기준)
     const float MarkRingRadiusPx = 500f;                 // 측정: 얇은 고리의 반지름 (원본 px, 불투명 픽셀 반지름 중앙값 474 · 90% 506)
     static readonly Vector2 MarkCenterNorm = new Vector2(622f / 1254f, 629f / 1254f);   // 측정: 고리 중심 (그림 가운데에서 왼쪽 5px · 아래 2px, 아래쪽 기준)
-    const float BaseDamage = 10f, BaseCooldown = 10f;   // [해석] 두 번째 폭발도 초기 피해량 10
+    const float BaseDamage = 40f, BaseCooldown = 10f;   // [해석] 두 번째 폭발도 같은 초기 피해량. 10 → 40 (밸런스 확정 2026-11-24)
+    // 기본 강화 1회 (밸런스 확정 2026-11-24): 피해량 +20% · 쿨타임 -5%
+    public override float BasicDamageStep => 0.2f;
+    public override float BasicCooldownStep => 0.05f;
 
     const float RangeMul = 2f;          // 범위 배율 (사용자 2026-11-22: 2배). 판정 · 이펙트 크기 모두
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
@@ -872,14 +883,14 @@ public class FireBreaker : ActiveSkill
             };
             case 10: return new[]
             {
-                new SpecialUpgradeOption { id = Chain, title = "연쇄 분출", desc = "공격 횟수 +2" },
+                new SpecialUpgradeOption { id = Chain, title = "연쇄 분출", desc = "공격 횟수 +1" },
                 new SpecialUpgradeOption { id = Release, title = "방출", desc = "적중 시 넉백" },
                 new SpecialUpgradeOption { id = Absorb, title = "충격 흡수", desc = "마지막 폭발 적중 시 적 하나당 최대 체력 5% 회복" },
             };
             case 15: return new[]
             {
                 new SpecialUpgradeOption { id = Stack, title = "중첩 붕괴", desc = "적중 시 받는 최종 피해량 +20%를 부여합니다. 최대 스택 5" },
-                new SpecialUpgradeOption { id = Crust, title = "지각 붕괴", desc = "공격 횟수 +2, 공격 간격 -50%" },
+                new SpecialUpgradeOption { id = Crust, title = "지각 붕괴", desc = "공격 횟수 +1, 공격 간격 -50%" },
                 new SpecialUpgradeOption { id = Gravity, title = "중력 붕괴", desc = "공격 횟수 능력치가 무효화됩니다.", specs = new[] { "공격 횟수 능력치 무효화 1당 '범위' +50%", "공격 횟수 능력치 무효화 1당 '기절' +2초" } },
             };
         }
@@ -892,7 +903,7 @@ public class FireBreaker : ActiveSkill
         {
             id = ComboFlame, title = "오버 드라이브 플레임 브레이커", recipe = "연쇄 분출 + 지각 붕괴", requires = new[] { Chain, Crust },
             desc = "매 공격 시 공격 횟수의 2배만큼 무작위 대상의 위치에 추가 사용합니다. 같은 적에게 중복 생성될 수 있습니다.",
-            specs = new[] { "'최종 피해량' -60%", "공격 횟수 +5", "공격 횟수 1당 추가 사용 +2" },
+            specs = new[] { "'최종 피해량' -80%", "공격 횟수 +1", "공격 횟수 1당 추가 사용 +2" },
         },
     };
 
@@ -1075,7 +1086,7 @@ public class FireExecution : ActiveSkill
     const float FadeOutTime = 0.5f;     // [임시] 끝날 때 고리 이펙트가 서서히 사라지는 시간 (사용자 2026-11-22)
     const int BaseHits = 30;
     const float HitInterval = 0.025f;   // 베기 1회 간격. 사용자 2026-11-22: 속도 2배 (30회 0.75초 = 0.025초 간격). 공격 횟수가 늘어도 간격은 그대로 [해석]
-    const float BaseDamage = 5f, BaseCooldown = 30f;
+    const float BaseDamage = 12f, BaseCooldown = 30f;   // 베기 초기 피해량 5 → 12 (밸런스 확정 2026-11-24)
 
     // 특수 강화 id (파이어 엑스큐션)
     public const string Slaughter = "FE5A", Flow = "FE5B", Focus = "FE5C";
@@ -1084,7 +1095,7 @@ public class FireExecution : ActiveSkill
     public const string ComboDimension = "FEC1";
 
     // 특수 강화 확정 수치 (노션)
-    const int SlaughterBonus = 15;          // 난도질: 공격 횟수 +15
+    const int SlaughterBonus = 5;           // 난도질: 공격 횟수 +5 (+15 → +5, 밸런스 확정 2026-11-24)
     const float FlowSlow = 0.5f;            // 유동 검무: 시전 중 이동 속도 -50% (이동 불가 삭제)
     const float FocusRange = -0.5f, FocusDamage = 0.5f;   // 집중 절삭: 범위 -50% · 피해량 +50%
     const float QuickTimeMul = 0.25f;       // 고속 절단: 공격 시간 -75%
@@ -1092,15 +1103,16 @@ public class FireExecution : ActiveSkill
     const int WindEvery = 5, WindCount = 8; // 검풍: 베기 5회마다 검기 8개
     const float WindRatio = 0.4f;           // 검풍: 총 피해량의 40% 고정 피해
     const float ScorchFinal = 0.5f;         // 작열 절삭: 화상 상태 적 최종 피해량 +50%
-    const int EndlessBonus = 30;            // 무진참: 공격 횟수 +30
+    const int EndlessBonus = 10;            // 무진참: 공격 횟수 +10 (+30 → +10, 2026-11-24)
     const float EndlessCooldownMul = 1.25f; // 무진참: 쿨타임 +25%
     const int AfterimageCount = 6;          // 잔영: 종료 시 소형 연속 베기 6개
     const float AfterimageRatio = 0.6f;     // 잔영: 총 피해량의 60% 고정 피해
     const int BlazingEvery = 5;             // 타오르는 검: 화상 상태 적 5회 적중 시 폭발
     const float BlazingRatio = 1f;          // 타오르는 검: 폭발 화상 총 피해량의 100% 고정 피해
-    const int ComboBonus = 30;              // 플레임 디멘션 블레이드: 공격 횟수 +30
-    const int ComboWaveEvery = 3;           // 플레임 디멘션 블레이드: 공격 횟수 3당 검기 1개
-    const float DimensionSlashRatio = 1f;   // 플레임 디멘션 블레이드: 검기가 맞은 자리의 연속 베기 = 기존 총 피해량의 100% (검기 40% 와 합쳐 140%) [해석, 사용자 의도]
+    const int ComboBonus = 5;               // 플레임 디멘션 블레이드: 공격 횟수 +5 (+30 → +5, 밸런스 확정 2026-11-24)
+    const int ComboWaveEvery = 5;           // 플레임 디멘션 블레이드: 공격 횟수 5당 검기 1개 (3 → 5)
+    const float DimensionWaveRatio = 0.2f;  // 플레임 디멘션 블레이드: 검기 = 기존 총 피해량의 20% (40% → 20%)
+    const float DimensionSlashRatio = 0.6f; // 플레임 디멘션 블레이드: 검기가 맞은 자리의 연속 베기 = 기존 총 피해량의 60% (100% → 60%, 검기 20% 와 합쳐 80%) [해석, 사용자 의도]
 
     // [임시] 노션에 없는 수치
     const float WaveSpeed = 14f, WaveRange = 10f, WaveSize = 0.55f;   // 검기 속도 · 사거리 · 크기
@@ -1130,7 +1142,7 @@ public class FireExecution : ActiveSkill
         {
             case 5: return new[]
             {
-                new SpecialUpgradeOption { id = Slaughter, title = "난도질", desc = "공격 횟수 +15" },
+                new SpecialUpgradeOption { id = Slaughter, title = "난도질", desc = "공격 횟수 +5" },
                 new SpecialUpgradeOption { id = Flow, title = "유동 검무", desc = "이동 불가가 사라집니다. 시전 중 이동 속도 -50%" },
                 new SpecialUpgradeOption { id = Focus, title = "집중 절삭", desc = "범위 -50%, 피해량 +50%" },
             };
@@ -1143,7 +1155,7 @@ public class FireExecution : ActiveSkill
             };
             case 15: return new[]
             {
-                new SpecialUpgradeOption { id = Endless, title = "무진참", desc = "공격 횟수 +30, 쿨타임 +25%" },
+                new SpecialUpgradeOption { id = Endless, title = "무진참", desc = "공격 횟수 +10, 쿨타임 +25%" },
                 new SpecialUpgradeOption { id = Afterimage, title = "잔영", keywords = new[] { "간접 사용", "직접 피해", "고정 피해", "투사체", "원거리" },
                     desc = "종료 시 무작위 위치에 소형 연속 베기 6개를 생성합니다.", specs = new[] { "'파이어 엑스큐션' '총 피해량'의 60% '고정 피해'" } },
                 new SpecialUpgradeOption { id = Blazing, title = "타오르는 검", desc = "화상 상태 적에게 5회 적중하면 폭발이 발생합니다.", specs = new[] { "폭발: 화상 '총 피해량'의 100% '고정 피해'" } },
@@ -1159,7 +1171,7 @@ public class FireExecution : ActiveSkill
             id = ComboDimension, title = "플레임 디멘션 블레이드", recipe = "검풍 + 잔영", requires = new[] { Wind, Afterimage },
             keywords = new[] { "간접 사용", "직접 피해", "고정 피해", "투사체", "원거리" },
             desc = "연속 베기가 사라지고 공격 횟수가 늘어납니다. 공격 횟수에 비례해 유도 검기를 발사하고, 검기가 적중하면 연속 베기가 발생합니다.",
-            specs = new[] { "연속 베기 삭제", "공격 횟수 +30", "공격 횟수 3당 검기 1개 발사", "검기 유도", "검기 적중 시 연속 베기 발생" },
+            specs = new[] { "연속 베기 삭제", "공격 횟수 +5", "공격 횟수 5당 검기 1개 발사", "검기 유도", "검기 적중 시 연속 베기 발생" },
         },
     };
 
@@ -1223,7 +1235,7 @@ public class FireExecution : ActiveSkill
             // 플레임 디멘션 블레이드 (사용자 2026-11-23 의도): 검기 하나마다 총 피해량의 40% (검기) + 그 자리에 생기는 연속 베기 100% = 140%.
             // 총 피해량 = 최종 피해량 × 공격 횟수 (조합의 공격 횟수 +30 이 먼저 적용된 횟수). 검기 수는 공격 횟수 3당 1개 (나누지 않음)
             float baseTotal = FinalDamageOf(BaseDamage) * hits;
-            waveDamage = baseTotal * WindRatio;
+            waveDamage = baseTotal * DimensionWaveRatio;
             smallComboTotal = baseTotal * DimensionSlashRatio;
         }
 
@@ -1431,9 +1443,12 @@ public class FireStream : Skill
     const int EndlessStacks = 2;                // 무한 기동: 최대 스택 +2
     const float EndlessCooldown = 0.5f;         // 무한 기동: 쿨타임 감소 +50% (배율 0.5)
     const float EndlessFinal = 0.25f;           // 무한 기동: 최종 피해량 -75%
-    const float IlseomFinal = 10f;              // 화염 일섬: 최종 피해량 +1000%
-    const float IlseomPerReduction = 5f;        // 화염 일섬: 쿨타임 감소 능력치 무효화 1% 당 최종 피해량 +5% (전환율 1 = 100% → +500%)
-    const float IlseomPerStack = 1.5f;          // 화염 일섬: 최대 스택 능력치 무효화 1당 최종 피해량 +150%
+    const float IlseomFinal = 5f;               // 화염 일섬: 최종 피해량 +500% (+1000% → +500%, 밸런스 확정 2026-11-24)
+    const float IlseomPerReduction = 25f;       // 화염 일섬: 쿨타임 감소 능력치 무효화 1% 당 최종 피해량 +25% (+5% → +25%, 전환율 1 = 100% → +2500%)
+    const float IlseomPerStack = 4f;            // 화염 일섬: 최대 스택 능력치 무효화 1당 최종 피해량 +400% (+150% → +400%)
+    // 기본 강화 1회 (밸런스 확정 2026-11-24): 피해량 +15% · 쿨타임 -3.5%
+    public override float BasicDamageStep => 0.15f;
+    public override float BasicCooldownStep => 0.035f;
     // [임시] 노션에 없는 수치
     const float TrailTime = 3f;                 // 불타는 궤적: 장판 지속 시간 (파이어 차지 불타는 궤적과 같게)
     const float TrailTick = 0.5f;               // 불타는 궤적: 지속 피해 간격
@@ -1522,7 +1537,7 @@ public class FireStream : Skill
         {
             id = ComboIlseom, title = "화염 일섬", recipe = "꿰뚫는 화염 + 화염의 창", requires = new[] { Pierce, Lance },
             desc = "쿨타임 감소 · 최대 스택 능력치가 무효화되고, 무효화한 만큼 최종 피해량이 증가합니다.",
-            specs = new[] { "'최종 피해량' +1000%", "쿨타임 감소 능력치 무효화 1% 당 '최종 피해량' +5%", "최대 스택 능력치 무효화 1당 '최종 피해량' +150%" },
+            specs = new[] { "'최종 피해량' +500%", "쿨타임 감소 능력치 무효화 1% 당 '최종 피해량' +25%", "최대 스택 능력치 무효화 1당 '최종 피해량' +400%" },
         },
     };
 
