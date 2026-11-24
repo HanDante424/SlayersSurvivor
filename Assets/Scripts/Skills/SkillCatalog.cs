@@ -187,6 +187,7 @@ public static class SkillCatalog
     public static readonly HashSet<string> LevelUpPool = new HashSet<string>
     {
         "A01", "A02", "M01", "P01", "P02", "P03", "P04", "P05", "P06",
+        "U01",   // 블레이징 스톰: 캐릭터 Lv.45 이상부터 후보 (GameManager.BuildChoices), 획득은 스킬 Lv.1 (2026-11-24 사용자)
         // 레니아 (리소스 있음 — 9종 전부)
         "LA01", "LA02", "LA03", "LA04", "LA05", "LM01", "LM02", "LM03", "LM04",
         "LP01", "LP02", "LP03",   // 레니아 패시브 (아이콘 리소스 없이 텍스트만)

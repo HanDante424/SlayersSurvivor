@@ -99,6 +99,7 @@ public class GameManager : MonoBehaviour
         if (State != GameState.Playing) return;
 
         Elapsed += Time.deltaTime;
+        ChargeUltimate(Time.deltaTime);
         if (Stage.IsRaid || Stage.IsDebug) { Enemy.Separate(); return; }   // 디버그 맵: 시간 제한 · 스폰 없음. 레이드: 시간 제한 · 일반 스폰 없음 (보스 처치 = 승리)
         if (Elapsed >= surviveTime) { Victory(); return; }
 
@@ -167,15 +168,23 @@ public class GameManager : MonoBehaviour
     // ---------- 경험치 / 레벨업 ----------
     public void OnEnemyKilled(Enemy e)
     {
-        Kills++;
-        // 궁극기 게이지: 적 처치 수 기반 (기획서 확정). [임시] 궁극기 보유 중에만 충전
-        var p = Player.I;
-        if (p != null && p.FirstOfKind(SkillKind.Ultimate) != null)
-            ultimateGauge = Mathf.Min(Tuning.Skills.gaugeMax, ultimateGauge + Tuning.Skills.gaugePerKill * CombatMods.UltimateGaugeMul());
+        Kills++;   // 궁극기 게이지는 더 이상 처치로 차지 않음 (시간 충전, Update 참고)
     }
 
     // ---------- 궁극기 게이지 ----------
     float ultimateGauge;
+
+    /// <summary>
+    /// 기본 충전: 초당 최대치의 1% (SkillTuning.gaugePerSecondPct, 사용자 2026-11-24). 궁극기 보유 중에만.
+    /// 에너지 흡수 등 게이지 획득량 증가는 여기에도 적용. [임시] 궁극기 시전 중에도 충전
+    /// </summary>
+    void ChargeUltimate(float dt)
+    {
+        var p = Player.I;
+        if (p == null || UltimateReady || p.FirstOfKind(SkillKind.Ultimate) == null) return;
+        var T = Tuning.Skills;
+        ultimateGauge = Mathf.Min(T.gaugeMax, ultimateGauge + T.gaugeMax * T.gaugePerSecondPct * 0.01f * dt * CombatMods.UltimateGaugeMul());
+    }
     public float UltimateGaugeFraction => Mathf.Clamp01(ultimateGauge / Mathf.Max(1f, Tuning.Skills.gaugeMax));
     public bool UltimateReady => ultimateGauge >= Tuning.Skills.gaugeMax;
     /// <summary>[임시] 사용 시 0으로 초기화 (기획 미정)</summary>

@@ -1,7 +1,7 @@
 using UnityEngine;
 
 // 에른 스트레이 새 패시브 3종 — 방어 · 피해 대비 · 자원 획득 (2026-11-24 사용자)
-// 기본 성능 + 고유 기본 강화 3종. 특수 강화: 잿불 갑주 · 불씨 수확은 구현됨, 화염 보호막은 미설계 (선택 화면에 "미설계" 확인 버튼만).
+// 기본 성능 + 고유 기본 강화 3종. 특수 강화: 세 패시브 모두 구현됨 (화염 보호막은 특수 조합 미정) (선택 화면에 "미설계" 확인 버튼만).
 
 /// <summary>
 /// P04 잿불 갑주: 최대 체력 +25% · 받는 피해량 -20% · 모든 회복량 +10%
@@ -59,7 +59,7 @@ public class EmberArmor : Skill
         var p = P;
         if (p != null)
         {
-            p.DynamicTakenMul = DynamicTaken;
+            p.TakenMods.Add(DynamicTaken);
             p.DamageReceived = OnDamageReceived;
             p.ReviveHook = TryRevive;
             lastPos = p.transform.position;
@@ -73,7 +73,7 @@ public class EmberArmor : Skill
         var p = P;
         if (p != null)
         {
-            p.DynamicTakenMul = null; p.DamageReceived = null; p.ReviveHook = null;
+            p.TakenMods.Remove(DynamicTaken); p.DamageReceived = null; p.ReviveHook = null;
         }
         Remove();
     }
@@ -529,47 +529,178 @@ public class EmberHarvest : Skill
 /// P06 화염 보호막 (2026-11-24 사용자): 화상 피해를 적용할 때 그 피해의 10% 만큼 보호막 획득.
 /// 한 번에 얻는 양은 최대 체력의 5% 까지, 획득 쿨타임 0.5초, 보호막은 매초 5% 소모, 총량 기본 상한 = 최대 체력의 100%.
 /// 고유 기본 강화: 최대 보호막 상한 +5% / 보호막 획득량 +10% / 보호막 감소량 -0.2%p
+/// 특수 강화:
+///   Lv.5  두꺼운 껍질 (얻는 보호막 상한 +100%) · 임계 돌파 (최대 보호막 상한 +100%) · 고속 흡수 (획득 쿨타임 -50%)
+///   Lv.10 불길 흐름 (보호막이 있을 때 이동속도 +10%) · 재의 방패 (보호막이 있을 때 받는 피해 -10%) · 긴급 주입 (체력 50% 이하 → 주변 넉백 + 보호막 최대치 획득, 쿨타임 60초)
+///   Lv.15 불타는 방벽 (보호막이 있을 때 매초 주변 적 화상 스택 +1) · 보호막 일격 (보호막 80% 이상에서 수동 스킬 사용 시 보호막 50% 감소, 그 스킬 최종 피해량 +50%) · 터질듯한 보호막 (최대 보호막 상한 +100%)
 /// [해석] "피해" = 화상 피해 1회(틱)에 실제 적용된 피해량. "매초 5% 소모" = 현재 보호막의 5% (지수 감소).
-/// [해석] 상한 +5% = 최대 체력 대비 +5%p (100% → 105%), 획득량 +10% = 한 번에 얻는 양(상한 포함)에 곱, 감소량 -0.2%p = 5% → 4.8% (0 아래로는 안 내려감).
+/// [해석] 상한류 +100% 는 최대 체력 대비 비율에 +100%p 를 합연산 (기본 100% + 기본 강화 + 임계 돌파 + 터질듯한 보호막).
+///        '얻는 보호막 상한' = 한 번에 얻는 양의 상한 (최대 체력의 5% → 10%), '최대 보호막 상한' = 총량 상한.
+/// [해석] 보호막 일격: "보호막이 80% 이상" = 최대 보호막 상한 대비 80% 이상. "보호막 50% 감소" = 현재 보호막의 절반 소모.
+///        피해 +50% 는 그 발동 (시전 중 + 끝난 뒤 {StrikeGrace}초) 의 그 스킬 피해에만. 수동 슬롯 스킬만 해당.
+/// [임시] 긴급 주입 · 불타는 방벽 범위 5, 긴급 주입 넉백 거리 4.
+/// 특수 조합은 사용자 입력이 중간에 끊겨 ("[긴급 주입] +") 아직 없음.
 /// </summary>
 public class FlameBarrier : Skill
 {
     const float ShieldPerBurn = 0.10f;      // 화상 피해의 10%
-    const float MaxGainOfMaxHp = 0.05f;     // 한 번에 얻는 보호막 상한 = 최대 체력의 5%
+    const float BaseMaxGainOfMaxHp = 0.05f; // 한 번에 얻는 보호막 상한 = 최대 체력의 5%
     const float BaseCapOfMaxHp = 1.0f;      // 기본 총량 상한 = 최대 체력의 100%
-    const float GainCooldown = 0.5f;        // 획득 쿨타임
+    const float BaseGainCooldown = 0.5f;    // 획득 쿨타임
     const float BaseDecay = 0.05f;          // 매초 5% 소모
 
     const float UpCap = 0.05f, UpGain = 0.10f, UpDecay = 0.002f;
 
+    // 특수 강화 id
+    public const string Thick = "FB5A", Breakthrough = "FB5B", Rapid = "FB5C";
+    public const string Flow = "FB10A", AshShield = "FB10B", Emergency = "FB10C";
+    public const string Wall = "FB15A", Strike = "FB15B", Bloated = "FB15C";
+    public const string ComboOverflow = "FBC1";   // 넘치는 방벽 [임시 이름] = 긴급 주입 + 터질듯한 보호막
+
+    // 특수 강화 수치
+    const float ThickMul = 1.0f;            // 얻는 보호막 상한 +100%
+    const float CapBonus = 1.0f;            // 최대 보호막 상한 +100% (임계 돌파 · 터질듯한 보호막 각각)
+    const float RapidCooldownCut = 0.5f;    // 획득 쿨타임 -50%
+    const float FlowMove = 0.10f;           // 보호막이 있을 때 이동속도 +10%
+    const float AshShieldCut = 0.10f;       // 보호막이 있을 때 받는 피해 -10%
+    const float EmergencyHpRatio = 0.50f, EmergencyCooldown = 60f;
+    const float AreaRadius = 5f, EmergencyKnock = 4f;   // [임시]
+    const int WallStacks = 1; const float WallInterval = 1f;
+    const float StrikeShieldRatio = 0.80f, StrikeConsume = 0.50f, StrikeFinal = 0.50f, StrikeGrace = 1.5f;
+    // 특수 조합 넘치는 방벽: 긴급 주입 발동 시 10초간 최대 보호막 상한 +100% · 보호막 감소 없음, 긴급 주입 쿨타임 -25%
+    const float OverflowSeconds = 10f, OverflowCap = 1.0f, OverflowCooldownCut = 0.25f;
+
     int capUps, gainUps, decayUps;
-    float readyAt;   // 다음 획득이 가능한 시각 (Time.time 기준)
+    float readyAt;          // 다음 획득이 가능한 시각 (Time.time 기준)
+    float appliedMove = 1f;
+    float emergencyReadyAt;
+    float overflowUntil;    // 넘치는 방벽 효과가 끝나는 시각
+    float wallTimer;
+    // 보호막 일격: 이번에 강화된 발동
+    Skill strikeSkill;
+    float strikeUntil;
+    Mod mod;
 
-    float CapOfMaxHp => BaseCapOfMaxHp + UpCap * capUps;
+    bool Overflow => HasCombo(ComboOverflow);
+    bool OverflowActive => Overflow && Time.time < overflowUntil;
+    float CapOfMaxHp => BaseCapOfMaxHp + UpCap * capUps + (HasSpecial(Breakthrough) ? CapBonus : 0f) + (HasSpecial(Bloated) ? CapBonus : 0f)
+                        + (OverflowActive ? OverflowCap : 0f);
+    float CapAmount => P != null ? P.maxHp * CapOfMaxHp : 0f;
+    float MaxGainOfMaxHp => BaseMaxGainOfMaxHp * (1f + (HasSpecial(Thick) ? ThickMul : 0f));
+    float GainCooldown => BaseGainCooldown * (HasSpecial(Rapid) ? 1f - RapidCooldownCut : 1f);
     float GainMul => 1f + UpGain * gainUps;
-    float Decay => Mathf.Max(0f, BaseDecay - UpDecay * decayUps);
+    float Decay => OverflowActive ? 0f : Mathf.Max(0f, BaseDecay - UpDecay * decayUps);   // 넘치는 방벽: 10초간 감소량 -100%
+    bool HasShield => P != null && P.shield > 0.01f;
 
-    void OnEnable() { Enemy.Damaged += OnDamaged; readyAt = 0f; }
+    class Mod : CombatModifier
+    {
+        readonly FlameBarrier f;
+        public Mod(FlameBarrier f) => this.f = f;
+        /// <summary>보호막 일격: 강화된 발동의 스킬 피해 최종 +50%</summary>
+        public override float FinalMul(in DamageInfo d) =>
+            f.strikeSkill != null && d.source == f.strikeSkill && Time.time < f.strikeUntil ? 1f + StrikeFinal : 1f;
+    }
+
+    void OnEnable()
+    {
+        Enemy.Damaged += OnDamaged;
+        Skill.Activated += OnSkillActivated;
+        mod = new Mod(this);
+        CombatMods.Add(mod);
+        readyAt = 0f;
+        if (P != null) P.TakenMods.Add(AshShieldTaken);
+    }
 
     void OnDisable()
     {
         Enemy.Damaged -= OnDamaged;
-        if (P != null) P.shield = 0f;
+        Skill.Activated -= OnSkillActivated;
+        if (mod != null) { CombatMods.Remove(mod); mod = null; }
+        var p = P;
+        if (p == null) return;
+        p.TakenMods.Remove(AshShieldTaken);
+        p.moveSpeedMul /= appliedMove;
+        appliedMove = 1f;
+        p.shield = 0f;
     }
+
+    /// <summary>재의 방패: 보호막이 있을 때 받는 피해 -10%</summary>
+    float AshShieldTaken() => HasSpecial(AshShield) && HasShield ? 1f - AshShieldCut : 1f;
 
     void OnDamaged(Enemy e, DamageInfo d, int dealt)
     {
         if (!d.IsBurn || dealt <= 0 || P == null || Time.time < readyAt) return;
         readyAt = Time.time + GainCooldown;
         float gain = Mathf.Min(dealt * ShieldPerBurn, P.maxHp * MaxGainOfMaxHp) * GainMul;
-        P.shield = Mathf.Min(P.maxHp * CapOfMaxHp, P.shield + gain);
+        if (P.shield < CapAmount) P.shield = Mathf.Min(CapAmount, P.shield + gain);   // 상한이 줄어도 이미 있는 보호막은 깎지 않음
+    }
+
+    /// <summary>보호막 일격: 보호막 80% 이상에서 수동 스킬을 쓰면 보호막 절반 소모 + 그 스킬 최종 피해 +50%</summary>
+    void OnSkillActivated(Skill s)
+    {
+        if (!HasSpecial(Strike) || P == null || s == null || s.Entry == null || s.Entry.kind != SkillKind.Manual) return;
+        if (P.shield < CapAmount * StrikeShieldRatio) return;
+        P.shield *= 1f - StrikeConsume;
+        strikeSkill = s;
+        strikeUntil = Time.time + StrikeGrace;
     }
 
     public override void Tick(float dt)
     {
-        if (P == null || P.shield <= 0f) return;
-        P.shield *= Mathf.Pow(1f - Decay, dt);
-        if (P.shield < 0.01f) P.shield = 0f;
+        var p = P;
+        if (p == null) return;
+
+        // 보호막 감소
+        if (p.shield > 0f)
+        {
+            p.shield *= Mathf.Pow(1f - Decay, dt);
+            if (p.shield < 0.01f) p.shield = 0f;
+        }
+
+        // 불길 흐름: 보호막이 있을 때 이동속도 +10%
+        float move = HasSpecial(Flow) && HasShield ? 1f + FlowMove : 1f;
+        if (!Mathf.Approximately(move, appliedMove))
+        {
+            p.moveSpeedMul = p.moveSpeedMul / appliedMove * move;
+            appliedMove = move;
+        }
+
+        // 보호막 일격: 강화된 스킬이 아직 시전 중이면 유지
+        if (strikeSkill != null && strikeSkill is ActiveSkill a && a.IsCastingNow) strikeUntil = Mathf.Max(strikeUntil, Time.time + StrikeGrace);
+
+        // 긴급 주입: 체력 50% 이하 → 주변 넉백 + 보호막 최대치 (쿨타임 60초)
+        if (HasSpecial(Emergency) && Time.time >= emergencyReadyAt && p.hp <= p.maxHp * EmergencyHpRatio)
+        {
+            emergencyReadyAt = Time.time + EmergencyCooldown * (Overflow ? 1f - OverflowCooldownCut : 1f);
+            if (Overflow) overflowUntil = Time.time + OverflowSeconds;   // 상한 +100% · 감소 없음 (10초) 을 먼저 켜고 최대치까지 채움
+            p.shield = CapAmount;
+            Vector2 c = p.transform.position;
+            foreach (var e in Enemy.All)
+            {
+                if (e == null || e.hp <= 0f || e.IsWall) continue;
+                Vector2 to = (Vector2)e.transform.position - c;
+                if (to.magnitude > AreaRadius + e.radius) continue;
+                e.Push(to.sqrMagnitude > 0.0001f ? to : Random.insideUnitCircle, Enemy.KnockSpeed(EmergencyKnock));
+            }
+        }
+
+        // 불타는 방벽: 보호막이 있는 동안 매초 주변 적에게 화상 스택 +1
+        if (HasSpecial(Wall) && HasShield && FlameSword.I != null)
+        {
+            wallTimer += dt;
+            if (wallTimer >= WallInterval)
+            {
+                wallTimer -= WallInterval;
+                Vector2 c = p.transform.position;
+                foreach (var e in Enemy.All)
+                {
+                    if (e == null || e.hp <= 0f || e.IsWall || e.Hidden) continue;
+                    float rr = AreaRadius + e.radius;
+                    if (((Vector2)e.transform.position - c).sqrMagnitude <= rr * rr) FlameSword.I.AddStacks(e, WallStacks);
+                }
+            }
+        }
+        else wallTimer = 0f;
     }
 
     public override PassiveUpgradeOption[] PassiveBasicOptions() => new[]
@@ -603,6 +734,42 @@ public class FlameBarrier : Skill
 
     public override string BasicSummary =>
         $"상한 {CapOfMaxHp * 100:0}% · 획득 +{UpGain * gainUps * 100:0}% · 감소 {Decay * 100:0.0}%/초";
+
+    public override SpecialUpgradeOption[] SpecialOptions(int lv)
+    {
+        switch (lv)
+        {
+            case 5: return new[]
+            {
+                new SpecialUpgradeOption { id = Thick, title = "두꺼운 껍질", desc = "한 번에 얻는 보호막 상한 +100%" },
+                new SpecialUpgradeOption { id = Breakthrough, title = "임계 돌파", desc = "최대 보호막 상한 +100%" },
+                new SpecialUpgradeOption { id = Rapid, title = "고속 흡수", desc = "보호막 획득 쿨타임 -50%" },
+            };
+            case 10: return new[]
+            {
+                new SpecialUpgradeOption { id = Flow, title = "불길 흐름", desc = "보호막이 있을 때 이동 속도 +10%" },
+                new SpecialUpgradeOption { id = AshShield, title = "재의 방패", desc = "보호막이 있을 때 받는 피해 -10%" },
+                new SpecialUpgradeOption { id = Emergency, title = "긴급 주입", desc = "체력이 50% 이하일 때 주변 적을 넉백하고 보호막을 최대치까지 얻습니다 (쿨타임 60초)" },
+            };
+            case 15: return new[]
+            {
+                new SpecialUpgradeOption { id = Wall, title = "불타는 방벽", desc = "보호막이 있을 때 매초 주변 적의 화상 스택 +1" },
+                new SpecialUpgradeOption { id = Strike, title = "보호막 일격", desc = "보호막이 80% 이상일 때 수동 스킬을 사용하면 보호막이 50% 감소하고, 그 수동 스킬의 최종 피해량 +50%" },
+                new SpecialUpgradeOption { id = Bloated, title = "터질듯한 보호막", desc = "최대 보호막 상한 +100%" },
+            };
+        }
+        return base.SpecialOptions(lv);
+    }
+
+    public override SpecialComboOption[] SpecialCombos() => new[]
+    {
+        new SpecialComboOption
+        {
+            id = ComboOverflow, title = "넘치는 방벽", recipe = "긴급 주입 + 터질듯한 보호막", requires = new[] { Emergency, Bloated },
+            desc = "긴급 주입이 보호막을 한계 너머까지 채우고, 한동안 사라지지 않게 붙들어 둡니다.",
+            specs = new[] { "긴급 주입 동안(10초) '최대 보호막 상한' +100%", "긴급 주입 동안(10초) '보호막 감소량' -100%", "긴급 주입 '쿨타임' -25%" },
+        },
+    };
 
     public override string Badge => P != null && P.shield > 0.5f ? Mathf.CeilToInt(P.shield).ToString() : null;
 }

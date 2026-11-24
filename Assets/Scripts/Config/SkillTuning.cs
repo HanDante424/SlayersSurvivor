@@ -87,7 +87,7 @@ public class SkillTuning : ScriptableObject
     public int ultimateUpgradeLevel = 60;
     [Tooltip("[임시] 최대 강화 단계 미확정 → 획득 1 + 강화 1")] public int ultimateMaxLevel = 2;
     [Tooltip("[임시] 게이지 최대치")] public float gaugeMax = 100f;
-    [Tooltip("[임시] 적 1마리 처치당 게이지")] public float gaugePerKill = 1f;
+    [Tooltip("궁극기 게이지 기본 충전: 초당 최대치의 N% (2026-11-24 사용자: 기본 초당 1%만, 처치 충전 없음)")] public float gaugePerSecondPct = 1f;
 
     [Header("조작키 [임시]")]
     public KeyCode[] manualKeys = { KeyCode.J, KeyCode.K, KeyCode.L };

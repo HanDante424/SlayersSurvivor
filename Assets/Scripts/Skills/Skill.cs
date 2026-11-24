@@ -323,7 +323,14 @@ public abstract class Skill : MonoBehaviour
     /// <summary>가장 최근 직접 발동의 번호. 그 발동에서 나온 피해(지연·지속 포함)가 같은 번호를 가짐</summary>
     public int CastId { get; private set; }
     /// <summary>직접 발동 시작 (쿨타임 자동 발동 · 키 입력) 시 호출</summary>
-    protected void BeginCast() => CastId = ++castCounter;
+    protected void BeginCast()
+    {
+        CastId = ++castCounter;
+        Activated?.Invoke(this);
+    }
+
+    /// <summary>스킬이 발동을 시작할 때 (발동 번호가 정해진 직후, 피해 계산 전). 화염 보호막 '보호막 일격'용</summary>
+    public static event System.Action<Skill> Activated;
 
     // ---------- 쿨타임 ----------
     /// <summary>스킬 기본 강화 쿨타임 감소 → 배율 1개 (기본 강화끼리 합연산)</summary>

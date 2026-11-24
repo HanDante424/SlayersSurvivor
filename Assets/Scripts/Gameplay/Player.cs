@@ -24,7 +24,8 @@ public class Player : MonoBehaviour
     public float relicChanceMul = 1f;
 
     /// <summary>상황에 따라 달라지는 받는 피해 배율 (잿불 갑주: 불굴 · 타오르는 장갑 · 화염 진지 …). 피격 순간에 계산</summary>
-    public System.Func<float> DynamicTakenMul;
+    /// (여러 패시브가 함께 쓰므로 목록: 잿불 갑주 · 화염 보호막 재의 방패. 각 배율을 모두 곱함)
+    public readonly System.Collections.Generic.List<System.Func<float>> TakenMods = new System.Collections.Generic.List<System.Func<float>>();
     /// <summary>피해를 받을 때 호출 (받는 피해 배율 적용 후 · 보호막 흡수 전의 양) — 잿불 비축 누적용</summary>
     public System.Action<float> DamageReceived;
     /// <summary>적이 죽을 때 경험치 드랍 배율을 정함 (탐욕의 불씨: 50% 확률 2배). null = 그대로</summary>
@@ -707,7 +708,8 @@ public class Player : MonoBehaviour
     {
         if (DebugCheats.God || (invuln > 0 && !ignoreHitInvuln) || IsInvulnerable || GameManager.I.State != GameState.Playing) return;
         if (CounterHit()) return;
-        dmg *= damageTakenMul * (DynamicTakenMul != null ? DynamicTakenMul() : 1f);
+        dmg *= damageTakenMul;
+        for (int i = 0; i < TakenMods.Count; i++) dmg *= TakenMods[i]();
         DamageReceived?.Invoke(dmg);
         if (shield > 0f)   // 보호막이 먼저 받아 냄
         {
