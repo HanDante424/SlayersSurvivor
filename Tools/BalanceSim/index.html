@@ -283,6 +283,7 @@ function defaultState() {
       fs: { on: true, useBasic: true, useSpec: true, params: {}, ups: { dps: 0, stk: 0, dur: 0 }, picks: {}, open: false },
       hf: { on: false, useBasic: true, useSpec: true, params: {}, ups: { fin: 0, mob: 0, dot: 0 }, picks: {}, open: false },
       ab: { on: false, useBasic: true, useSpec: true, params: {}, ups: { fin: 0, cd: 0, stk: 0 }, picks: {}, open: false },
+      fb: { on: false, useBasic: true, useSpec: true, params: {}, ups: {}, picks: {}, open: false },
     },
     skills: [],
     calc: { initial: 10, pct: 0.3, flat: 0, finals: '1.5, 1.2', burn: 1, stun: 1, recv: 1, fixed: false },
@@ -297,7 +298,7 @@ function mergeState(d, j) {
   if (!(j.migr >= 1) && d.G.minDmg === 0) d.G.minDmg = 1;
   if (!(j.migr >= 2)) d.G.killRate = 0;   // 2026-11-23: 처치 효과는 기본 미적용 (저장된 0.5 를 0 으로)   // 2026-11-23: 게임이 최소 피해 1 로 바뀜 → 이전에 저장된 0 은 새 기본값으로
   d.migr = 2;
-  for (const k of ['fs', 'hf', 'ab']) if (j.pas && j.pas[k]) d.pas[k] = Object.assign(d.pas[k], j.pas[k]);
+  for (const k of PAS_KEYS) if (j.pas && j.pas[k]) d.pas[k] = Object.assign(d.pas[k], j.pas[k]);
   for (const sc of d.skills) { const x = (j.skills || []).find(q => q.id === sc.id); if (x) Object.assign(sc, x); }
   d.items = j.items || []; d.sets = j.sets || [];
   d.ui = j.ui || d.ui;
@@ -330,7 +331,7 @@ function bakWrite(a) {
 function hasWork(s) {   // 의미 있는 조정이 있는 상태만 백업 (빈 기본 상태로 좋은 백업을 밀어내지 않게)
   return Object.keys(s.ov || {}).length > 0 || Object.keys(s.bv || {}).length > 0 || (s.locks || []).length > 0 || !!s.lock || (s.items || []).length > 0
     || (s.skills || []).some(k => Object.keys(k.params || {}).length || Object.keys(k.picks || {}).length || (k.ups && (k.ups.dmg || k.ups.cd)))
-    || ['fs', 'hf', 'ab'].some(k => s.pas && s.pas[k] && Object.keys(s.pas[k].params || {}).length);
+    || PAS_KEYS.some(k => s.pas && s.pas[k] && Object.keys(s.pas[k].params || {}).length);
 }
 /** label: '수동' · '자동' · '초기화 전' 등. force 면 내용이 같아도 새로 쌓지 않음 (같은 내용 중복은 항상 건너뜀) */
 function snapshot(label, state) {
@@ -547,9 +548,9 @@ function buildPreset() {
   const bt = document.createElement('div'); bt.className = 'toolbar';
   const mk = (t, f) => { const x = document.createElement('button'); x.className = 'small'; x.textContent = t; x.addEventListener('click', () => { f(); save(); rerender(); }); return x; };
   bt.append(
-    mk('전부 켜기', () => { S.inc = { basic: true, passive: true, item: true }; for (const k of ['fs', 'hf', 'ab']) Object.assign(S.pas[k], { on: true, useBasic: true, useSpec: true }); }),
+    mk('전부 켜기', () => { S.inc = { basic: true, passive: true, item: true }; for (const k of PAS_KEYS) Object.assign(S.pas[k], { on: true, useBasic: true, useSpec: true }); }),
     mk('순수 특수 강화만', () => { S.inc = { basic: false, passive: false, item: false }; }),
-    mk('화염의 검만', () => { S.inc = { basic: true, passive: true, item: true }; S.pas.fs.on = true; S.pas.hf.on = false; S.pas.ab.on = false; }));
+    mk('화염의 검만', () => { S.inc = { basic: true, passive: true, item: true }; S.pas.fs.on = true; S.pas.hf.on = false; S.pas.ab.on = false; S.pas.fb.on = false; }));
   b.appendChild(bt);
   const bb = document.createElement('div'); bb.className = 'toolbar'; bb.style.marginTop = '4px';
   const nIn = document.createElement('input'); nIn.type = 'number'; nIn.min = 0; nIn.step = 1; nIn.value = S.ui.basicN != null ? S.ui.basicN : 14; nIn.style.width = '56px';
@@ -561,7 +562,7 @@ function buildPreset() {
   b.appendChild(bb);
   const bbInfo = document.createElement('div'); bbInfo.className = 'hint'; bbInfo.id = 'bestInfo'; bbInfo.textContent = S.ui.bestInfo || '';
   b.appendChild(bbInfo);
-  for (const k of ['fs', 'hf', 'ab']) {
+  for (const k of PAS_KEYS) {
     const q = S.pas[k], dim = !S.inc.passive;
     const r = document.createElement('div'); r.className = 'row'; r.style.flexWrap = 'wrap';
     const nm = document.createElement('label'); nm.style.flex = '1 1 100%'; nm.style.color = 'var(--text)'; nm.textContent = PASSIVES[k].name; r.appendChild(nm);
@@ -586,7 +587,7 @@ function buildInputs() {
 
   // 패시브
   const pb = document.getElementById('passiveBox'); pb.innerHTML = '';
-  for (const k of ['fs', 'hf', 'ab']) {
+  for (const k of PAS_KEYS) {
     const P = PASSIVES[k], st = S.pas[k];
     const det = document.createElement('details'); det.open = !!st.open;
     det.addEventListener('toggle', () => { st.open = det.open; save(); });
@@ -709,8 +710,9 @@ function makeCfg(st) {
   const inc = st.inc || { basic: true, passive: true, item: true };
   const zero = u => Object.fromEntries(Object.keys(u).map(k => [k, 0]));
   const pas = {};
-  for (const k of ['fs', 'hf', 'ab']) {
+  for (const k of PAS_KEYS) {
     const q = st.pas[k];
+    if (!q) continue;   // 이전에 저장된 상태에 없는 패시브 (화염 보호막 추가 전)
     pas[k] = {
       on: inc.passive && q.on,
       params: q.params,
@@ -727,7 +729,7 @@ function makeCfg(st) {
 function presetText() {
   const i = S.inc, off = [];
   if (!i.basic) off.push('기본 강화 꺼짐');
-  if (!i.passive) off.push('패시브 꺼짐'); else for (const k of ['fs', 'hf', 'ab']) { const q = S.pas[k]; if (q.on && q.useBasic === false) off.push(PASSIVES[k].name.split(' ')[0] + ' 기본 강화 꺼짐'); if (q.on && q.useSpec === false) off.push(PASSIVES[k].name.split(' ')[0] + ' 특수 강화 꺼짐'); }
+  if (!i.passive) off.push('패시브 꺼짐'); else for (const k of PAS_KEYS) { const q = S.pas[k]; if (q.on && q.useBasic === false) off.push(PASSIVES[k].name.split(' ')[0] + ' 기본 강화 꺼짐'); if (q.on && q.useSpec === false) off.push(PASSIVES[k].name.split(' ')[0] + ' 특수 강화 꺼짐'); }
   if (!i.item) off.push('아이템 꺼짐');
   return off.length ? '프리셋: ' + off.join(' · ') : '';
 }
@@ -1404,7 +1406,7 @@ function renderBal() {
     });
   }
   // ── 패시브
-  for (const k of ['fs', 'hf', 'ab']) {
+  for (const k of PAS_KEYS) {
     const P = PASSIVES[k];
     addGroup('p:' + k, P.name, colorOf.passive, '<span class="tag pas">패시브</span>', body => {
       let rows = 0;

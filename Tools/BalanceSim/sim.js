@@ -117,6 +117,11 @@ function runSim(cfg) {
   const fsHas = id => fsOn && (FSC.picks || []).includes(id);
   const hfHas = id => hfOn && (HFC.picks || []).includes(id);
   const abHas = id => abOn && (ABC.picks || []).includes(id);
+  // 화염 보호막 (이전에 저장된 설정에는 없을 수 있음). DPS 에 닿는 것은 불타는 방벽 · 보호막 일격 둘뿐
+  const FBC = cfg.pas.fb || {};
+  const fbOn = !!FBC.on;
+  const fbHas = id => fbOn && (FBC.picks || []).includes(id);
+  let fbWall = 0;   // 불타는 방벽: 아직 부여하지 않은 화상 스택 (소수 누적)
 
   // ── 화염의 검 (화상)
   const fsP = paramValues({ params: PASSIVES.fs.params }, FSC.params);
@@ -282,6 +287,7 @@ function runSim(cfg) {
     if (sk.m.flags.noExtras && sk.m.nums && sk.m.nums['OSC.base'] != null) fin *= 1 + sk.m.nums['OSC.base'] + sk.m.nums['OSC.per'] * sk.m.nullExtrasN;   // 추가 사용 무효화: 최종 +기본 + 무효화한 추가 사용 1당 +per
     const nc = sk.m.nullCd;
     if (nc) fin *= 1 + (nc.base || 0) + (nc.perPct || 0) * cdReductionPct(sk) + (nc.perStack || 0) * (sk.m.flags.nullStacks ? Math.max(0, (sk.def.stacks || 1) + (sk.m.stacksAdd || 0) - 1) : (sk.m.stacksAdd || 0));   // 무효화한 스택 수 = 무효화 전 최대 스택 - 1
+    if (fbHas('FB15B') && (sk.def.kind === 'manual' || sk.id === 'firecharge')) fin *= 1 + pn('FB15B', 'final') * pn('FB15B', 'ratio');   // 보호막 일격: 수동 스킬 최종 +50% (조건을 채운 비율만큼 기댓값)
     sk._lp = pct; sk._lf = fin;   // 화면 표시용 (이번 피해에 적용된 피해량 % · 최종 피해량 배율)
     return v * fin;
   }
@@ -481,6 +487,12 @@ function runSim(cfg) {
     else { abHold = 0; abCritical = false; }
 
     if (now + 1e-9 >= nextKill) { onKill(); nextKill += killIv; }
+
+    // 불타는 방벽: 보호막이 있는 동안 간격마다 주변 적 화상 스택 +N (주 대상도 포함, 화염의 검이 켜져 있어야 함)
+    if (fbHas('FB15A') && fsOn) {
+      fbWall += DT * pn('FB15A', 'stacks') * pn('FB15A', 'uptime') / Math.max(0.05, pn('FB15A', 'interval'));
+      while (fbWall >= 1 - 1e-9) { fbWall -= 1; addBurn(1); }
+    }
 
     // 화상 틱
     if (burn.stacks > 0) {
