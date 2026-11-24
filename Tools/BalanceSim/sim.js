@@ -24,7 +24,8 @@ function mergeMods(list) {
     if (x.extrasSet) m.extras = x.extrasSet.slice();   // 조합이 추가 사용을 통째로 바꿈
     if (x.nullCd) m.nullCd = x.nullCd;
   }
-  if (m.flags.noExtras) m.extras = [];
+  m.nullExtrasN = 0;
+  if (m.flags.noExtras) { m.nullExtrasN = m.extras.length; m.extras = []; }   // 무효화한 추가 사용 수 (오버 드라이브 블레이징 슬래시의 최종 피해량 계산용)
   return m;
 }
 
@@ -278,6 +279,7 @@ function runSim(cfg) {
     const pct = sk.m.dmgPct + sk.ups.dmg * bvs(sk.id, 'dmg') + (o.extraPct || 0) + globalDmgPct() + (isDot ? dotPct() : 0);
     const v = (initial + IT.initialAdd) * (1 + pct) + IT.flatAdd;
     let fin = sk.m.finalMul * (o.extraFinal || 1) * globalFinal(false);
+    if (sk.m.flags.noExtras && sk.m.nums && sk.m.nums['OSC.base'] != null) fin *= 1 + sk.m.nums['OSC.base'] + sk.m.nums['OSC.per'] * sk.m.nullExtrasN;   // 추가 사용 무효화: 최종 +기본 + 무효화한 추가 사용 1당 +per
     const nc = sk.m.nullCd;
     if (nc) fin *= 1 + (nc.base || 0) + (nc.perPct || 0) * cdReductionPct(sk) + (nc.perStack || 0) * (sk.m.flags.nullStacks ? Math.max(0, (sk.def.stacks || 1) + (sk.m.stacksAdd || 0) - 1) : (sk.m.stacksAdd || 0));   // 무효화한 스택 수 = 무효화 전 최대 스택 - 1
     sk._lp = pct; sk._lf = fin;   // 화면 표시용 (이번 피해에 적용된 피해량 % · 최종 피해량 배율)

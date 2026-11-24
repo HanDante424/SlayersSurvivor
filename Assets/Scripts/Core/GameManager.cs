@@ -257,7 +257,8 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        float cdNow = s.CooldownReduction, cdNext = Mathf.Min(T.upgradeCooldown * (s.CooldownUps + 1), T.cooldownReductionCap);
+        float dmgStep = s.BasicDamageStep, cdStep = s.BasicCooldownStep;   // 스킬마다 다를 수 있음
+        float cdNow = s.CooldownReduction, cdNext = Mathf.Min(cdStep * (s.CooldownUps + 1), T.cooldownReductionCap);
         string cdCap = cdNext <= cdNow ? "  <color=#FF8080>(최대 90% 도달 — 더 줄지 않음)</color>" : "";
         var list = new List<Upgrade>
         {
@@ -265,8 +266,8 @@ public class GameManager : MonoBehaviour
             new Upgrade
             {
                 title = SkillCatalog.BasicUpgrades[0].title,
-                desc = SkillText.Highlight($"'피해량' +{Pct(T.upgradeDamage)}")
-                     + $"\n<size=15><color=#AAAAAA>누적 +{Pct(s.DamageBonus)} → +{Pct(s.DamageBonus + T.upgradeDamage)}</color></size>",
+                desc = SkillText.Highlight($"'피해량' +{Pct(dmgStep)}")
+                     + $"\n<size=15><color=#AAAAAA>누적 +{Pct(s.DamageBonus)} → +{Pct(s.DamageBonus + dmgStep)}</color></size>",
                 apply = () => FinishBasic(s, BasicUpgrade.Damage),
             },
             new Upgrade
@@ -279,7 +280,7 @@ public class GameManager : MonoBehaviour
             new Upgrade
             {
                 title = SkillCatalog.BasicUpgrades[2].title,
-                desc = SkillText.Highlight($"'쿨타임 감소' +{Pct(T.upgradeCooldown)}")
+                desc = SkillText.Highlight($"'쿨타임 감소' +{Pct(cdStep)}")
                      + $"\n<size=15><color=#AAAAAA>누적 -{Pct(cdNow)} → -{Pct(cdNext)}</color>{cdCap}</size>",
                 apply = () => FinishBasic(s, BasicUpgrade.Cooldown),
             },

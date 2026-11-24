@@ -73,6 +73,11 @@ public class FireSlash : AutoSkill
     const float TripleAngle = 60f;
     const float ChainAngle = 120f;      // 연속 공격 생성: 공격 방향 이외 120° 간격 2방향 · 죽음의 메아리: 120° 간격 3방향
     const float QuickMul = 0.5f;        // 빠른 공격: 사용 후 남은 쿨타임 절반 감소
+    const float TrackDamage = 0.5f;     // 대상 추적: 피해량 +50% (2026-11-24 밸런스)
+    const float ScatterCooldown = 0.9f; // 난사: 쿨타임 감소 +10%
+    const float BothWaysDamage = 0.25f; // 양방향 공격: 피해량 +25%
+    const float ChainCooldown = 0.9f;   // 연속 공격: 쿨타임 감소 +10%
+    const float TripleFinal = 1.25f;    // 삼연발: 최종 피해량 +25%
     const float HeavyFinal = 1.0f;      // 묵직한 일격: 최종 피해량 +100%
     const float HeavyRange = 0.5f;      //               공격 범위 +50%
     const float HeavyPerReduction = 2f; //               무효화된 쿨타임 감소 1%당 최종 피해량 +2% (+100% 와 합쳐 최종 배율 1개)
@@ -128,8 +133,17 @@ public class FireSlash : AutoSkill
 
     protected override float CooldownMultiplier => HasSpecial(Heavy) ? 1f : GeneralCooldownMultiplier;
     /// <summary>묵직한 일격: '최종 피해량' +100% 와 전환분(1%당 +2%)을 묵직한 일격 안에서 합쳐 최종 배율 1개 (예: 75% → 1 + 1 + 1.5 = ×3.5)</summary>
-    protected override float SpecialFinalDamageMul => HasSpecial(Heavy) ? 1f + HeavyFinal + HeavyConvertedReduction * HeavyPerReduction : 1f;
+    protected override float SpecialFinalDamageMul =>
+        (HasSpecial(Heavy) ? 1f + HeavyFinal + HeavyConvertedReduction * HeavyPerReduction : 1f)
+        * (HasSpecial(TripleShot) ? TripleFinal : 1f);
     protected override float SpecialRangeBonus => HasSpecial(Heavy) ? HeavyRange : 0f;
+    /// <summary>대상 추적 +50% · 양방향 공격 +25% (피해량, 기본 강화와 합연산)</summary>
+    protected override float SpecialDamageBonus => (HasSpecial(Track) ? TrackDamage : 0f) + (HasSpecial(BothWays) ? BothWaysDamage : 0f);
+    /// <summary>난사 · 연속 공격: 쿨타임 감소 +10% (×0.9)</summary>
+    protected override float SpecialCooldownMul => (HasSpecial(Scatter) ? ScatterCooldown : 1f) * (HasSpecial(Chain) ? ChainCooldown : 1f);
+    // 기본 강화 1회 (밸런스 확정 2026-11-24): 피해량 +20% · 쿨타임 -5%
+    public override float BasicDamageStep => 0.2f;
+    public override float BasicCooldownStep => 0.05f;
 
     /// <summary>빠른 공격: 사용 후 남은 쿨타임 절반 (묵직한 일격이면 쿨타임 감소 무효화)</summary>
     protected override void AfterFire()
@@ -396,8 +410,8 @@ public class SolarSlash : AutoSkill
 {
     // 기본 수치 (2026-11-11 스킬 설명 중간본: 베기 5 · 폭발 12 · 쿨타임 5초)
     const float BaseCooldown = 5f;
-    const float SlashDamage = 5f;
-    const float ExplosionDamage = 12f;
+    const float SlashDamage = 7f;           // 밸런스 확정 2026-11-24 (5 → 7)
+    const float ExplosionDamage = 15f;      // (12 → 15)
 
     const float FxFps = 20f;            // [임시] 12프레임 → 0.6초 (원형 베기 → 태양 → 폭발)
     const float FxWidth = 2.6f;         // [임시] 한 칸 가로 = 폭발 범위 x 이 값 (마지막 폭발 고리 ≈ 판정 원)
@@ -445,8 +459,13 @@ public class SolarSlash : AutoSkill
     const float SupernovaKnockRange = 0.5f; // 초신성: 넉백 범위 +50%
     const float SupernovaDamagePerKnock = 1f;   //     누적 넉백 범위 1%당 피해 +1%
     const float SupernovaCooldown = 0.5f;   //         쿨타임 +50%
-    const float FlareDamage = 0.5f;         // 플레어: 최종 피해량 +50% (독립 배율)
-    const float FlareCooldown = 0.25f;      //         쿨타임 -25%
+    const float FlareDamage = 1f;           // 플레어: 최종 피해량 +100% (독립 배율, 2026-11-24 +50% → +100%)
+    const float FlareCooldown = 0.1f;       //         쿨타임 -10% (2026-11-24 -25% → -10%)
+    const float ShockDamage = 0.5f;         // 충격 발산: 피해량 +50% (2026-11-24)
+    const float ConcussionFinal = 1.25f;    // 뇌진탕: 최종 피해량 +25%
+    const float BurnFinal = 1.25f;          // 타오름: 최종 피해량 +25%
+    const float SunspotFinal = 2f;          // 흑점 폭발: 최종 피해량 +100%
+    const float MultiCooldown = 0.75f;      // 연속 폭발: 쿨타임 감소 +25%
 
     bool Burning => HasSpecial(Burn);
     /// <summary>뇌진탕은 후속타가 있을 때만 (타오름이면 획득 기록만 남고 비활성)</summary>
@@ -463,15 +482,23 @@ public class SolarSlash : AutoSkill
     /// <summary>'피해량' % (타오름·초신성 넉백 변환)</summary>
     protected override float SpecialDamageBonus =>
         (Burning ? KnockRangeBonus * BurnDamagePerKnock : 0f)
-        + (HasSpecial(Supernova) ? KnockRangeBonus * SupernovaDamagePerKnock : 0f);
-    /// <summary>플레어 = '최종 피해량' +50% (결정 기록 v1.0)</summary>
-    protected override float SpecialFinalDamageMul => HasSpecial(Flare) ? 1f + FlareDamage : 1f;
+        + (HasSpecial(Supernova) ? KnockRangeBonus * SupernovaDamagePerKnock : 0f)
+        + (HasSpecial(Shock) ? ShockDamage : 0f);
+    /// <summary>최종 피해량 배율 (독립 효과끼리 곱, 2026-11-24 밸런스): 뇌진탕 ×1.25 · 타오름 ×1.25 · 흑점 폭발 ×2 · 플레어 ×2</summary>
+    protected override float SpecialFinalDamageMul =>
+        (HasSpecial(Flare) ? 1f + FlareDamage : 1f)
+        * (HasSpecial(Concussion) ? ConcussionFinal : 1f)
+        * (Burning ? BurnFinal : 1f)
+        * (HasSpecial(Sunspot) ? SunspotFinal : 1f);
     protected override float SpecialRangeBonus => Burning ? BurnRange + KnockRangeBonus * BurnRangePerKnock : 0f;
-    /// <summary>쿨타임 독립 배율 곱연산: 플레어 ×0.75 · 메아리 ×1.25 · 초신성 ×1.5</summary>
+    /// <summary>쿨타임 독립 배율 곱연산: 플레어 ×0.9 · 메아리 ×1.25 · 초신성 ×1.5 · 연속 폭발 ×0.75</summary>
     protected override float SpecialCooldownMul =>
         (HasSpecial(Flare) ? 1f - FlareCooldown : 1f)
         * (HasSpecial(Echo) ? 1f + EchoCooldown : 1f)
-        * (HasSpecial(Supernova) ? 1f + SupernovaCooldown : 1f);
+        * (HasSpecial(Supernova) ? 1f + SupernovaCooldown : 1f)
+        * (HasSpecial(Multi) ? MultiCooldown : 1f);
+    // 기본 강화 1회 (밸런스 확정 2026-11-24): 피해량 +20% (쿨타임은 공통값)
+    public override float BasicDamageStep => 0.2f;
 
     protected override float CooldownSeconds => CooldownOf(BaseCooldown);
     // 타오름: 지속 공격이 끝난 뒤부터 쿨타임 → BurnRoutine 이 Casting 으로 처리 (CastDuration 미사용)
@@ -764,7 +791,10 @@ public class FireBall : AutoSkill
 {
     const float Speed = 10f;            // [임시] 투사체 속도
     const int Pierce = 1;               // [임시] 기본 관통 수 (기획 미정 → 1: 한 명 맞으면 종료)
-    const float DirectDamage = 3f, ExplosionDamage = 4f, BaseCooldown = 3f;   // 노션 확정 (직격 3 · 폭발 4)
+    const float DirectDamage = 5f, ExplosionDamage = 6f, BaseCooldown = 3f;   // 밸런스 확정 2026-11-24 (직격 3 → 5 · 폭발 4 → 6)
+    // 기본 강화 1회 (밸런스 확정 2026-11-24): 피해량 +15% · 쿨타임 -3%
+    public override float BasicDamageStep => 0.15f;
+    public override float BasicCooldownStep => 0.03f;
     const float ExplosionRatio = 0.5f;  // [임시] 폭발 반경 = 범위 좁음 × 비율 (기획에 반경 없음) → 기본 0.8
     // 폭발 이펙트 ErnStray_FireExplosion: 3×3, 칸 512, 8프레임 (9번째 칸은 빈 칸), 1회 재생
     const string ExplosionSheet = "ErnStray_FireExplosion";
@@ -1117,7 +1147,7 @@ public class FireBallReturner : MonoBehaviour
 public class FireBuster : AutoSkill
 {
     const float Knock = 9f;             // [임시] 밀치기 세기
-    const float BaseDamage = 20f, BaseCooldown = 10f;
+    const float BaseDamage = 60f, BaseCooldown = 10f;   // 초기 피해량 20 → 60 (밸런스 확정 2026-11-24)
     // 폭발 이펙트 ErnStray_FireBusterExplosion (2026-11-20, 원본 Project Slayers/output/FireBuster_Explosion_v2): 3×3, 칸 512, 8프레임 (9번째 칸 빈 칸), 1회 재생
     const string FxSheet = "ErnStray_FireBusterExplosion";
     const int FxFrames = 8;
@@ -1132,7 +1162,10 @@ public class FireBuster : AutoSkill
     // 특수 강화 확정 수치 (노션)
     const float WaveRange = 0.3f, WaveKnock = 0.5f;          // 열파: 범위 +30% · 넉백 +50%
     const int IgniteStacks = 2;                              // 점화: 화상 +2
-    const float DenseRange = -0.25f, DenseDamage = 0.75f;    // 고농축: 범위 -25% · 피해량 +75%
+    const float DenseRange = -0.25f, DenseFinal = 0.75f;     // 고농축: 범위 -25% · 최종 피해량 +75% (2026-11-24 피해량 → 최종 피해량)
+    const float WaveDamage = 0.25f;                          // 열파: 피해량 +25% (2026-11-24)
+    const float ConcussFinal = 1.25f, ConcussStun = 1f;      // 뇌진탕: 최종 피해량 +25% · 넉백된 적이 다른 적과 충돌하면 기절 1초 (2026-11-24 노션)
+    const float OverheatCooldownCut = 0.025f;                // 과열 반응: 화상 상태 적 적중 시 남은 쿨타임 2.5% 감소
     const float DoubleDelay = 0.5f, DoublePct = 1f;          // 이중 폭발: 0.5초 뒤 1회, 총 피해량 100% 고정
     const float OverheatFinal = 0.5f;                        // 과열 반응: 화상 적 최종 피해량 +50%
     const float NovaRange = 1f, NovaFinal = 1.5f, NovaCooldown = 1f;   // 초신성: 범위 +100% · 최종 피해량 +150% · 쿨타임 +100%
@@ -1154,15 +1187,15 @@ public class FireBuster : AutoSkill
         {
             case 5: return new[]
             {
-                new SpecialUpgradeOption { id = Wave, title = "열파", desc = "범위 +30%, 넉백 +50%" },
+                new SpecialUpgradeOption { id = Wave, title = "열파", desc = "범위 +30%, 넉백 +50%, 피해량 +25%" },
                 new SpecialUpgradeOption { id = Ignite, title = "점화", desc = "적중 시 적용된 모든 화상 +2" },
-                new SpecialUpgradeOption { id = Dense, title = "고농축", desc = "범위 -25%, 피해량 +75%" },
+                new SpecialUpgradeOption { id = Dense, title = "고농축", desc = "범위 -25%, 최종 피해량 +75%" },
             };
             case 10: return new[]
             {
                 new SpecialUpgradeOption { id = Double, title = "이중 폭발", keywords = new[] { "근거리", "간접 사용", "직접 피해", "넉백" }, desc = "종료 시 0.5초 뒤 폭발이 1회 추가 발동합니다. 파이어 버스터 총 피해량의 100% 고정 피해." },
-                new SpecialUpgradeOption { id = Concuss, title = "뇌진탕", desc = "(노션 미입력 — 아직 설계되지 않았습니다)", locked = true },
-                new SpecialUpgradeOption { id = Overheat, title = "과열 반응", desc = "화상 상태의 적 적중 시 최종 피해량 +50%" },
+                new SpecialUpgradeOption { id = Concuss, title = "뇌진탕", keywords = new[] { "기절" }, desc = "넉백된 적이 다른 적과 부딪히면 1초 기절, 최종 피해량 +25%" },
+                new SpecialUpgradeOption { id = Overheat, title = "과열 반응", desc = "화상 상태의 적 적중 시 최종 피해량 +50%, 남은 쿨타임 2.5% 감소" },
             };
             case 15: return new[]
             {
@@ -1175,12 +1208,24 @@ public class FireBuster : AutoSkill
     }
 
     protected override float SpecialRangeBonus => (HasSpecial(Wave) ? WaveRange : 0f) + (HasSpecial(Dense) ? DenseRange : 0f) + (HasSpecial(Nova) ? NovaRange : 0f);
-    protected override float SpecialDamageBonus => HasSpecial(Dense) ? DenseDamage : 0f;
-    protected override float SpecialFinalDamageMul => HasSpecial(Nova) ? 1f + NovaFinal : 1f;
+    /// <summary>열파: 피해량 +25% (2026-11-24 밸런스 · 기본 강화와 합연산)</summary>
+    protected override float SpecialDamageBonus => HasSpecial(Wave) ? WaveDamage : 0f;
+    /// <summary>최종 피해량 (독립 배율): 고농축 ×1.75 (피해량 → 최종 피해량) · 뇌진탕 ×1.25 · 초신성 ×2.5</summary>
+    protected override float SpecialFinalDamageMul =>
+        (HasSpecial(Dense) ? 1f + DenseFinal : 1f) * (HasSpecial(Concuss) ? ConcussFinal : 1f) * (HasSpecial(Nova) ? 1f + NovaFinal : 1f);
     protected override float SpecialCooldownMul => HasSpecial(Nova) ? 1f + NovaCooldown : 1f;
+    // 기본 강화 1회 (밸런스 확정 2026-11-24): 피해량 +30% · 쿨타임 -5%
+    public override float BasicDamageStep => 0.3f;
+    public override float BasicCooldownStep => 0.05f;
 
-    /// <summary>과열 반응: 화상 상태 적에게 최종 피해량 +50% (대상 단계 배율 — 피해가 들어가기 전의 화상 상태 기준)</summary>
-    static float OverheatMul(Enemy e) => FlameSword.IsBurning(e) ? 1f + OverheatFinal : 1f;
+    /// <summary>과열 반응: 화상 상태 적에게 최종 피해량 +50% (대상 단계 배율 — 피해가 들어가기 전의 화상 상태 기준).
+    /// 화상 상태 적에게 적중할 때마다 남은 쿨타임 2.5% 감소 (2026-11-24, 적중마다 적용 [해석])</summary>
+    float OverheatMul(Enemy e)
+    {
+        if (!FlameSword.IsBurning(e)) return 1f;
+        ReduceRemainingCooldown(OverheatCooldownCut);
+        return 1f + OverheatFinal;
+    }
 
     /// <summary>같은 사용에서 나온 간접 사용 고정 피해 (모든 증감 무효)</summary>
     DamageInfo FixedOf(float amount, CastRef cast, DamageType type = DamageType.Direct)
@@ -1233,7 +1278,7 @@ public class FireBuster : AutoSkill
         else
         {
             dmg = MakeDamage(BaseDamage, cast);
-            if (HasSpecial(Overheat)) dmg.perTarget = OverheatMul;
+            if (HasSpecial(Overheat)) dmg.perTarget = OverheatMul;   // 인스턴스 메서드 (화상 적중마다 쿨타임 감소)
         }
 
         // 연쇄 폭발: "화상 상태의 적" = 맞기 전에 이미 화상인 적 (이번 피해가 화상을 새로 거는 경우는 제외)
@@ -1247,6 +1292,7 @@ public class FireBuster : AutoSkill
 
         SkillHits.Circle(at, r, dmg, knock, e =>
         {
+            if (HasSpecial(Concuss) && e != null && e.hp > 0) e.MarkConcussion(T.concussionWindow, ConcussStun, T.concussionStunsOther);   // 뇌진탕: 넉백 중 다른 적과 충돌하면 기절 (솔라 슬래시와 같은 방식)
             if (HasSpecial(Ignite) && FlameSword.I != null) FlameSword.I.AddStacks(e, IgniteStacks);   // 점화: 적용된 화상 +2 (이번 적중이 건 화상 포함 [해석])
             if (burning != null && burning.TryGetValue(e, out float total)) ChainExplode(e.transform.position, total, cast);
         });
@@ -1277,8 +1323,11 @@ public class FireBlade : AutoSkill
 {
     const int MaxTargets = 8;           // [임시] 연속 참격 대상 수 제한 (기획 미정, 첫 베기는 범위 안 전부)
     const int SlashCount = 5;           // 베기 공격 횟수 5
-    const float FirstSlashDamage = 5f;  // 노션: 베기 초기 피해량 5
-    const float SlashDamage = 3f, ExplosionDamage = 20f, BaseCooldown = 15f;
+    const float FirstSlashDamage = 10f; // 첫 베기 초기 피해량 5 → 10 (밸런스 확정 2026-11-24)
+    const float SlashDamage = 15f, ExplosionDamage = 40f, BaseCooldown = 15f;   // 연속 베기 3 → 15 · 폭발 20 → 40 (2026-11-24)
+    const float SpinFinal = 0.5f;               // 회전 베기: 최종 피해량 +50% (2026-11-24)
+    const float SpreadDamage = 0.25f;           // 확산: 피해량 +25%
+    const float TripleDamage = 0.5f;            // 삼연발: 피해량 +50%
     const float SlashInterval = 0.12f;  // [임시]
     const float ExplosionRatio = 0.35f; // [임시] 폭발 반경 = 범위 좁음 × 비율 (기획 미정)
     const float FirstSlashDistance = 1.5f;   // 첫 베기 중심 = 플레이어 앞 이 거리 (사용자 2026-11-22: 2.5 → 1.5 더 가깝게). 판정 · 이펙트 · 적 인식이 같은 중심. 이전에는 플레이어 위치
@@ -1341,7 +1390,7 @@ public class FireBlade : AutoSkill
             case 5: return new[]
             {
                 new SpecialUpgradeOption { id = Frenzy, title = "난무", desc = "연속 참격의 공격 횟수 +5" },
-                new SpecialUpgradeOption { id = Spin, title = "회전 베기", desc = "첫 베기를 회전 베기로 변경합니다. 범위 +50%" },
+                new SpecialUpgradeOption { id = Spin, title = "회전 베기", desc = "첫 베기를 회전 베기로 변경합니다. 범위 +50%, 최종 피해량 +50%" },
                 new SpecialUpgradeOption { id = Spread, title = "확산", keywords = new[] { "간접 사용", "직접 피해", "고정 피해", "근거리" }, desc = "종료 시 폭발에 맞은 적들에게 연속 베기와 폭발이 발생합니다. 각 피해량은 원본과 동일, 추가 연속 베기는 1회만 발생." },
             };
             case 10: return new[]
@@ -1364,6 +1413,11 @@ public class FireBlade : AutoSkill
     /// <summary>참격 집중이 삭제한 연속 베기 횟수 (폭발 피해량 증가의 기준)</summary>
     int FocusSlashCount => SlashCount + (HasSpecial(Frenzy) ? FrenzyBonus : 0);
     protected override float SpecialRangeBonus => HasSpecial(Spin) ? SpinRange : 0f;
+    protected override float SpecialFinalDamageMul => HasSpecial(Spin) ? 1f + SpinFinal : 1f;
+    protected override float SpecialDamageBonus => (HasSpecial(Spread) ? SpreadDamage : 0f) + (HasSpecial(Triple) ? TripleDamage : 0f);
+    // 기본 강화 1회 (밸런스 확정 2026-11-24): 피해량 +20% · 쿨타임 -3.5%
+    public override float BasicDamageStep => 0.2f;
+    public override float BasicCooldownStep => 0.035f;
 
     /// <summary>타오르는 참격: 화상 상태 적에게 최종 피해량 +100% (대상 단계, 피해가 들어가기 전 화상 기준)</summary>
     static float BlazingMul(Enemy e) => FlameSword.IsBurning(e) ? 1f + BlazingFinal : 1f;
@@ -1638,7 +1692,10 @@ public class FireStorm : AutoSkill
     const float Duration = 3f;          // 화염 소용돌이 지속 시간 3초
     const float TickInterval = 1f;      // [해석] 지속 피해 기본 피해 간격 1초 (결정 기록)
     const float SlowMul = 0.5f;         // [임시] 슬로우 비율 (기획 미정)
-    const float DotDamage = 2f, ExplosionDamage = 15f, BaseCooldown = 14f;
+    const float DotDamage = 8f, ExplosionDamage = 15f, BaseCooldown = 14f;   // 소용돌이 틱 2 → 8 (밸런스 확정 2026-11-24)
+    // 기본 강화 1회 (밸런스 확정 2026-11-24): 피해량 +20% · 쿨타임 -3.5%
+    public override float BasicDamageStep => 0.2f;
+    public override float BasicCooldownStep => 0.035f;
     const float Knock = 9f;             // [임시]
     const float RangeMul = 1.69f;       // 범위 배율 (사용자 2026-11-22: 30% 증가를 두 번 = 1.3 x 1.3). 소용돌이 · 폭발 모두
 

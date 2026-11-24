@@ -78,12 +78,17 @@ public abstract class Skill : MonoBehaviour
     public int RangeUps { get; private set; }
     public int CooldownUps { get; private set; }
 
+    /// <summary>기본 강화 1회당 피해량 증가 (스킬마다 덮어쓸 수 있음, 2026-11-24 밸런스 확정). 기본 = SkillTuning 공통값</summary>
+    public virtual float BasicDamageStep => T.upgradeDamage;
+    /// <summary>기본 강화 1회당 쿨타임 감소 (스킬마다 덮어쓸 수 있음)</summary>
+    public virtual float BasicCooldownStep => T.upgradeCooldown;
+
     /// <summary>공격력 증가율 합계 (0.3 = +30%)</summary>
-    public float DamageBonus => T.upgradeDamage * DamageUps;
+    public float DamageBonus => BasicDamageStep * DamageUps;
     /// <summary>범위 증가율 합계</summary>
     public float RangeBonus => T.upgradeRange * RangeUps;
     /// <summary>쿨타임 감소율 합계 (최대 cooldownReductionCap = 90%)</summary>
-    public float CooldownReduction => Mathf.Min(T.upgradeCooldown * CooldownUps, T.cooldownReductionCap);
+    public float CooldownReduction => Mathf.Min(BasicCooldownStep * CooldownUps, T.cooldownReductionCap);
 
     /// <summary>기본 강화 1개 적용 후 스킬 레벨 +1. 특수 강화는 이 다음에 SpecialPending 으로 확인</summary>
     public void ApplyBasicUpgrade(BasicUpgrade u)

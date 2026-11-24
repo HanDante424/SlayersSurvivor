@@ -117,7 +117,18 @@
       </div>
     </div>
     <div class="panel">
-      <h2>계산 포함 (프리셋) <span class="hint" style="margin:0">끄면 값은 남아 있고 계산에서만 빠짐</span></h2>
+      <h2>백업 · 복구 <span class="hint" style="margin:0">브라우저 저장소가 지워져도 파일로 남김</span></h2>
+      <div class="toolbar">
+        <button class="primary small" id="btnBakNow">지금 백업</button>
+        <button class="small" id="btnBakSave" title="전체 세팅을 .json 파일로 내려받음 (브라우저 밖에 보관 — 가장 안전)">파일로 저장</button>
+        <button class="small" id="btnBakLoad">파일 불러오기</button>
+        <input type="file" id="bakFile" accept=".json,application/json" style="display:none">
+      </div>
+      <div class="hint" id="bakInfo"></div>
+      <div id="bakList"></div>
+    </div>
+    <div class="panel">
+      <h2>계산 포함 (프리셋)<span class="hint" style="margin:0">끄면 값은 남아 있고 계산에서만 빠짐</span></h2>
       <div id="presetBox"></div>
     </div>
     <div class="panel">
@@ -150,6 +161,7 @@
       <button id="btnResetAll" title="모든 세팅 (수치 조정 · 스킬 · 패시브 · 아이템 · 확정 · 프리셋 · 적 수 · 보스 체력) 을 처음 상태로">모든 세팅 초기화</button>
       <button id="btnEv"title="기댓값 시트의 모든 빌드를 다시 계산">기댓값 다시 계산</button>
       <label class="switch" title="끄면 5 · 10 · 15레벨에서 반드시 하나씩 고른 빌드만 계산"><input type="checkbox" id="evNone" checked> 선택 안 함 포함</label>
+      <label class="switch" title="끄면 특수 조합 빌드를 빼고 5 · 10 · 15레벨 특수 강화만으로 기댓값 · 최대 · 비중을 봄 (다시 계산하지 않고 바로 바뀜)"><input type="checkbox" id="evCombo" checked> 특수 조합 포함</label>
       <span class="hint" style="margin:0" id="evStatus"></span>
     </div>
     <div class="tabs">
@@ -297,7 +309,77 @@ function mergeState(d, j) {
 }
 let S = defaultState();
 try { const j = JSON.parse(localStorage.getItem(STORE) || 'null'); if (j) S = mergeState(defaultState(), j); } catch (e) {}
-function save() { try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {} }
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {}
+  autoSnapshot();
+}
+
+// ═════════ 백업 (2026-11-24: 밸패 확정 값이 사라진 일 이후) ═════════
+// 저장소가 비어도 이전 상태를 되살릴 수 있게 최근 상태를 따로 쌓아 둠. 가장 안전한 건 "파일로 저장" (브라우저 밖)
+const BAK = 'slayers.balancesim.bak';
+const BAK_MAX = 40, BAK_AUTO_GAP = 90000;
+let lastAuto = 0;
+const bakKey = s => JSON.stringify(Object.assign({}, s, { ui: null }));   // 접힘 상태만 다른 건 같은 상태로 침
+function bakRead() { try { const a = JSON.parse(localStorage.getItem(BAK) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function bakWrite(a) {
+  for (let i = 0; i < 6; i++) {   // 용량 초과면 오래된 것부터 줄여서 다시 시도
+    try { localStorage.setItem(BAK, JSON.stringify(a)); return true; } catch (e) { a.shift(); }
+  }
+  return false;
+}
+function hasWork(s) {   // 의미 있는 조정이 있는 상태만 백업 (빈 기본 상태로 좋은 백업을 밀어내지 않게)
+  return Object.keys(s.ov || {}).length > 0 || Object.keys(s.bv || {}).length > 0 || (s.locks || []).length > 0 || !!s.lock || (s.items || []).length > 0
+    || (s.skills || []).some(k => Object.keys(k.params || {}).length || Object.keys(k.picks || {}).length || (k.ups && (k.ups.dmg || k.ups.cd)))
+    || ['fs', 'hf', 'ab'].some(k => s.pas && s.pas[k] && Object.keys(s.pas[k].params || {}).length);
+}
+/** label: '수동' · '자동' · '초기화 전' 등. force 면 내용이 같아도 새로 쌓지 않음 (같은 내용 중복은 항상 건너뜀) */
+function snapshot(label, state) {
+  const s = state || S;
+  if (!hasWork(s)) return false;
+  const a = bakRead(), key = bakKey(s);
+  if (a.length && a[a.length - 1].key === key) return false;
+  a.push({ t: Date.now(), label, key, data: JSON.parse(JSON.stringify(s)) });
+  while (a.length > BAK_MAX) { const i = a.findIndex(x => x.label === '자동'); a.splice(i >= 0 ? i : 0, 1); }   // 넘치면 자동 백업부터 버림
+  const ok = bakWrite(a);
+  try { renderBackups(); } catch (e) {}
+  return ok;
+}
+function autoSnapshot() {
+  const now = Date.now();
+  if (now - lastAuto < BAK_AUTO_GAP) return;
+  lastAuto = now; snapshot('자동');
+}
+function bakSummary(s) {
+  const nov = Object.values(s.ov || {}).reduce((n, o) => n + Object.keys(o || {}).length, 0);
+  return `수치 조정 ${nov} · 확정 ${(s.locks || []).length + (s.lock ? 1 : 0)} · 아이템 ${(s.items || []).length}`;
+}
+function renderBackups() {
+  const box = document.getElementById('bakList'); if (!box) return;
+  const a = bakRead().slice().reverse();
+  document.getElementById('bakInfo').textContent = a.length ? `백업 ${a.length}개 (최대 ${BAK_MAX}개 · 같은 내용은 건너뜀 · 이 브라우저 안에만 있음)` : '백업 없음 — "파일로 저장" 으로 파일도 꼭 받아 두세요';
+  box.innerHTML = '';
+  a.forEach((x, i) => {
+    const row = document.createElement('div'); row.className = 'toolbar'; row.style.margin = '2px 0';
+    const d = new Date(x.t), p = n => String(n).padStart(2, '0');
+    const sp = document.createElement('span'); sp.style.fontSize = '11px'; sp.style.flex = '1';
+    sp.textContent = `${p(d.getMonth() + 1)}/${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())} · ${x.label} · ${bakSummary(x.data)}`;
+    const b = document.createElement('button'); b.className = 'small'; b.textContent = '복구';
+    b.addEventListener('click', () => {
+      if (!confirm('이 백업으로 되돌릴까요? (지금 상태는 "복구 전" 백업으로 남깁니다)')) return;
+      snapshot('복구 전');
+      S = mergeState(defaultState(), x.data); EV = null;
+      try { localStorage.setItem(STORE, JSON.stringify(S)); } catch (e) {}
+      rerender(); renderBackups();
+    });
+    row.append(sp, b); box.appendChild(row);
+  });
+}
+function bakDownload() {
+  const t = JSON.stringify(S, null, 1), d = new Date(), p = n => String(n).padStart(2, '0');
+  const url = URL.createObjectURL(new Blob([t], { type: 'application/json' }));
+  const a = document.createElement('a'); a.href = url; a.download = `balancesim_${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}_${p(d.getHours())}${p(d.getMinutes())}.json`;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
 
 const COLORS = ['#ff9a3c', '#7fc4ff', '#9be59b', '#d58cff', '#ffd36b', '#ff6b8b', '#5fd6c9', '#b0b8ff', '#e0a070', '#8fd14f', '#f0f0f0', '#c46a3a', '#6aa0ff'];
 const colorOf = {};
@@ -988,6 +1070,21 @@ function computeEV() {
     else finish();
   }
   function finish() {
+    EV = { all: rows, stale: false, ms: performance.now() - t0, N: S.G.N, T: S.G.T };
+    evFilter();
+    EVRUN = false;
+    st.textContent = `${jobs.length}개 빌드 · ${(EV.ms / 1000).toFixed(1)}초`;
+    renderEV();
+    markEvBtn();
+  }
+  chunk();
+}
+/** 기댓값 시트 표시용: 특수 조합 포함 여부에 맞춰 빌드를 거르고 스킬별 요약을 다시 만듦 (다시 시뮬레이션하지 않음) */
+function evFilter() {
+  const inclCombo = document.getElementById('evCombo').checked;
+  const rows = EV.all.filter(r => inclCombo || !r.combo);
+  EV.rows = rows;
+  {
     const sum = {};
     for (const sc of S.skills) {
       const list = rows.filter(r => r.id === sc.id);
@@ -999,14 +1096,10 @@ function computeEV() {
       const base = list.find(r => r.isBase);
       sum[sc.id] = { id: sc.id, def: SKILLS.find(d => d.id === sc.id), n: list.length, min: v[0] || 0, max: v[v.length - 1] || 0, avg, med, best, worst, base: base ? base.dps : 0 };
     }
-    EV = { rows, sum, stale: false, ms: performance.now() - t0, N: S.G.N, T: S.G.T };
-    EVRUN = false;
-    st.textContent = `${jobs.length}개 빌드 · ${(EV.ms / 1000).toFixed(1)}초`;
-    renderEV();
-    markEvBtn();
+    EV.sum = sum;
   }
-  chunk();
 }
+document.getElementById('evCombo').addEventListener('change', () => { if (EV && EV.all) { evFilter(); renderEV(); } });
 /** 기댓값 시트의 빌드 (특수 강화 선택 + 조합) 를 왼쪽 스킬 패널에 그대로 적용하고 그 스킬을 펼쳐 보여줌 */
 function applyBuildToLeft(id, picks, combo) {
   const sc = S.skills.find(k => k.id === id); if (!sc) return;
@@ -1451,6 +1544,7 @@ document.getElementById('btnPatchCopy').addEventListener('click', () => copyText
 document.getElementById('btnPatchCsv').addEventListener('click', () => copyText(patchCsv()));
 document.getElementById('btnPatchReset').addEventListener('click', () => {
   if (!confirm('특수 강화 수치와 스킬 수치를 모두 기본값으로 되돌릴까요? (전역 설정과 아이템은 그대로)')) return;
+  snapshot('수치 초기화 전');
   S.ov = {};
   for (const sc of S.skills) sc.params = {};
   S.pas.fs.params = {};
@@ -1462,7 +1556,8 @@ document.getElementById('btnBase').addEventListener('click', () => { S.base = su
 document.getElementById('btnBaseClear').addEventListener('click', () => { S.base = null; save(); renderResult(LAST); });
 /** 모든 세팅 초기화: 저장된 상태 · 수치 조정 · 확정 · 기준 · 계산 캐시까지 전부 처음으로 */
 function resetAll() {
-  if (!confirm('모든 세팅을 처음 상태로 되돌릴까요?\n(수치 조정 · 확정 · 아이템 · 프리셋 · 적 수 · 보스 체력 · 접힘 상태가 전부 지워집니다)')) return;
+  if (!confirm('모든 세팅을 처음 상태로 되돌릴까요?\n(수치 조정 · 확정 · 아이템 · 프리셋 · 적 수 · 보스 체력 · 접힘 상태가 전부 지워집니다)\n지우기 전 상태는 "백업 · 복구" 에 "초기화 전" 으로 남습니다.')) return;
+  snapshot('초기화 전');
   try { localStorage.removeItem(STORE); } catch (e) {}
   S = defaultState();
   EV = null; EVSORT = { key: 'dps', dir: -1 }; SORT = { key: 'dps', dir: -1 };
@@ -1476,8 +1571,23 @@ document.getElementById('btnExport').addEventListener('click', () => {
 });
 document.getElementById('btnImport').addEventListener('click', () => {
   const t = prompt('복사한 설정을 붙여넣으세요'); if (!t) return;
-  try { S = mergeState(defaultState(), JSON.parse(t)); save(); rerender(); } catch (e) { alert('읽을 수 없는 설정입니다.'); }
+  try { const n = mergeState(defaultState(), JSON.parse(t)); snapshot('붙여넣기 전'); S = n; save(); rerender(); } catch (e) { alert('읽을 수 없는 설정입니다.'); }
 });
+document.getElementById('btnBakNow').addEventListener('click', () => { const ok = snapshot('수동'); renderBackups(); if (!ok && !hasWork(S)) alert('아직 바꾼 값이 없어서 백업할 내용이 없습니다.'); });
+document.getElementById('btnBakSave').addEventListener('click', () => { snapshot('파일 저장'); bakDownload(); });
+document.getElementById('btnBakLoad').addEventListener('click', () => document.getElementById('bakFile').click());
+document.getElementById('bakFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try { const n = mergeState(defaultState(), JSON.parse(r.result)); snapshot('파일 불러오기 전'); S = n; EV = null; save(); rerender(); renderBackups(); }
+    catch (err) { alert('읽을 수 없는 파일입니다.'); }
+    e.target.value = '';
+  };
+  r.readAsText(f);
+});
+renderBackups();
+snapshot('열 때');   // 저장돼 있던 상태를 한 번 남김 (같은 내용이면 건너뜀)
 document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
   document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('on', x === b));
   for (const t of ['result', 'sweep', 'spec', 'ev', 'bal', 'patch', 'calc']) document.getElementById('tab-' + t).style.display = t === b.dataset.tab ? '' : 'none';

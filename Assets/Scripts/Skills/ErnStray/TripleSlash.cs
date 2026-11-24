@@ -17,7 +17,10 @@ public class TripleSlash : ActiveSkill
 {
     // 기본 수치 (기획 확정 — 임의 변경 금지)
     const float BaseCooldown = 8f;
-    const float DamagePerHit = 8f;
+    const float DamagePerHit = 10f;     // 베기 1회 초기 피해량 8 → 10 (밸런스 확정 2026-11-24)
+    // 기본 강화 1회 (밸런스 확정 2026-11-24): 피해량 +20% · 쿨타임 -5%
+    public override float BasicDamageStep => 0.2f;
+    public override float BasicCooldownStep => 0.05f;
     const int BaseHits = 3;
 
     const float FxForward = 1.2f;       // [임시] 이펙트 중심 = 플레이어 앞 범위 x 이 값
@@ -70,17 +73,17 @@ public class TripleSlash : ActiveSkill
     public const string Tsubame = "TC1";   // 츠바메가에시 = 일섬 + 삼연발
 
     // 특수 강화 확정 수치
-    const int FrenzyMul = 3;            // 난도질: 총 공격 횟수 3배 (다른 공격 횟수 배수와는 합연산)
+    const int FrenzyMul = 2;            // 난도질: 총 공격 횟수 2배 (3배 → 2배, 밸런스 확정 2026-11-24. 다른 공격 횟수 배수와는 합연산)
     const float SpreadAngle = 120f;     // 난개: 120° 간격 추가 2방향
     const float QuickPrepReduce = 0.025f;   // 빠른 준비: 피해 적용마다 남은 쿨타임 2.5% 감소
     const float OverloadRange = 0.5f, OverloadDamage = 1f, OverloadCooldown = 0.25f;   // 과부화
     const float IlseomPerHit = 1.25f;   // 일섬: 공격 횟수 1회당 피해량 +125%
     const float SearingPerStack = 0.05f;    // 고열 절삭: 대상 화상 스택당 최종 피해량 +5% (내부 합연산)
-    const float SearingCap = 0.75f;         // 고열 절삭: 효과 상한 75% (노션)
+    const float SearingCap = 0.5f;          // 고열 절삭: 효과 상한 50% (75% → 50%, 밸런스 확정 2026-11-24)
     const int TripleCastExtra = 2;      // 삼연발: 발동 횟수 +2
     // 특수 조합 츠바메가에시 (노션 2026-11-20)
-    const float TsubameFinal = 5f;          // 최종 피해량 +500%
-    const float TsubamePerReduction = 10f;  // 무효화된 쿨타임 감소 1%당 최종 피해량 +10% (+500% 와 합쳐 최종 배율 1개 — 묵직한 일격 방식)
+    const float TsubameFinal = 10f;         // 최종 피해량 +1000% (+500% → +1000%, 밸런스 확정 2026-11-24)
+    const float TsubamePerReduction = 30f;  // 무효화된 쿨타임 감소 1%당 최종 피해량 +30% (+10% → +30%, 2026-11-24. +1000% 와 합쳐 최종 배율 1개 — 묵직한 일격 방식)
     const float TsubameCooldown = 2f;       // 쿨타임 +200%
     const float EmbersShare = 0.4f;     // 잔화의 검흔: 최종 피해량의 40% (노션)
     const float EmbersDuration = 3f, EmbersInterval = 1f;
@@ -144,7 +147,7 @@ public class TripleSlash : ActiveSkill
         {
             case 5: return new[]
             {
-                new SpecialUpgradeOption { id = Frenzy, title = "난도질", desc = "총 공격 횟수 3배 (3타 → 9타)" },
+                new SpecialUpgradeOption { id = Frenzy, title = "난도질", desc = "총 공격 횟수 2배 (3타 → 6타)" },
                 new SpecialUpgradeOption { id = Spread, title = "난개", desc = "바라보는 방향 + 120° 간격 2방향, 총 3방향 공격" },
                 new SpecialUpgradeOption { id = QuickPrep, title = "빠른 준비", desc = "트리플 슬래시 피해가 적에게 적용될 때마다 남은 쿨타임 2.5% 감소" },
             };
@@ -152,7 +155,7 @@ public class TripleSlash : ActiveSkill
             {
                 new SpecialUpgradeOption { id = Overload, title = "과부화", desc = "범위 +50% · 피해량 +100% · 쿨타임 +25%" },
                 new SpecialUpgradeOption { id = Ilseom, title = "일섬", desc = "공격을 1회로 합침 · 원래 공격 횟수 1회당 피해량 +125%" },
-                new SpecialUpgradeOption { id = Searing, title = "고열 절삭", desc = "대상의 화상 스택 1당 최종 피해량 +5% (상한 75%)" + NeedsFlameSword },
+                new SpecialUpgradeOption { id = Searing, title = "고열 절삭", desc = "대상의 화상 스택 1당 최종 피해량 +5% (상한 50%)" + NeedsFlameSword },
             };
             case 15: return new[]
             {
@@ -173,7 +176,7 @@ public class TripleSlash : ActiveSkill
             requires = new[] { Ilseom, TripleCast },
             keywords = new[] { "수동", "피해 스킬", "근거리", "직접 사용", "직접 피해" },
             desc = "한순간에 3번의 베기를 사용하는 궁극의 비기",
-            specs = new[] { "'최종 피해량' +500%", "'쿨타임 감소' '무효화'", "'쿨타임 감소' 1% 당 '최종 피해량' +10%", "'쿨타임' +200%" },
+            specs = new[] { "'최종 피해량' +1000%", "'쿨타임 감소' '무효화'", "'쿨타임 감소' 1% 당 '최종 피해량' +30%", "'쿨타임' +200%" },
         },
     };
 
@@ -294,7 +297,7 @@ public class TripleSlash : ActiveSkill
         yield return Rotate(facing, -SpreadAngle);
     }
 
-    /// <summary>고열 절삭: 대상 화상 스택 합계 1당 +5%, 상한 +75% (내부 합연산 → 배율 1개)</summary>
+    /// <summary>고열 절삭: 대상 화상 스택 합계 1당 +5%, 상한 +50% (내부 합연산 → 배율 1개)</summary>
     static float SearingMul(Enemy e) => 1f + Mathf.Min(SearingCap, SearingPerStack * FlameSword.StacksOn(e));
 
     /// <summary>
