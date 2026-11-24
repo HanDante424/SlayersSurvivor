@@ -110,7 +110,7 @@ public class GameManager : MonoBehaviour
     {
         float minutes = Elapsed / 60f;
         float interval = Mathf.Max(0.08f, 0.9f - minutes * 0.12f);
-        int maxEnemies = 60 + (int)(minutes * 40);
+        int maxEnemies = Mathf.Min(LateAliveCap, 60 + (int)(minutes * 40));   // [임시] 후반 동시 생존 상한 (몹 시험안 2026-11-24)
         float hpMul = 1f + minutes * 0.35f;
 
         spawnTimer -= Time.deltaTime;
@@ -129,14 +129,19 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    const int LateAliveCap = 340;          // [임시] 일반 몹 동시 생존 상한 (이 수 이상이면 새 배치 대기, 배치 때문에 실제 최대 약 347)
+    const float LateRangedShift = 0.05f;   // [임시] 2분부터 궁수 · 라이더 각 +5%p, 고블린 -10%p
+
     /// <summary>
-    /// [임시] 등장 비율: 처음엔 고블린만 → 45초부터 궁수 · 1분 30초부터 라이더 · 2분부터 홉 고블린, 시간이 갈수록 각 비율이 올라감 (각 최대 20%)
+    /// [임시] 등장 비율: 처음엔 고블린만 → 45초부터 궁수 · 1분 30초부터 라이더 · 2분부터 홉 고블린, 시간이 갈수록 각 비율이 올라감 (각 최대 20%).
+    /// 2분부터 궁수 · 라이더는 +5%p (후반 고블린 30 · 궁수 25 · 라이더 25 · 홉 20%), 고블린이 그만큼 줄어듦.
     /// </summary>
     EnemyKind PickKind(float minutes)
     {
         float hob = minutes > 2f ? Mathf.Min(0.2f, 0.05f + (minutes - 2f) * 0.03f) : 0f;
         float rider = minutes > 1.5f ? Mathf.Min(0.2f, 0.08f + (minutes - 1.5f) * 0.03f) : 0f;
         float archer = minutes > 0.75f ? Mathf.Min(0.2f, 0.1f + (minutes - 0.75f) * 0.03f) : 0f;
+        if (minutes >= 2f) { rider += LateRangedShift; archer += LateRangedShift; }
         float r = Random.value;
         if (r < hob) return EnemyKind.Hobgoblin;
         if (r < hob + rider) return EnemyKind.GoblinRider;
