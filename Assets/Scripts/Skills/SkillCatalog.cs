@@ -93,6 +93,20 @@ public static class SkillCatalog
             "주변의 화상 상태의 적마다 이로운 효과를 얻습니다.",
             "'스택' 당 '최종 피해량' +5%", "'스택' 당 '쿨타임 감소' +1%")),
 
+        // 새 패시브 3종 — 기반 단계 (2026-11-24 사용자). 강화 미설계라 최대 레벨 1 [임시]
+        E("P04", "잿불 갑주", "Ember Armor", SkillKind.Passive, typeof(EmberArmor), new SkillText(
+            new[] { "패시브" },
+            "단단한 잿불이 몸을 감싸 더 오래 버틸 수 있습니다.",
+            "'최대 체력' +25%", "'받는 피해량' -20%")),
+        E("P05", "불씨 수확", "Ember Harvest", SkillKind.Passive, typeof(EmberHarvest), new SkillText(
+            new[] { "패시브" },
+            "더 많은 경험치를 더 멀리서 거둡니다.",
+            "'경험치 획득' +20%", "'경험치 획득 범위' +30%")),
+        E("P06", "화염 보호막", "Flame Barrier", SkillKind.Passive, typeof(FlameBarrier), new SkillText(
+            new[] { "패시브", "보호막" },
+            "'화상' 피해를 입힐 때마다 보호막을 얻습니다.\n보호막은 시간이 지나며 줄어듭니다.",
+            "'화상' 피해량의 10%만큼 '보호막' 획득", "'보호막' 매초 5% 감소")),
+
         // 궁극기 1종 (U02 미설계)
         E("U01", "블레이징 스톰", "Blazing Storm", SkillKind.Ultimate, typeof(BlazingStorm), new SkillText(
             new[] { "궁극기", "직접 사용", "직접 피해", "근거리", "무적", "기절" },
@@ -172,7 +186,7 @@ public static class SkillCatalog
     /// </summary>
     public static readonly HashSet<string> LevelUpPool = new HashSet<string>
     {
-        "A01", "A02", "M01", "P01", "P02", "P03",
+        "A01", "A02", "M01", "P01", "P02", "P03", "P04", "P05", "P06",
         // 레니아 (리소스 있음 — 9종 전부)
         "LA01", "LA02", "LA03", "LA04", "LA05", "LM01", "LM02", "LM03", "LM04",
         "LP01", "LP02", "LP03",   // 레니아 패시브 (아이콘 리소스 없이 텍스트만)

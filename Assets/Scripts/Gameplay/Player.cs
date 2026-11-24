@@ -12,6 +12,12 @@ public class Player : MonoBehaviour
     public float damageMul = 1f;
     public float cooldownMul = 1f;
     public float areaMul = 1f;
+    /// <summary>받는 피해 배율 (잿불 갑주: 0.8 = -20%). 보호막보다 먼저 적용</summary>
+    public float damageTakenMul = 1f;
+    /// <summary>경험치 획득 배율 (불씨 수확: 1.2 = +20%)</summary>
+    public float xpGainMul = 1f;
+    /// <summary>보호막 (화염 보호막): 피해를 체력보다 먼저 받아 냄</summary>
+    public float shield;
 
     [Header("업그레이드 배율")]
     public float moveSpeedMul = 1f;
@@ -681,6 +687,13 @@ public class Player : MonoBehaviour
     {
         if (DebugCheats.God || (invuln > 0 && !ignoreHitInvuln) || IsInvulnerable || GameManager.I.State != GameState.Playing) return;
         if (CounterHit()) return;
+        dmg *= damageTakenMul;
+        if (shield > 0f)   // 보호막이 먼저 받아 냄
+        {
+            float absorbed = Mathf.Min(shield, dmg);
+            shield -= absorbed;
+            dmg -= absorbed;
+        }
         hp -= dmg;
         invuln = 0.35f;
         CameraFollow.Shake(0.12f, 0.15f);

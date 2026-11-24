@@ -196,9 +196,15 @@ public class GameManager : MonoBehaviour
     public void DebugSpawnChest() { if (Player.I != null) Chest.Spawn((Vector2)Player.I.transform.position + Vector2.right * 2f); }
     public void DebugFillUltimate() => ultimateGauge = Tuning.Skills.gaugeMax;
 
+    float xpCarry;   // 경험치 배율 소수점 이월 (작은 영혼 1 × 1.2 가 버려지지 않게)
+
     public void AddXp(int amount)
     {
-        Xp += amount;
+        float mul = Player.I != null ? Player.I.xpGainMul : 1f;
+        xpCarry += amount * mul;
+        int gain = Mathf.FloorToInt(xpCarry + 0.0001f);
+        xpCarry -= gain;
+        Xp += gain;
         while (Xp >= XpToNext)
         {
             Xp -= XpToNext;
@@ -818,6 +824,8 @@ public class GameManager : MonoBehaviour
         // 체력 바 (플레이어 아래)
         var sp = Camera.main.WorldToScreenPoint(p.HealthBarWorldPosition);
         UIStyles.Bar(new Rect(sp.x - 30, H - sp.y, 60, 7), p.hp / p.maxHp, new Color(0.9f, 0.25f, 0.25f));
+        if (p.shield > 0.01f)   // 보호막: 체력 바 위에 파란 바 (최대 체력 대비)
+            UIStyles.Bar(new Rect(sp.x - 30, H - sp.y - 8, 60, 5), Mathf.Clamp01(p.shield / p.maxHp), new Color(0.35f, 0.7f, 1f));
 
         // 보유 스킬 (종류별)
         float y = 52;
