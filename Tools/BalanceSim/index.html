@@ -632,8 +632,8 @@ function buildInputs() {
     body.appendChild(row(`피해량 강화 횟수 (+${+(bvCur('skill', def.id, 'dmg') * 100).toFixed(2)}%/회)`, numInput(sc.ups.dmg, 0, 1, v => sc.ups.dmg = Math.max(0, Math.round(v)))));
     body.appendChild(row(`쿨타임 강화 횟수 (-${+(bvCur('skill', def.id, 'cd') * 100).toFixed(2)}%/회)`, numInput(sc.ups.cd, 0, 1, v => sc.ups.cd = Math.max(0, Math.round(v)))));
     // 기본 강화 1회당 증가량 (%) — 밸패 수정 탭과 같은 값. 퍼센트로 입력 (10 = +10%)
-    body.appendChild(row('피해량 강화 1회당 증가', numInput(+(bvCur('skill', def.id, 'dmg') * 100).toFixed(4), BASIC_DEF.skill.dmg * 100, 'any', v => setBv('skill', def.id, 'dmg', v / 100)), '%'));
-    body.appendChild(row('쿨타임 강화 1회당 감소', numInput(+(bvCur('skill', def.id, 'cd') * 100).toFixed(4), BASIC_DEF.skill.cd * 100, 'any', v => setBv('skill', def.id, 'cd', v / 100)), '%'));
+    body.appendChild(row('피해량 강화 1회당 증가', numInput(+(bvCur('skill', def.id, 'dmg') * 100).toFixed(4), basicDefOf(def.id, 'dmg') * 100, 'any', v => setBv('skill', def.id, 'dmg', v / 100)), '%'));
+    body.appendChild(row('쿨타임 강화 1회당 감소', numInput(+(bvCur('skill', def.id, 'cd') * 100).toFixed(4), basicDefOf(def.id, 'cd') * 100, 'any', v => setBv('skill', def.id, 'cd', v / 100)), '%'));
     specialBlock(body, def.id, def.specials, sc.picks);
     if (!def.specials.length) body.insertAdjacentHTML('beforeend', '<div class="hint">특수 강화 없음</div>');
     for (const cm of def.combos || []) {
@@ -1255,11 +1255,12 @@ const refFs = (k, orig) => (LK().fs && LK().fs[k] != null) ? LK().fs[k] : orig;
 const clone = o => JSON.parse(JSON.stringify(o));
 // ── 기본 강화 1회당 증가량 (스킬 · 패시브별)
 const bvKey = (kind, id) => (kind === 'skill' ? 's:' : 'p:') + id;
-const bvDef = (kind, k) => BASIC_DEF[kind][k];
-const bvCur = (kind, id, k) => { const o = S.bv[bvKey(kind, id)]; return o && o[k] != null ? o[k] : bvDef(kind === 'skill' ? 'skill' : id, k); };
-const bvRef = (kind, id, k) => { const o = (LK().bv || {})[bvKey(kind, id)]; return o && o[k] != null ? o[k] : bvDef(kind === 'skill' ? 'skill' : id, k); };
+// 기본값 = 게임 값 (스킬은 스킬 정의의 basic, 패시브는 BASIC_DEF). 시뮬레이터가 따로 두는 기본값 없음
+const bvDef = (kind, id, k) => (kind === 'skill' ? basicDefOf(id, k) : BASIC_DEF[id][k]);
+const bvCur = (kind, id, k) => { const o = S.bv[bvKey(kind, id)]; return o && o[k] != null ? o[k] : bvDef(kind, id, k); };
+const bvRef = (kind, id, k) => { const o = (LK().bv || {})[bvKey(kind, id)]; return o && o[k] != null ? o[k] : bvDef(kind, id, k); };
 function setBv(kind, id, k, v) {
-  const key = bvKey(kind, id), def = bvDef(kind === 'skill' ? 'skill' : id, k);
+  const key = bvKey(kind, id), def = bvDef(kind, id, k);
   if (Math.abs(v - def) < 1e-9) { if (S.bv[key]) { delete S.bv[key][k]; if (!Object.keys(S.bv[key]).length) delete S.bv[key]; } }
   else (S.bv[key] = S.bv[key] || {})[k] = v;
 }
@@ -1363,7 +1364,7 @@ function renderBal() {
       if (bvRows.length) {
         const h = document.createElement('div'); h.className = 'tier'; h.textContent = '기본 강화 (1회당 증가량)'; body.appendChild(h);
         const t = newTable(body);
-        for (const k of bvRows) { fieldRow(t, BASIC_LBL.skill[k][0], BASIC_LBL.skill[k][1], bvDef('skill', k), bvRef('skill', def.id, k), bvCur('skill', def.id, k), v => setBv('skill', def.id, k, v)); rows++; }
+        for (const k of bvRows) { fieldRow(t, BASIC_LBL.skill[k][0], BASIC_LBL.skill[k][1], bvDef('skill', def.id, k), bvRef('skill', def.id, k), bvCur('skill', def.id, k), v => setBv('skill', def.id, k, v)); rows++; }
       }
       const params = [['cd', '기본 쿨타임' + (def.stacks ? ' (스택당)' : ''), def.cd, '초']].concat(Object.keys(def.params).map(k => [k, def.params[k].l, def.params[k].v, def.params[k].u || '']));
       const pr = params.filter(([k, l, d]) => match(def.name, '스킬 수치', l) && (!only || isChanged(sc.params[k] != null ? sc.params[k] : d, refParam(sc.id, k, d))));
@@ -1509,7 +1510,8 @@ function patchRows() {
     const group = isSkill ? (SKILLS.find(d => d.id === id) || {}).name : (PASSIVES[id] || {}).name;
     for (const k in S.bv[key]) {
       const ref = (((LK().bv || {})[key] || {})[k]);
-      add(group, '기본 강화', '-', BASIC_LBL[kind][k][0], BASIC_DEF[kind][k], S.bv[key][k], BASIC_LBL[kind][k][1].indexOf('=') < 0 ? BASIC_LBL[kind][k][1] : '', Math.abs(S.bv[key][k] - (ref != null ? ref : BASIC_DEF[kind][k])) > 1e-9);
+      const dflt = bvDef(isSkill ? 'skill' : 'pas', id, k);
+      add(group, '기본 강화', '-', BASIC_LBL[kind][k][0], dflt, S.bv[key][k], BASIC_LBL[kind][k][1].indexOf('=') < 0 ? BASIC_LBL[kind][k][1] : '', Math.abs(S.bv[key][k] - (ref != null ? ref : dflt)) > 1e-9);
     }
   }
   for (const id in S.ov) {

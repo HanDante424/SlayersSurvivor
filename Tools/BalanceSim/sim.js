@@ -104,7 +104,7 @@ function runSim(cfg) {
   const PASS = {};
   for (const k in PASSIVES) for (const x of PASSIVES[k].specials) PASS[x.id] = x;
   // 기본 강화 1회당 증가량 (스킬 · 패시브별로 화면에서 바꾼 값 또는 기본값)
-  const bvs = (id, k) => { const o = cfg.bv && cfg.bv['s:' + id]; return o && o[k] != null ? o[k] : BASIC_DEF.skill[k]; };
+  const bvs = (id, k) => { const o = cfg.bv && cfg.bv['s:' + id]; return o && o[k] != null ? o[k] : basicDefOf(id, k); };
   const bvp = (k, n) => { const o = cfg.bv && cfg.bv['p:' + k]; return o && o[n] != null ? o[n] : BASIC_DEF[k][n]; };
   const pn = (id, k) => { const o = cfg.ov && cfg.ov[id] && cfg.ov[id]['nums.' + k]; return o != null ? o : PASS[id].nums[k].v; };
   const MIN = G.minDmg == null ? 1 : G.minDmg;   // 피해 1회 최소 피해 (게임 규칙: 0 보다 큰 피해는 최소 1)

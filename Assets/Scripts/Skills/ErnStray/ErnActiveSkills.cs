@@ -411,7 +411,7 @@ public class OverFlameSlash : ActiveSkill
     public const string ComboBlazing = "OSC1";
 
     // 특수 강화 확정 수치 (노션 2026-11-22)
-    const float GiantRange = 0.5f, GiantFinal = 0.25f;      // 거대한 검: 범위 +50% · 최종 피해량 +25% (2026-11-24 피해량 → 최종 피해량)
+    const float GiantRange = 0.5f, GiantFinal = 0.75f;      // 거대한 검: 범위 +50% · 최종 피해량 +75% (2026-11-24 피해량 +25% → 최종 피해량 +75%, 사용자 확정 설정 ×1.75)
     const float BindStun = 2f, BindDamage = 0.25f;          // 옭아매는 화염: 기절 +2초 · 피해량 +25% (2026-11-24)
     const float TripleDamage = 0.25f;                       // 삼연발: 피해량 +25% (2026-11-24)
     const float QuickPrepPerHit = 0.025f;                   // 빠른 준비: 적중 시 남은 쿨타임 감소 2.5%
@@ -440,7 +440,7 @@ public class OverFlameSlash : ActiveSkill
         {
             case 5: return new[]
             {
-                new SpecialUpgradeOption { id = Giant, title = "거대한 검", desc = "범위 +50%, 최종 피해량 +25%" },
+                new SpecialUpgradeOption { id = Giant, title = "거대한 검", desc = "범위 +50%, 최종 피해량 +75%" },
                 new SpecialUpgradeOption { id = Bind, title = "옭아매는 화염", desc = "기절 +2초, 피해량 +25%" },
                 new SpecialUpgradeOption { id = QuickPrep, title = "빠른 준비", desc = "적중 시 남은 쿨타임 감소 2.5%" },
             };
