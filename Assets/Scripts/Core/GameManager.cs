@@ -44,6 +44,7 @@ public class GameManager : MonoBehaviour
         Stage.ApplyStartMap();  // 맵 크기: 디버그 맵이면 고른 크기 유지, 아니면 기본으로 (카메라 · 바닥보다 먼저)
         DebugMap.Clean();        // 재시작 시 이전 판의 소환 목록 정리
         CombatMods.Clear();   // 재시작 시 이전 판의 패시브 수정자가 남지 않게
+        Relics.Clear();       // 유물도 새 판은 처음부터
         MidBossArena.Reset();  // 중간보스 포위 상태도 새 판으로
         Application.targetFrameRate = 120;
 
@@ -191,6 +192,8 @@ public class GameManager : MonoBehaviour
         pendingLevelUps += n;
         if (State == GameState.Playing) OpenLevelUp();
     }
+    /// <summary>테스트: 플레이어 옆에 유물 상자 생성</summary>
+    public void DebugSpawnChest() { if (Player.I != null) Chest.Spawn((Vector2)Player.I.transform.position + Vector2.right * 2f); }
     public void DebugFillUltimate() => ultimateGauge = Tuning.Skills.gaugeMax;
 
     public void AddXp(int amount)
@@ -228,6 +231,25 @@ public class GameManager : MonoBehaviour
             if (list.Count > 0) { ShowMenu("레벨 업!", "", list); return; }
             // 고를 수 있는 스킬이 하나도 없으면 이번 레벨업은 건너뜀
         }
+    }
+
+    /// <summary>유물 상자 획득: 유물 3개 중 하나 선택 (레벨업 선택 화면과 같은 카드 UI)</summary>
+    public void OpenRelicChest()
+    {
+        if (State != GameState.Playing) return;
+        var list = new List<Upgrade>();
+        foreach (var r in Relics.Roll())
+        {
+            var relic = r;
+            int have = Relics.Count(relic.id);
+            list.Add(new Upgrade
+            {
+                title = relic.name + (have > 0 ? $"  <size=14>(보유 ×{have})</size>" : ""),
+                desc = relic.desc,
+                apply = () => Relics.Give(relic),
+            });
+        }
+        if (list.Count > 0) ShowMenu("유물 발견!", "유물 하나를 고르세요", list);
     }
 
     void Pick(int i)
@@ -820,6 +842,10 @@ public class GameManager : MonoBehaviour
                 }
             }
         }
+
+        string relicLine = Relics.Summary();
+        if (relicLine.Length > 0)
+            GUI.Label(new Rect(12, y, 700, 26), $"<size=13><color=#AAAAAA>유물</color></size>  <color=#F2BF4C>{relicLine}</color>", SkillListStyle);
 
         DrawSkillBar(p, W, H);
 

@@ -163,6 +163,7 @@ public class DebugCheats : MonoBehaviour
             KnightLabel + " · 홉 고블린 기사",
             AnyBoss != null ? "보스 체력 절반 (F11)" : "보스 체력 절반 (보스 없음)",
             AnyBoss != null ? "보스 체력 -30% (최대 체력 기준)" : "보스 체력 -30% (보스 없음)",
+            "유물 상자 생성 (플레이어 옆)",
             "닫기 (F2)",
         };
         float top = H - 12 - labels.Length * (bh + gap);
@@ -197,7 +198,8 @@ public class DebugCheats : MonoBehaviour
                 case 13: SummonBoss(EnemyKind.HobgoblinKnight); break;
                 case 14: HalveBossHp(); break;
                 case 15: CutBossHp30(); break;
-                case 16: open = false; break;
+                case 16: GameManager.I?.DebugSpawnChest(); break;
+                case 17: open = false; break;
             }
         }
 
