@@ -18,6 +18,17 @@ public class Player : MonoBehaviour
     public float xpGainMul = 1f;
     /// <summary>보호막 (화염 보호막): 피해를 체력보다 먼저 받아 냄</summary>
     public float shield;
+    /// <summary>모든 회복량 배율 (잿불 갑주). 체력 회복은 반드시 Heal() 로</summary>
+    public float healMul = 1f;
+    /// <summary>유물 상자 드랍 확률 배율 (불씨 수확, 일반 몹만 — 중간보스는 확정)</summary>
+    public float relicChanceMul = 1f;
+
+    /// <summary>체력 회복 (회복량 배율 적용, 최대 체력까지)</summary>
+    public void Heal(float amount)
+    {
+        if (amount <= 0f) return;
+        hp = Mathf.Min(maxHp, hp + amount * healMul);
+    }
 
     [Header("업그레이드 배율")]
     public float moveSpeedMul = 1f;
@@ -664,7 +675,7 @@ public class Player : MonoBehaviour
         if (Input.GetKeyDown(T.movementKey)) FirstOfKind(SkillKind.Movement)?.TryActivate();
         if (Input.GetKeyDown(T.ultimateKey)) FirstOfKind(SkillKind.Ultimate)?.TryActivate();
 
-        if (regen > 0) hp = Mathf.Min(maxHp, hp + regen * dt);
+        if (regen > 0) Heal(regen * dt);
 
         if (invuln > 0)
         {

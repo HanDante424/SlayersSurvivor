@@ -23,7 +23,8 @@ public class Chest : MonoBehaviour
     public static void TryDrop(Vector2 pos, bool guaranteed)
     {
         if (Stage.IsRaid || Stage.IsDebug) return;
-        if (!guaranteed && Random.value >= NormalDropChance) return;
+        float chance = NormalDropChance * (Player.I != null ? Player.I.relicChanceMul : 1f);   // 불씨 수확: 상대 증가
+        if (!guaranteed && Random.value >= chance) return;
         Spawn(pos);
     }
 

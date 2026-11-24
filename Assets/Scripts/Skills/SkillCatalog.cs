@@ -93,11 +93,11 @@ public static class SkillCatalog
             "주변의 화상 상태의 적마다 이로운 효과를 얻습니다.",
             "'스택' 당 '최종 피해량' +5%", "'스택' 당 '쿨타임 감소' +1%")),
 
-        // 새 패시브 3종 — 기반 단계 (2026-11-24 사용자). 강화 미설계라 최대 레벨 1 [임시]
+        // 새 패시브 3종 — 방어 · 피해 대비 · 자원 획득 (2026-11-24 사용자). 고유 기본 강화까지, 특수 강화는 미설계
         E("P04", "잿불 갑주", "Ember Armor", SkillKind.Passive, typeof(EmberArmor), new SkillText(
             new[] { "패시브" },
             "단단한 잿불이 몸을 감싸 더 오래 버틸 수 있습니다.",
-            "'최대 체력' +25%", "'받는 피해량' -20%")),
+            "'최대 체력' +25%", "'받는 피해량' -20%", "'모든 회복량' +10%")),
         E("P05", "불씨 수확", "Ember Harvest", SkillKind.Passive, typeof(EmberHarvest), new SkillText(
             new[] { "패시브" },
             "더 많은 경험치를 더 멀리서 거둡니다.",
@@ -105,7 +105,7 @@ public static class SkillCatalog
         E("P06", "화염 보호막", "Flame Barrier", SkillKind.Passive, typeof(FlameBarrier), new SkillText(
             new[] { "패시브", "보호막" },
             "'화상' 피해를 입힐 때마다 보호막을 얻습니다.\n보호막은 시간이 지나며 줄어듭니다.",
-            "'화상' 피해량의 10%만큼 '보호막' 획득", "'보호막' 매초 5% 감소")),
+            "'화상' 피해의 10%만큼 '보호막' 획득", "한 번에 최대 체력의 5%까지", "'보호막' 최대 체력의 100%까지", "'쿨타임' 0.5초", "'보호막' 매초 5% 소모")),
 
         // 궁극기 1종 (U02 미설계)
         E("U01", "블레이징 스톰", "Blazing Storm", SkillKind.Ultimate, typeof(BlazingStorm), new SkillText(

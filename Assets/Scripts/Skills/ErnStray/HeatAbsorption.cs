@@ -170,7 +170,7 @@ public class HeatAbsorption : Skill
     void OnDamaged(Enemy e, DamageInfo d, int dealt)
     {
         if (!HasSpecial(Leech) || dealt <= 0 || P == null) return;
-        P.hp = Mathf.Min(P.maxHp, P.hp + dealt * Scaled(LeechPct));
+        P.Heal(dealt * Scaled(LeechPct));
     }
 
     // ---------- 진행 ----------

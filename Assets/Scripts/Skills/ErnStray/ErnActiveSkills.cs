@@ -1070,7 +1070,7 @@ public class FireBreaker : ActiveSkill
         {
             e.Stun(stun);
             if (stack) AddStack(e);   // 중첩 붕괴: 이번 피해가 들어간 뒤부터 받는 최종 피해량 증가
-            if (absorb && P != null) P.hp = Mathf.Min(P.maxHp, P.hp + P.maxHp * AbsorbHeal);   // 충격 흡수: 마지막 폭발 적 하나당 최대 체력 5%
+            if (absorb && P != null) P.Heal(P.maxHp * AbsorbHeal);   // 충격 흡수: 마지막 폭발 적 하나당 최대 체력 5%
         });
         if (main) CameraFollow.Shake(0.1f, 0.1f);
     }
